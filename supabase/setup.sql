@@ -293,6 +293,7 @@ grant execute on function public.deck_overview(text, text) to authenticated;
 
 insert into public.trimesters (id, name, sort) values (1, 'Trimester 1', 1) on conflict (id) do nothing;
 insert into public.subjects (slug, trimester_id, name, short_name, sort) values ('fvcs', 1, 'Firm Value and Capital Structure', 'FVCS', 1) on conflict (slug) do update set name = excluded.name, short_name = excluded.short_name;
+insert into public.subjects (slug, trimester_id, name, short_name, sort) values ('fv', 1, 'Firm Valuation', 'FV', 2) on conflict (slug) do update set name = excluded.name, short_name = excluded.short_name;
 
 delete from public.concept_items where subject_slug = 'fvcs';
 insert into public.concept_items (subject_slug, topic, kind, text, correct, distractors) values
@@ -513,6 +514,78 @@ insert into public.concept_items (subject_slug, topic, kind, text, correct, dist
   ('fvcs', '6', 'MC', 'Which of the following is an exit strategy through which venture investors can realize the return on their investment?', array['An acquisition of the company', 'An initial public offering']::text[], array['A new round of convertible preferred stock', 'A down round at a lower valuation', 'An increase in the employee stock option pool']::text[]),
   ('fvcs', '6', 'MC', 'Why do SPAC investors typically not redeem their shares if the SPAC share price is well above €10 near the closing date?', array['Because redemption only returns €10 per share, less than the shares are worth in the market.']::text[], array['Because redemption would cancel their warrants.', 'Because redemptions are only allowed after the merger.', 'Because the sponsor’s promote would be lost.']::text[]);
 
+delete from public.concept_items where subject_slug = 'fv';
+insert into public.concept_items (subject_slug, topic, kind, text, correct, distractors) values
+  ('fv', '1', 'T', 'Under the weak form of the efficient market hypothesis, prices reflect all information contained in past prices and trading volume, so technical analysis cannot earn abnormal returns.', null, null),
+  ('fv', '1', 'T', 'Under the semi-strong form, prices reflect all publicly available information, so fundamental analysis of public data cannot earn persistent abnormal returns.', null, null),
+  ('fv', '1', 'T', 'The strong form of market efficiency is contradicted by the evidence that insiders earn abnormal returns.', null, null),
+  ('fv', '1', 'T', 'Event studies typically find that prices react quickly to new public information, which supports semi-strong efficiency.', null, null),
+  ('fv', '1', 'T', 'Post-earnings-announcement drift is evidence against the semi-strong form of market efficiency.', null, null),
+  ('fv', '1', 'T', 'Momentum is an anomaly that challenges the weak form of market efficiency.', null, null),
+  ('fv', '1', 'T', 'Equity value equals firm value minus net debt.', null, null),
+  ('fv', '1', 'T', 'Firm (enterprise) value is the value of the whole business, financed by both debt and equity.', null, null),
+  ('fv', '1', 'T', 'Firm value can be split into the value of assets in place and the value of growth assets.', null, null),
+  ('fv', '1', 'T', 'Debt is a fixed claim with tax-deductible interest and a fixed maturity; equity is a residual claim with no maturity.', null, null),
+  ('fv', '1', 'T', 'In a DCF valuation the inputs rest on subjective forecasts, so the resulting value is uncertain.', null, null),
+  ('fv', '1', 'T', 'In an event study, the abnormal return is the actual return minus the normal return predicted by a model such as the market model.', null, null),
+  ('fv', '1', 'T', 'The cumulative abnormal return adds up the abnormal returns over the event window.', null, null),
+  ('fv', '1', 'T', 'Higher liquidity is associated with more efficient prices (Chung and Hrazdil, 2010).', null, null),
+  ('fv', '1', 'T', 'Chordia, Roll and Subrahmanyam (2005) find that NYSE prices converge to efficiency within roughly 5 to 60 minutes.', null, null),
+  ('fv', '1', 'T', 'Many anomalies weaken once returns are adjusted for risk, trading frictions or data mining.', null, null),
+  ('fv', '1', 'T', 'Passive strategies such as index funds tend to deliver strong risk-adjusted returns over the long run because active management rarely beats the market after costs.', null, null),
+  ('fv', '1', 'T', 'Stocks with high idiosyncratic volatility have had low subsequent returns (Ang, Hodrick, Xing and Zhang, 2009).', null, null),
+  ('fv', '1', 'F', 'Under the weak form of market efficiency, fundamental analysis of financial statements cannot earn abnormal returns, but technical analysis can.', null, null),
+  ('fv', '1', 'F', 'The strong form of market efficiency holds in practice, because insider trading is never profitable.', null, null),
+  ('fv', '1', 'F', 'Equity value equals firm value plus net debt.', null, null),
+  ('fv', '1', 'F', 'Market capitalisation measures the value of the whole business, debt included.', null, null),
+  ('fv', '1', 'F', 'If markets are semi-strong efficient, prices react to new public information only after several weeks.', null, null),
+  ('fv', '1', 'F', 'Daily stock returns on the NYSE show strong positive autocorrelation, which allows simple trading rules to beat the market.', null, null),
+  ('fv', '1', 'F', 'In an event study, the abnormal return is the stock return minus the risk-free rate.', null, null),
+  ('fv', '1', 'F', 'Debt holders have a residual claim on the firm’s cash flows and strong influence over management.', null, null),
+  ('fv', '1', 'F', 'The existence of anomalies proves that all markets are inefficient.', null, null),
+  ('fv', '1', 'F', 'Moeller, Schlingemann and Stulz (2005) show that acquiring-firm shareholders gained on average from acquisitions in 1998–2001.', null, null),
+  ('fv', '1', 'F', 'Lunar-phase effects in stock returns are fully explained by differences in volatility and trading volume.', null, null),
+  ('fv', '1', 'MC', 'Which form of market efficiency implies that technical analysis cannot earn abnormal returns, but says nothing about fundamental analysis?', array['The weak form']::text[], array['The semi-strong form', 'The strong form', 'None of the forms']::text[]),
+  ('fv', '1', 'MC', 'Which information is NOT assumed to be reflected in prices under the semi-strong form of market efficiency?', array['Private information held by insiders']::text[], array['Past prices and trading volume', 'Published financial statements', 'Announced dividends and mergers']::text[]),
+  ('fv', '1', 'MC', 'What is the difference between firm value and equity value?', array['Firm value is the value of the whole business to all capital providers; equity value is what remains for shareholders after net debt.']::text[], array['Firm value is the book value of assets; equity value is the market capitalisation.', 'There is no difference when the firm has debt.', 'Equity value includes debt; firm value excludes it.']::text[]),
+  ('fv', '1', 'MC', 'What are the main steps of an event study?', array['Define the event window, estimate normal returns with a model, compute abnormal and cumulative abnormal returns, and test them.']::text[], array['Regress the stock return on the risk-free rate and report the R².', 'Compare the share price one year before and after the event without a benchmark.', 'Compute the average market return in the event window.']::text[]),
+  ('fv', '1', 'MC', 'What does post-earnings-announcement drift suggest?', array['Prices under-react to earnings news, contradicting semi-strong efficiency.']::text[], array['Prices over-react and reverse immediately, as weak-form efficiency predicts.', 'Insiders trade on private information, contradicting only the strong form.', 'Markets are fully efficient because the drift is predictable.']::text[]),
+  ('fv', '1', 'MC', 'Why is it hard to beat the market consistently with DCF valuation if markets are efficient?', array['Prices already reflect publicly available information, and DCF inputs are subjective estimates.']::text[], array['DCF models ignore cash flows.', 'DCF values are always equal to book values.', 'Efficient markets do not use discount rates.']::text[]),
+  ('fv', '2', 'T', 'The dividend discount model suits mature firms with a stable dividend policy.', null, null),
+  ('fv', '2', 'T', 'The Gordon growth model requires the growth rate to be below the cost of equity.', null, null),
+  ('fv', '2', 'T', 'Sustainable growth equals the retention ratio multiplied by the return on equity.', null, null),
+  ('fv', '2', 'T', 'Retaining more earnings raises the share price only if the return on equity exceeds the cost of equity.', null, null),
+  ('fv', '2', 'T', 'If ROE equals the cost of equity, changing the payout ratio does not change the share price.', null, null),
+  ('fv', '2', 'T', 'The H-model assumes growth declines linearly from the high rate to the stable rate, with H equal to half the length of the transition period.', null, null),
+  ('fv', '2', 'T', 'FCFF equals EBIT × (1 − t) plus depreciation, minus capital expenditure, minus the increase in net working capital.', null, null),
+  ('fv', '2', 'T', 'FCFE is approximately FCFF minus after-tax interest plus net new borrowing.', null, null),
+  ('fv', '2', 'T', 'FCFF is discounted at the WACC; FCFE is discounted at the cost of equity.', null, null),
+  ('fv', '2', 'T', 'An FCFF valuation suits firms whose leverage is expected to change, because the WACC stays relatively stable while debt is repaid.', null, null),
+  ('fv', '2', 'T', 'An FCFE valuation suits firms with a stable debt-equity ratio.', null, null),
+  ('fv', '2', 'T', 'The long-run growth rate in the terminal value should not exceed the long-run growth rate of the economy, typically 2–4%.', null, null),
+  ('fv', '2', 'T', 'Equity value equals firm value minus the market value of debt plus cash, minus preferred stock and minority interests where present.', null, null),
+  ('fv', '2', 'T', 'Preferred stock paying a fixed dividend can be valued as a perpetuity: dividend divided by the required return.', null, null),
+  ('fv', '2', 'T', 'The future reversal of a deferred tax liability is a cash outflow that reduces firm value.', null, null),
+  ('fv', '2', 'T', 'The terminal value often accounts for more than 70% of a DCF firm value, so its assumptions deserve the most scrutiny.', null, null),
+  ('fv', '2', 'T', 'High earnings volatility reduces the predictability of future earnings (Dichev and Tang, 2009).', null, null),
+  ('fv', '2', 'F', 'The Gordon growth model can value a firm whose dividends grow faster than its cost of equity forever.', null, null),
+  ('fv', '2', 'F', 'Retaining more earnings always increases the share price, because growth rises.', null, null),
+  ('fv', '2', 'F', 'FCFE is discounted at the WACC.', null, null),
+  ('fv', '2', 'F', 'FCFF is computed after interest payments to debt holders.', null, null),
+  ('fv', '2', 'F', 'The dividend discount model is the best choice for firms that do not pay dividends, such as Tesla.', null, null),
+  ('fv', '2', 'F', 'Depreciation is subtracted when moving from NOPAT to free cash flow.', null, null),
+  ('fv', '2', 'F', 'An increase in net working capital increases free cash flow.', null, null),
+  ('fv', '2', 'F', 'Terminal growth rates of 8–10% are appropriate for most mature firms.', null, null),
+  ('fv', '2', 'F', 'Equity value equals firm value plus the market value of debt.', null, null),
+  ('fv', '2', 'F', 'In the two-stage DDM the transition from high to stable growth is gradual.', null, null),
+  ('fv', '2', 'F', 'Deferred tax liabilities can be ignored in a DCF because they never lead to cash payments.', null, null),
+  ('fv', '2', 'MC', 'Which model fits a firm with high leverage that it plans to reduce over the coming years?', array['An FCFF model discounted at the WACC']::text[], array['An FCFE model discounted at the cost of equity', 'The Gordon growth model', 'A dividend discount model with constant payout']::text[]),
+  ('fv', '2', 'MC', 'Which model fits a mature utility with a long record of stable dividends?', array['The dividend discount model']::text[], array['An FCFF model with a 10-year high-growth phase', 'The H-model with growth falling from 20%', 'No DCF model can value it']::text[]),
+  ('fv', '2', 'MC', 'A firm earns an ROE of 8% while its cost of equity is 11%. It increases its retention ratio. What happens to its share price?', array['It falls, because reinvested earnings earn less than shareholders require.']::text[], array['It rises, because growth increases.', 'It stays the same, because value does not depend on payout.', 'It rises, because dividends fall.']::text[]),
+  ('fv', '2', 'MC', 'What is the main weakness of the two-stage dividend discount model?', array['The abrupt drop from high to stable growth.']::text[], array['It cannot handle growth above the cost of equity in the first stage.', 'It ignores the terminal value.', 'It requires the firm to pay no dividends.']::text[]),
+  ('fv', '2', 'MC', 'Why do DCF models use an explicit forecast period of 3–10 years followed by a terminal value?', array['Cash flows stabilise and forecasting further ahead adds little but uncertainty.']::text[], array['Accounting rules forbid forecasts beyond ten years.', 'The terminal value is always small, so it can be approximated.', 'Discount rates are undefined after ten years.']::text[]),
+  ('fv', '2', 'MC', 'How do you get from firm value to the value of common equity?', array['Subtract the market value of debt, add cash, and subtract preferred stock and minority interests.']::text[], array['Add the market value of debt and subtract cash.', 'Multiply firm value by the debt-equity ratio.', 'Subtract the book value of total liabilities, including deferred revenue, and ignore cash.']::text[]);
+
 insert into public.decks (id, subject_slug, owner_id, name, source) values ('6b1c0f1e-6a43-4f0e-9d3c-0f5c2a9e7f01', 'fvcs', null, 'FVCS core concepts', 'official') on conflict (id) do update set name = excluded.name;
 insert into public.cards (deck_id, front, back, sort, ext_key) values
   ('6b1c0f1e-6a43-4f0e-9d3c-0f5c2a9e7f01', 'MM Proposition I (perfect markets)', 'The total value of a firm equals the market value of the cash flows generated by its assets; it does not depend on the capital structure. V<sub>L</sub> = V<sub>U</sub>.', 0, 'l1-mm1'),
@@ -567,4 +640,36 @@ insert into public.cards (deck_id, front, back, sort, ext_key) values
   ('6b1c0f1e-6a43-4f0e-9d3c-0f5c2a9e7f01', 'PIPE', 'Private investment in public equity: shares sold privately to institutions to fund the merger.', 49, 'l6-pipe'),
   ('6b1c0f1e-6a43-4f0e-9d3c-0f5c2a9e7f01', 'Cashless warrant exercise: new shares', 'Warrants × (P − K) / P.', 50, 'l6-cashless'),
   ('6b1c0f1e-6a43-4f0e-9d3c-0f5c2a9e7f01', 'Effective IPO price in a SPAC merger', 'Gross cash raised / shares issued to non-target shareholders (public, sponsor, PIPE, warrant shares).', 51, 'l6-effprice')
+on conflict (deck_id, ext_key) do update set front = excluded.front, back = excluded.back, sort = excluded.sort;
+
+insert into public.decks (id, subject_slug, owner_id, name, source) values ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'fv', null, 'FV lectures 1–2', 'official') on conflict (id) do update set name = excluded.name;
+insert into public.cards (deck_id, front, back, sort, ext_key) values
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Weak-form efficiency', 'Prices reflect all past prices and volume. Technical analysis earns no abnormal returns. Challenged by momentum.', 0, 'l1-weak'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Semi-strong-form efficiency', 'Prices reflect all public information. Fundamental analysis earns no persistent abnormal returns. Event studies show fast reactions; post-earnings drift contradicts it.', 1, 'l1-semi'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Strong-form efficiency', 'Prices reflect public and private information, so even insiders cannot beat the market. Rejected: insiders earn abnormal returns.', 2, 'l1-strong'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Three empirical tests of market efficiency', 'Autocorrelation tests, event studies, cross-sectional tests (do size or book-to-market predict returns?).', 3, 'l1-tests'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Firm (enterprise) value', 'Value of the whole business to debt and equity holders: what a buyer pays for the entire firm.', 4, 'l1-ev'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Equity value', 'Residual claim of shareholders = firm value − net debt (− preferred, − minorities). Equals market capitalisation in market terms.', 5, 'l1-eqv'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Two parts of firm value', 'Assets in place (existing investments with current cash flows) + growth assets (value of future investments).', 6, 'l1-assets'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Fundamental DCF equation', 'V<sub>0</sub> = Σ E[CF<sub>n</sub>] / (1 + r)<sup>n</sup>', 7, 'l1-dcf'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Abnormal return (market model)', 'AR<sub>t</sub> = R<sub>t</sub> − (α + β R<sub>m,t</sub>). CAR = sum of ARs over the event window.', 8, 'l1-ar'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Chordia, Roll & Subrahmanyam (2005)', 'NYSE daily returns are not autocorrelated, order imbalances persist; arbitrage restores efficiency within 5–60 minutes.', 9, 'l1-crs'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Moeller, Schlingemann & Stulz (2005)', 'Acquirers lost 12 cents per dollar spent in 1998–2001 ($240bn), driven by a few large deals by highly valued acquirers.', 10, 'l1-msz'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Ang, Hodrick, Xing & Zhang (2009)', 'High idiosyncratic volatility → low future returns; 1.31% per month spread across 23 markets.', 11, 'l1-ahxz'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Yuan, Zheng & Zhu (2006)', 'Returns around full moons are 3–5% p.a. lower than around new moons in 48 countries; not explained by volatility or volume.', 12, 'l1-lunar'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'DDM vs. FCFF vs. FCFE: when to use which', 'DDM: mature firms, stable dividends. FCFF at WACC: whole firm, changing leverage, capital-intensive or growth phases. FCFE at k<sub>e</sub>: stable leverage, focus on equity.', 13, 'l2-which'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Gordon growth model', 'V<sub>0</sub> = D<sub>1</sub> / (k<sub>e</sub> − g), with g &lt; k<sub>e</sub> and g ≤ long-run growth of the economy.', 14, 'l2-gordon'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Sustainable growth', 'g = b × ROE = (1 − payout) × ROE', 15, 'l2-sustain'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Implied cost of equity', 'k<sub>e</sub> = D<sub>1</sub> / P<sub>0</sub> + g', 16, 'l2-implied'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'When does retaining more earnings raise value?', 'Only if ROE > k<sub>e</sub>. At ROE = k<sub>e</sub> nothing changes; below it, investors prefer dividends now.', 17, 'l2-retain'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Two-stage DDM', 'PV of dividends growing at g<sub>s</sub> for n years + D<sub>n</sub>(1 + g<sub>l</sub>) / [(k<sub>e</sub> − g<sub>l</sub>)(1 + k<sub>e</sub>)<sup>n</sup>]. Weakness: abrupt drop in growth.', 18, 'l2-twostage'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'H-model', 'V<sub>0</sub> = [D<sub>0</sub>(1 + g<sub>L</sub>) + D<sub>0</sub> H (g<sub>S</sub> − g<sub>L</sub>)] / (k<sub>e</sub> − g<sub>L</sub>); H = half the transition period, growth falls linearly.', 19, 'l2-h'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'FCFF', 'EBIT(1 − t) + D&amp;A − CapEx − ΔNWC', 20, 'l2-fcff'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'FCFE', 'FCFF − interest × (1 − t) + net new borrowing', 21, 'l2-fcfe'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Terminal value rules', 'TV<sub>T</sub> = CF<sub>T+1</sub> / (r − g); g typically 2–4% and below r; WACC stable in the long run. Check the TV share (often above 70%).', 22, 'l2-tv'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Bridge from firm value to equity value', 'Equity = firm value − market value of debt + cash − preferred stock − minority interests.', 23, 'l2-bridge'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Value of preferred stock', 'Preferred dividend / required return on preferred (a perpetuity).', 24, 'l2-pref'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Deferred tax liability in a DCF', 'Its reversal is a future cash outflow: forecast the payments and subtract their PV from firm value.', 25, 'l2-dtl'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Why 3–10 explicit years plus a terminal value?', 'Cash flows stabilise, uncertainty grows and the value becomes very sensitive to distant forecasts.', 26, 'l2-horizon'),
+  ('3d9a7c52-1f0b-4e6a-8c21-5b7e9d0a4f02', 'Dichev & Tang (2009)', 'Volatile earnings are harder to forecast; analysts do not fully adjust, so pull volatile earnings towards the mean in projections.', 27, 'l2-dt')
 on conflict (deck_id, ext_key) do update set front = excluded.front, back = excluded.back, sort = excluded.sort;

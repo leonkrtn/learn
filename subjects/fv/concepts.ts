@@ -1,0 +1,97 @@
+// Concept statements and short-answer questions for Firm Valuation, one entry per lecture.
+// Source for the Supabase seed (npm run seed:sql); the app reads the bank from the database.
+// Lectures 3–8 are added once their slides are available.
+import type { ConceptBank } from '@/lib/engine/types';
+
+export const LECTURES: Record<string, string> = {
+  '1': 'Market Efficiency, Price and Value',
+  '2': 'DCF Models: DDM, FCFF and FCFE',
+};
+
+export const BANK: ConceptBank = {
+  '1': {
+    T: [
+      'Under the weak form of the efficient market hypothesis, prices reflect all information contained in past prices and trading volume, so technical analysis cannot earn abnormal returns.',
+      'Under the semi-strong form, prices reflect all publicly available information, so fundamental analysis of public data cannot earn persistent abnormal returns.',
+      'The strong form of market efficiency is contradicted by the evidence that insiders earn abnormal returns.',
+      'Event studies typically find that prices react quickly to new public information, which supports semi-strong efficiency.',
+      'Post-earnings-announcement drift is evidence against the semi-strong form of market efficiency.',
+      'Momentum is an anomaly that challenges the weak form of market efficiency.',
+      'Equity value equals firm value minus net debt.',
+      'Firm (enterprise) value is the value of the whole business, financed by both debt and equity.',
+      'Firm value can be split into the value of assets in place and the value of growth assets.',
+      'Debt is a fixed claim with tax-deductible interest and a fixed maturity; equity is a residual claim with no maturity.',
+      'In a DCF valuation the inputs rest on subjective forecasts, so the resulting value is uncertain.',
+      'In an event study, the abnormal return is the actual return minus the normal return predicted by a model such as the market model.',
+      'The cumulative abnormal return adds up the abnormal returns over the event window.',
+      'Higher liquidity is associated with more efficient prices (Chung and Hrazdil, 2010).',
+      'Chordia, Roll and Subrahmanyam (2005) find that NYSE prices converge to efficiency within roughly 5 to 60 minutes.',
+      'Many anomalies weaken once returns are adjusted for risk, trading frictions or data mining.',
+      'Passive strategies such as index funds tend to deliver strong risk-adjusted returns over the long run because active management rarely beats the market after costs.',
+      'Stocks with high idiosyncratic volatility have had low subsequent returns (Ang, Hodrick, Xing and Zhang, 2009).',
+    ],
+    F: [
+      'Under the weak form of market efficiency, fundamental analysis of financial statements cannot earn abnormal returns, but technical analysis can.',
+      'The strong form of market efficiency holds in practice, because insider trading is never profitable.',
+      'Equity value equals firm value plus net debt.',
+      'Market capitalisation measures the value of the whole business, debt included.',
+      'If markets are semi-strong efficient, prices react to new public information only after several weeks.',
+      'Daily stock returns on the NYSE show strong positive autocorrelation, which allows simple trading rules to beat the market.',
+      'In an event study, the abnormal return is the stock return minus the risk-free rate.',
+      'Debt holders have a residual claim on the firm’s cash flows and strong influence over management.',
+      'The existence of anomalies proves that all markets are inefficient.',
+      'Moeller, Schlingemann and Stulz (2005) show that acquiring-firm shareholders gained on average from acquisitions in 1998–2001.',
+      'Lunar-phase effects in stock returns are fully explained by differences in volatility and trading volume.',
+    ],
+    MC: [
+      { q: 'Which form of market efficiency implies that technical analysis cannot earn abnormal returns, but says nothing about fundamental analysis?', correct: ['The weak form'], distractors: ['The semi-strong form', 'The strong form', 'None of the forms'] },
+      { q: 'Which information is NOT assumed to be reflected in prices under the semi-strong form of market efficiency?', correct: ['Private information held by insiders'], distractors: ['Past prices and trading volume', 'Published financial statements', 'Announced dividends and mergers'] },
+      { q: 'What is the difference between firm value and equity value?', correct: ['Firm value is the value of the whole business to all capital providers; equity value is what remains for shareholders after net debt.'], distractors: ['Firm value is the book value of assets; equity value is the market capitalisation.', 'There is no difference when the firm has debt.', 'Equity value includes debt; firm value excludes it.'] },
+      { q: 'What are the main steps of an event study?', correct: ['Define the event window, estimate normal returns with a model, compute abnormal and cumulative abnormal returns, and test them.'], distractors: ['Regress the stock return on the risk-free rate and report the R².', 'Compare the share price one year before and after the event without a benchmark.', 'Compute the average market return in the event window.'] },
+      { q: 'What does post-earnings-announcement drift suggest?', correct: ['Prices under-react to earnings news, contradicting semi-strong efficiency.'], distractors: ['Prices over-react and reverse immediately, as weak-form efficiency predicts.', 'Insiders trade on private information, contradicting only the strong form.', 'Markets are fully efficient because the drift is predictable.'] },
+      { q: 'Why is it hard to beat the market consistently with DCF valuation if markets are efficient?', correct: ['Prices already reflect publicly available information, and DCF inputs are subjective estimates.'], distractors: ['DCF models ignore cash flows.', 'DCF values are always equal to book values.', 'Efficient markets do not use discount rates.'] },
+    ],
+  },
+  '2': {
+    T: [
+      'The dividend discount model suits mature firms with a stable dividend policy.',
+      'The Gordon growth model requires the growth rate to be below the cost of equity.',
+      'Sustainable growth equals the retention ratio multiplied by the return on equity.',
+      'Retaining more earnings raises the share price only if the return on equity exceeds the cost of equity.',
+      'If ROE equals the cost of equity, changing the payout ratio does not change the share price.',
+      'The H-model assumes growth declines linearly from the high rate to the stable rate, with H equal to half the length of the transition period.',
+      'FCFF equals EBIT × (1 − t) plus depreciation, minus capital expenditure, minus the increase in net working capital.',
+      'FCFE is approximately FCFF minus after-tax interest plus net new borrowing.',
+      'FCFF is discounted at the WACC; FCFE is discounted at the cost of equity.',
+      'An FCFF valuation suits firms whose leverage is expected to change, because the WACC stays relatively stable while debt is repaid.',
+      'An FCFE valuation suits firms with a stable debt-equity ratio.',
+      'The long-run growth rate in the terminal value should not exceed the long-run growth rate of the economy, typically 2–4%.',
+      'Equity value equals firm value minus the market value of debt plus cash, minus preferred stock and minority interests where present.',
+      'Preferred stock paying a fixed dividend can be valued as a perpetuity: dividend divided by the required return.',
+      'The future reversal of a deferred tax liability is a cash outflow that reduces firm value.',
+      'The terminal value often accounts for more than 70% of a DCF firm value, so its assumptions deserve the most scrutiny.',
+      'High earnings volatility reduces the predictability of future earnings (Dichev and Tang, 2009).',
+    ],
+    F: [
+      'The Gordon growth model can value a firm whose dividends grow faster than its cost of equity forever.',
+      'Retaining more earnings always increases the share price, because growth rises.',
+      'FCFE is discounted at the WACC.',
+      'FCFF is computed after interest payments to debt holders.',
+      'The dividend discount model is the best choice for firms that do not pay dividends, such as Tesla.',
+      'Depreciation is subtracted when moving from NOPAT to free cash flow.',
+      'An increase in net working capital increases free cash flow.',
+      'Terminal growth rates of 8–10% are appropriate for most mature firms.',
+      'Equity value equals firm value plus the market value of debt.',
+      'In the two-stage DDM the transition from high to stable growth is gradual.',
+      'Deferred tax liabilities can be ignored in a DCF because they never lead to cash payments.',
+    ],
+    MC: [
+      { q: 'Which model fits a firm with high leverage that it plans to reduce over the coming years?', correct: ['An FCFF model discounted at the WACC'], distractors: ['An FCFE model discounted at the cost of equity', 'The Gordon growth model', 'A dividend discount model with constant payout'] },
+      { q: 'Which model fits a mature utility with a long record of stable dividends?', correct: ['The dividend discount model'], distractors: ['An FCFF model with a 10-year high-growth phase', 'The H-model with growth falling from 20%', 'No DCF model can value it'] },
+      { q: 'A firm earns an ROE of 8% while its cost of equity is 11%. It increases its retention ratio. What happens to its share price?', correct: ['It falls, because reinvested earnings earn less than shareholders require.'], distractors: ['It rises, because growth increases.', 'It stays the same, because value does not depend on payout.', 'It rises, because dividends fall.'] },
+      { q: 'What is the main weakness of the two-stage dividend discount model?', correct: ['The abrupt drop from high to stable growth.'], distractors: ['It cannot handle growth above the cost of equity in the first stage.', 'It ignores the terminal value.', 'It requires the firm to pay no dividends.'] },
+      { q: 'Why do DCF models use an explicit forecast period of 3–10 years followed by a terminal value?', correct: ['Cash flows stabilise and forecasting further ahead adds little but uncertainty.'], distractors: ['Accounting rules forbid forecasts beyond ten years.', 'The terminal value is always small, so it can be approximated.', 'Discount rates are undefined after ten years.'] },
+      { q: 'How do you get from firm value to the value of common equity?', correct: ['Subtract the market value of debt, add cash, and subtract preferred stock and minority interests.'], distractors: ['Add the market value of debt and subtract cash.', 'Multiply firm value by the debt-equity ratio.', 'Subtract the book value of total liabilities, including deferred revenue, and ignore cash.'] },
+    ],
+  },
+};

@@ -31,8 +31,9 @@ async function as<T>(db: PGlite, uid: string, fn: () => Promise<T>): Promise<T> 
 test('setup.sql applies twice and seeds content', async () => {
   const db = await boot();
   await db.exec(readFileSync('supabase/setup.sql', 'utf8'));
-  const n = await db.query<{ n: number }>("select count(*)::int as n from public.concept_items where subject_slug = 'fvcs'");
-  assert.equal(n.rows[0].n, 216);
+  const n = await db.query<{ s: string; n: number }>("select subject_slug as s, count(*)::int as n from public.concept_items group by 1 order by 1");
+  assert.deepEqual(n.rows.map(r => r.s), ['fv', 'fvcs']);
+  assert.equal(n.rows.find(r => r.s === 'fvcs')!.n, 216);
   const c = await db.query<{ n: number }>('select count(*)::int as n from public.cards');
   assert.ok(c.rows[0].n >= 50);
 });
@@ -70,7 +71,7 @@ test('decks: official visible to all, own decks private, overview counts', async
   });
   await assert.rejects(as(db, U2, () => db.query(`insert into public.cards (deck_id, front, back) values ('${deck}', 'x', 'y')`)));
   const seen2 = await as(db, U2, () => db.query<{ name: string }>('select name from public.decks'));
-  assert.deepEqual(seen2.rows.map(r => r.name), ['FVCS core concepts']);
+  assert.deepEqual(seen2.rows.map(r => r.name).sort(), ['FV lectures 1–2', 'FVCS core concepts']);
   const ov = await as(db, U1, async () => {
     const card = await db.query<{ id: string }>(`select id from public.cards where deck_id = '${deck}' limit 1`);
     await db.query(`insert into public.card_states (user_id, card_id, due, fsrs) values ('${U1}', '${card.rows[0].id}', now() - interval '1 hour', '{}')`);

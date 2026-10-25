@@ -2,7 +2,10 @@
 
 Exam practice for university courses: generated calculation questions (new firm and new numbers every time), concept questions, a timed mock exam, flashcards on an FSRS schedule with Anki import, and theory pages with interactive models. Next.js on Vercel, Supabase for accounts and progress.
 
-The first subject is **Firm Value and Capital Structure (FVCS)**: 26 calculation types and one concept type per lecture across 6 lectures, a 20-point / 120-minute mock exam, 216 concept items and 52 official flashcards.
+Subjects:
+
+- **Firm Value and Capital Structure (FVCS)**: 26 calculation types and one concept type per lecture across 6 lectures, a 20-point / 120-minute mock exam, 216 concept items and 52 official flashcards.
+- **Firm Valuation (FV)**: lectures 1–2 so far (market efficiency, event studies, DDM, H-model, FCFF/FCFE, terminal value, deferred taxes), 11 calculation types, 69 concept items, 28 flashcards. Lectures 3–8 and a mock exam follow once the slides and exam format are available.
 
 ## Setup
 

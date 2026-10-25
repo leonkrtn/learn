@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gradeQuestion, isOk, parseNum } from '../lib/engine/grade';
 import { CycleBag, pickAdaptive } from '../lib/engine/select';
+import { SUBJECTS } from '../subjects';
 import fvcs from '../subjects/fvcs';
 import { BANK } from '../subjects/fvcs/concepts';
+import { BANK as FV_BANK } from '../subjects/fv/concepts';
+
+const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK };
 
 test('parseNum accepts comma and point formats', () => {
   const cases: [string, number][] = [
@@ -26,9 +30,11 @@ test('isOk: 2% band with absolute floors, percent as fraction', () => {
   assert.ok(!isOk(5, 'm', NaN));
 });
 
-test('every generator runs 400 times with finite answers', () => {
-  const ctx = { bank: BANK };
-  for (const t of fvcs.types) {
+test('every generator of every subject runs 400 times with finite answers', () => {
+  for (const mod of Object.values(SUBJECTS)) {
+  const fvcs = mod;
+  const ctx = { bank: BANKS[mod.slug] };
+  for (const t of mod.types) {
     for (let i = 0; i < 400; i++) {
       const q = t.gen(ctx);
       assert.equal(fvcs.typeKeyOf(q.fam), t.key, t.key + ' produced ' + q.fam);
@@ -40,12 +46,13 @@ test('every generator runs 400 times with finite answers', () => {
       assert.ok(!/NaN|undefined|Infinity/.test(q.html + q.parts.map(p => 'prompt' in p ? p.prompt : '').join('')), t.key + ' text: ' + q.html.slice(0, 200));
     }
   }
+  }
 });
 
 test('grading the generated solutions scores full marks', () => {
-  const ctx = { bank: BANK };
-  for (const t of fvcs.types) {
-    const q = t.gen(ctx);
+  for (const mod of Object.values(SUBJECTS)) for (const t of mod.types) {
+    const fvcs = mod;
+    const q = t.gen({ bank: BANKS[mod.slug] });
     const answers = Object.fromEntries(q.parts.map((p, i) => [i, p.type === 'num' ? String(p.ans).replace('.', ',') : p.correct]));
     const g = gradeQuestion(q, answers, fvcs.tolerance);
     assert.equal(g.c, g.a, t.key);
@@ -62,8 +69,8 @@ test('mock exam has the real structure and 20 points', () => {
 });
 
 test('cycle mode: each round contains every type once, no repeat at the boundary', () => {
-  for (const topic of fvcs.topics) {
-    const keys = fvcs.types.filter(t => t.topic === topic.id).map(t => t.key);
+  for (const mod of Object.values(SUBJECTS)) for (const topic of mod.topics) {
+    const keys = mod.types.filter(t => t.topic === topic.id).map(t => t.key);
     const bag = new CycleBag(keys);
     let prev = '';
     for (let r = 0; r < 30; r++) {
