@@ -54,12 +54,21 @@ export function fmtAns(a: number): string {
   return (a < 0 ? '−' : '') + s;
 }
 
-export const UNIT: Record<Unit, [label: string, prefix: boolean]> = {
-  m: ['€ million', false], eur: ['€', true], pct: ['%', false], msh: ['million shares', false],
-  msh_w: ['million warrants', false], x: ['', false], k: ['€ thousand', false], bn: ['€ billion', false],
+/** Short unit label shown left of the input box. */
+export const UNIT: Record<Unit, string> = {
+  m: '€m', eur: '€', pct: '%', msh: 'm sh.', msh_w: 'm warr.', x: '×', k: '€k', bn: '€bn',
 };
 
 export function fmtSolution(p: NumPart): string {
-  const [label, prefix] = UNIT[p.unit];
-  return prefix ? label + fmtAns(p.ans) : fmtAns(p.ans) + (label ? ' ' + label : '');
+  const a = fmtAns(p.ans);
+  switch (p.unit) {
+    case 'm': return '€' + a + 'm';
+    case 'eur': return '€' + a;
+    case 'k': return '€' + a + 'k';
+    case 'bn': return '€' + a + 'bn';
+    case 'pct': return a + '%';
+    case 'msh': return a + 'm shares';
+    case 'msh_w': return a + 'm warrants';
+    default: return a;
+  }
 }

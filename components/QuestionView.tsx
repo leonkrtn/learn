@@ -71,11 +71,10 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
                 <div className="ansbox">
                   {p.type === 'num' ? (
                     <div className="numbox">
-                      <span className="unit pre">{UNIT[p.unit][1] ? UNIT[p.unit][0] : ''}</span>
+                      <span className="unit">{UNIT[p.unit]}</span>
                       <input className={'numin' + (r ? (r.ok ? ' ok' : ' bad') : '')} type="text" inputMode="decimal" autoComplete="off"
                         autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" aria-label={'Answer ' + LET[i]}
                         readOnly={locked} value={(answers[i] as string) ?? ''} onChange={e => set(i, e.target.value)} onKeyDown={onKey} />
-                      <span className="unit">{UNIT[p.unit][1] ? '' : UNIT[p.unit][0]}</span>
                     </div>
                   ) : p.type === 'choice' ? (
                     <div className={'seg' + (p.options.some(o => o.length > 14) ? ' stack' : '')}>

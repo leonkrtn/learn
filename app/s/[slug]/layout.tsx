@@ -18,7 +18,7 @@ export default async function SubjectLayout({ children, params }: { children: Re
   const cardsDue = decks.reduce((s, d) => s + studyable(d, newPerDay), 0);
   return (
     <>
-      <TopBar email={user.email || ''} crumbs={[{ href: '/', label: data.trimesterName || 'Subjects' }, { label: mod.name }]} />
+      <TopBar email={user.email || ''} crumbs={[{ label: data.trimesterName || 'Subjects' }, { label: mod.name }]} />
       <SubjectProvider slug={slug} bank={data.bank} initialSettings={data.settings} initialStats={data.stats} initialDue={data.due}>
         <div className="shell">
           <Sidebar cardsDue={cardsDue} />
