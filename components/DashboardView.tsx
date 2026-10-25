@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getSubject } from '@/subjects';
 
-export type DashSubject = { slug: string; name: string; short: string; trimester: number; answers: number; correct: number; due: number; cards: number };
+export type DashSubject = { slug: string; name: string; short: string; trimester: number; answers: number; correct: number };
 export type DashData = {
   name: string;
   error?: string;
@@ -12,12 +12,11 @@ export type DashData = {
 };
 
 export default function DashboardView({ d }: { d: DashData }) {
-  const todo = d.subjects.filter(s => getSubject(s.slug) && (s.due || s.cards));
   return (
     <div className="dash">
       <div>
         <h1>Subjects</h1>
-        <p className="greet">Signed in as {d.name}. Pick a subject to practise, or start with what is due on the right.</p>
+        <p className="greet">Signed in as {d.name}. Pick a subject to practise.</p>
         {d.error && <p className="err">The database is not set up yet ({d.error}). Run supabase/setup.sql in the Supabase SQL editor.</p>}
         {d.trimesters.map(t => {
           const list = d.subjects.filter(s => s.trimester === t.id);
@@ -31,12 +30,11 @@ export default function DashboardView({ d }: { d: DashData }) {
                   <span className="name">{s.name}</span>
                   <span className="k"><b>{s.answers ? Math.round(100 * s.correct / s.answers) + '%' : '—'}</b>correct</span>
                   <span className="k"><b>{s.answers}</b>answers</span>
-                  <span className="k"><b>{s.due + s.cards}</b>due today</span>
                 </Link>
               ) : (
                 <div className="subjrow off" key={s.slug}>
                   <span className="short">{s.short}</span><span className="name">{s.name}</span>
-                  <span className="k">In preparation</span><span /><span />
+                  <span className="k">In preparation</span><span />
                 </div>
               ))}
             </section>
@@ -44,20 +42,12 @@ export default function DashboardView({ d }: { d: DashData }) {
         })}
       </div>
       <div className="side">
-        <h3>Due today</h3>
-        {todo.length ? (
-          <ul>{todo.flatMap(s => [
-            ...(s.due ? [<li key={s.slug + 'r'}><Link href={`/s/${s.slug}/review`}>{s.short}: question types to review</Link><span className="v">{s.due}</span></li>] : []),
-            ...(s.cards ? [<li key={s.slug + 'c'}><Link href={`/s/${s.slug}/cards`}>{s.short}: flashcards</Link><span className="v">{s.cards}</span></li>] : []),
-          ])}</ul>
-        ) : <div className="empty">Nothing due. New cards and reviews appear here.</div>}
-
-        <h3>Weakest question types</h3>
+        <h3>Worth another look</h3>
         {d.weak.length ? (
           <ul>{d.weak.map(w => {
             const mod = getSubject(w.slug)!;
             const t = mod.types.find(x => x.key === w.type);
-            return <li key={w.slug + w.type}><Link href={`/s/${w.slug}/cycle?topic=${t?.topic || ''}`}>{mod.short}: {t?.name || w.type}</Link><span className="v weak">{Math.round(100 * w.rate)}%</span></li>;
+            return <li key={w.slug + w.type}><Link href={`/s/${w.slug}/cycle?topic=${t?.topic || ''}`}>{mod.short}: {t?.name || w.type}</Link><span className="v">{Math.round(100 * w.rate)}%</span></li>;
           })}</ul>
         ) : <div className="empty">Shown after three answers per type.</div>}
 

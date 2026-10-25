@@ -133,7 +133,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
       <div className="page">
         <div className="endbox">
           {mode.kind === 'review'
-            ? <><h2>Nothing due</h2><p>No question type is due for review. Types you get wrong come back here one day later, then after 3, 7, 16 and 35 days.</p>{tally.a > 0 && <p className="note">This round: {tally.c} of {tally.a} answers correct.</p>}</>
+            ? <><h2>Nothing to review</h2><p>Question types you get wrong show up here again a day later, then after 3, 7, 16 and 35 days, always with new numbers. Come by whenever it suits you.</p>{tally.a > 0 && <p className="note">This round: {tally.c} of {tally.a} answers correct.</p>}</>
             : <><h2>No question types selected</h2><p>Turn on at least one type in <Link href={`/s/${mod.slug}/settings`}>Settings</Link>.</p></>}
         </div>
       </div>

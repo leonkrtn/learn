@@ -271,7 +271,7 @@ h2.sec small { font-weight: 400; color: var(--muted); font-family: var(--sans); 
 .dash .greet { font-family: var(--sans); color: var(--muted); font-size: 15px; margin: 0 0 30px; }
 .tri { margin-bottom: 38px; }
 .tri h2 { font-family: var(--sans); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 500; margin: 0 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--rule-strong); }
-.subjrow { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 7rem 7rem 7rem; column-gap: 16px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--rule); text-decoration: none; }
+.subjrow { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 7rem 7rem; column-gap: 16px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--rule); text-decoration: none; }
 a.subjrow:hover { background: var(--chrome); }
 .subjrow .short { font-variant: small-caps; letter-spacing: 0.06em; font-size: 20px; padding-left: 4px; }
 .subjrow .name { font-size: 18px; }
@@ -289,7 +289,7 @@ a.subjrow:hover { background: var(--chrome); }
 
 /* ---------- flashcards ---------- */
 .decks { border-top: 1px solid var(--rule-strong); margin-top: 20px; font-family: var(--sans); }
-.deckrow { display: grid; grid-template-columns: minmax(0, 1fr) 6rem 6rem 6rem 10rem; column-gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--rule); font-size: 15.5px; }
+.deckrow { display: grid; grid-template-columns: minmax(0, 1fr) 6rem 6rem 12rem; column-gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--rule); font-size: 15.5px; }
 .deckrow .name { font-family: var(--serif); font-size: 18px; }
 .deckrow .name small { display: block; font-family: var(--sans); font-size: 13px; color: var(--muted); }
 .deckrow .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }

@@ -94,15 +94,13 @@ export default function Study({ deckName, cards, newLimit }: { deckName: string;
     return () => document.removeEventListener('keydown', onKey);
   }, [shown, rate]);
 
-  const newLeft = queue.filter(q => q.isNew).length;
-  const reviewLeft = queue.length - newLeft;
 
   return (
     <div className="page">
       <div className="pagehead"><h1>{deckName}</h1><span className="aside"><Link href={`/s/${mod.slug}/cards`} onClick={() => router.refresh()}>All decks</Link></span></div>
       <div className="studymeta">
         <span>{done} reviewed</span>
-        <span>{reviewLeft} due · {newLeft} new left</span>
+        <span>{queue.length} in this session</span>
       </div>
       {cur ? (
         <div className="card">
@@ -126,7 +124,7 @@ export default function Study({ deckName, cards, newLimit }: { deckName: string;
       ) : (
         <div className="endbox">
           <h2>Done for now</h2>
-          <p>{done ? `You reviewed ${done} cards.` : 'Nothing due in this deck.'} The next cards come back when the scheduler says they are due.</p>
+          <p>{done ? `You reviewed ${done} cards.` : 'Nothing to study in this deck right now.'} Cards come back on their own when it is a good time to repeat them.</p>
           <Link className="btn" href={`/s/${mod.slug}/cards`} onClick={() => router.refresh()}>Back to decks</Link>
         </div>
       )}
