@@ -6,8 +6,10 @@ import { SUBJECTS } from '../subjects';
 import fvcs from '../subjects/fvcs';
 import { BANK } from '../subjects/fvcs/concepts';
 import { BANK as FV_BANK } from '../subjects/fv/concepts';
+import { BANK as FI_BANK } from '../subjects/fi/concepts';
+import fi from '../subjects/fi';
 
-const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK };
+const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK };
 
 test('parseNum accepts comma and point formats', () => {
   const cases: [string, number][] = [
@@ -65,6 +67,14 @@ test('mock exam has the real structure and 20 points', () => {
     assert.deepEqual(ex.parts.map(p => p.qs.length), [2, 3, 8, 3]);
     const pts = ex.parts.reduce((s, p) => s + p.qs.reduce((a, q) => a + (q.pts || 0), 0), 0);
     assert.ok(Math.abs(pts - 20) < 1e-9);
+  }
+});
+
+test('FI mock exam follows the sample exam: 26 questions, 100 marks', () => {
+  for (let i = 0; i < 50; i++) {
+    const ex = fi.mock!.build({ bank: FI_BANK });
+    assert.deepEqual(ex.parts.map(p => p.qs.length), [19, 3, 3, 2]);
+    assert.deepEqual(ex.parts.map(p => p.qs.reduce((a, q) => a + (q.pts || 0), 0)), [38, 27, 21, 14]);
   }
 });
 

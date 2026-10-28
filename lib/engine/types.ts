@@ -1,4 +1,4 @@
-export type Unit = 'm' | 'eur' | 'pct' | 'msh' | 'msh_w' | 'x' | 'k' | 'bn';
+export type Unit = 'm' | 'eur' | 'pct' | 'msh' | 'msh_w' | 'x' | 'k' | 'bn' | 'n' | 'usd' | 'musd';
 
 export type NumPart = { type: 'num'; prompt: string; ans: number; unit: Unit; alts?: number[]; abs?: number };
 export type ChoicePart = { type: 'choice'; prompt: string; options: string[]; correct: number };

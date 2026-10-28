@@ -56,7 +56,7 @@ export function fmtAns(a: number): string {
 
 /** Short unit label shown left of the input box. */
 export const UNIT: Record<Unit, string> = {
-  m: '€m', eur: '€', pct: '%', msh: 'm sh.', msh_w: 'm warr.', x: '×', k: '€k', bn: '€bn',
+  m: '€m', eur: '€', pct: '%', msh: 'm sh.', msh_w: 'm warr.', x: '×', k: '€k', bn: '€bn', n: '', usd: '$', musd: '$m',
 };
 
 export function fmtSolution(p: NumPart): string {
@@ -66,6 +66,8 @@ export function fmtSolution(p: NumPart): string {
     case 'eur': return '€' + a;
     case 'k': return '€' + a + 'k';
     case 'bn': return '€' + a + 'bn';
+    case 'usd': return '$' + a;
+    case 'musd': return '$' + a + 'm';
     case 'pct': return a + '%';
     case 'msh': return a + 'm shares';
     case 'msh_w': return a + 'm warrants';
