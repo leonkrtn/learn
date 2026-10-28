@@ -55,9 +55,9 @@ test('grading the generated solutions scores full marks', () => {
   for (const mod of Object.values(SUBJECTS)) for (const t of mod.types) {
     const fvcs = mod;
     const q = t.gen({ bank: BANKS[mod.slug] });
-    const answers = Object.fromEntries(q.parts.map((p, i) => [i, p.type === 'num' ? String(p.ans).replace('.', ',') : p.correct]));
+    const answers = Object.fromEntries(q.parts.map((p, i) => [i, p.type === 'num' ? p.ans.toFixed(8).replace('.', ',') : p.correct]));
     const g = gradeQuestion(q, answers, fvcs.tolerance);
-    assert.equal(g.c, g.a, t.key);
+    assert.equal(g.c, g.a, t.key + ' ' + JSON.stringify(q.parts.map(p => p.type === 'num' ? p.ans : p.correct)));
   }
 });
 
