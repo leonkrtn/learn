@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabaseBrowser } from '@/lib/supabase/client';
 import { useSubject, type Settings } from './SubjectContext';
 
 export default function SettingsForm() {
@@ -29,6 +30,7 @@ export default function SettingsForm() {
     <div className="page">
       <div className="pagehead"><h1>Settings</h1><span className="aside">Saved to your account</span></div>
       <div style={{ height: 22 }} />
+      <ProfileName />
       <fieldset>
         <legend>Practice mode</legend>
         <label className="opt"><input type="radio" name="mode" checked={s.mode === 'endless'} onChange={() => setS({ ...s, mode: 'endless' })} /> Endless: one question after another</label>
@@ -87,5 +89,36 @@ export default function SettingsForm() {
         {on.size === 0 && <span className="err">With nothing selected, all types are used.</span>}
       </div>
     </div>
+  );
+}
+
+/** Display name shown on public slide notes and shared cheatsheets; the same for every subject. */
+function ProfileName() {
+  const [name, setName] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    const sb = supabaseBrowser();
+    sb.auth.getUser().then(({ data }) => data.user && sb.from('profiles').select('display_name').eq('user_id', data.user.id).maybeSingle()
+      .then(({ data: p }) => setName(p?.display_name ?? (data.user!.email || '').split('@')[0])));
+  }, []);
+  async function save() {
+    const v = (name || '').trim();
+    if (!v || v.length > 40) { setMsg({ ok: false, text: 'Use 1 to 40 characters.' }); return; }
+    const sb = supabaseBrowser();
+    const { data } = await sb.auth.getUser();
+    if (!data.user) return;
+    const { error } = await sb.from('profiles').upsert({ user_id: data.user.id, display_name: v, updated_at: new Date().toISOString() });
+    setMsg(error ? { ok: false, text: error.message } : { ok: true, text: 'Saved' });
+  }
+  return (
+    <fieldset>
+      <legend>Profile</legend>
+      <p className="note" style={{ marginTop: 0 }}>Your name on public slide notes and on a shared cheatsheet. It applies to all subjects.</p>
+      <div className="opt">
+        <input className="textin" value={name ?? ''} maxLength={40} disabled={name === null} onChange={e => { setName(e.target.value); setMsg(null); }} aria-label="Display name" />
+        <button type="button" className="btn ghost small" disabled={name === null} onClick={save}>Save name</button>
+        <span className={msg?.ok ? 'okmsg' : 'err'}>{msg?.text}</span>
+      </div>
+    </fieldset>
   );
 }

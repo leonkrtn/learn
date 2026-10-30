@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import CheatDrawer from '@/components/CheatDrawer';
 import { SubjectProvider } from '@/components/SubjectContext';
 import Sidebar from '@/components/Sidebar';
 import SyncNotice from '@/components/SyncNotice';
@@ -26,6 +27,7 @@ export default async function SubjectLayout({ children, params }: { children: Re
               <SyncNotice />
               {children}
             </main>
+            <CheatDrawer />
           </div>
         </div>
       </SubjectProvider>

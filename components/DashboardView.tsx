@@ -11,74 +11,75 @@ export type DashData = {
   mocks: { slug: string; score: number; max: number; date: string }[];
 };
 
+const pct = (c: number, a: number) => Math.round(100 * c / a) + '%';
+
 export default function DashboardView({ d }: { d: DashData }) {
   const ready = d.subjects.filter(s => getSubject(s.slug));
   const A = ready.reduce((a, s) => a + s.answers, 0), C = ready.reduce((a, s) => a + s.correct, 0);
+  const worst = d.weak[0];
+  const wMod = worst && getSubject(worst.slug)!;
+  const wType = worst && wMod!.types.find(x => x.key === worst.type);
+  const last = d.mocks[0];
   return (
     <div className="dash">
-      <div className="dashhead">
-        <h1>Welcome back, {d.name}</h1>
-        <p className="greet">Pick a subject to practise, or pick up where your weakest question types are.</p>
-      </div>
-      <div className="kpis">
-        <div className="kpi"><span>Answers</span><b>{A}</b></div>
-        <div className="kpi"><span>Correct</span><b>{A ? Math.round(100 * C / A) + '%' : '—'}</b></div>
-        <div className="kpi"><span>Subjects</span><b>{ready.length}</b></div>
-        <div className="kpi"><span>Last mock exam</span><b>{d.mocks.length ? <>{d.mocks[0].score.toFixed(1)}<small> / {d.mocks[0].max}</small></> : '—'}</b></div>
-      </div>
+      <header className="dashhead">
+        {worst ? (
+          <>
+            <h1>{Math.round(100 * worst.rate)}% on {wType?.name || worst.type}</h1>
+            <p className="greet">Your weakest question type, in {wMod!.name}. <Link href={`/s/${worst.slug}/cycle?topic=${wType?.topic || ''}`}>Practise lecture {wType?.topic}</Link></p>
+          </>
+        ) : A ? (
+          <><h1>{A} answers, {pct(C, A)} correct</h1><p className="greet">Weak spots show up here after three answers per question type.</p></>
+        ) : (
+          <><h1>Nothing answered yet</h1><p className="greet">{ready[0] ? <>Start with <Link href={`/s/${ready[0].slug}`}>{ready[0].name}</Link>.</> : 'No subject is ready yet.'}</p></>
+        )}
+        {A > 0 && (
+          <p className="tally num">
+            {A} answers · {pct(C, A)} correct{last ? <> · last mock exam {last.score.toFixed(1)} of {last.max} ({getSubject(last.slug)?.short || last.slug}, {new Date(last.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})</> : null}
+          </p>
+        )}
+      </header>
+      {d.error && <p className="err">The database is not set up yet ({d.error}). Run supabase/setup.sql in the Supabase SQL editor.</p>}
       <div className="dashgrid">
-        <div>
-          {d.error && <p className="err">The database is not set up yet ({d.error}). Run supabase/setup.sql in the Supabase SQL editor.</p>}
+        <div className="subjects">
           {d.trimesters.map(t => {
             const list = d.subjects.filter(s => s.trimester === t.id);
             if (!list.length) return null;
             return (
               <section className="tri" key={t.id}>
                 <h2>{t.name}</h2>
-                <div className="subjgrid">
-                  {list.map(s => {
-                    const rate = s.answers ? Math.round(100 * s.correct / s.answers) : 0;
-                    return getSubject(s.slug) ? (
-                      <Link className="subjcard" href={`/s/${s.slug}`} key={s.slug}>
-                        <span className="badge">{s.short}</span>
-                        <span className="name">{s.name}</span>
-                        <span className="bar"><span style={{ width: rate + '%' }} /></span>
-                        <span className="k"><span><b>{s.answers ? rate + '%' : '—'}</b> correct</span><span><b>{s.answers}</b> answers</span></span>
-                      </Link>
-                    ) : (
-                      <div className="subjcard off" key={s.slug}>
-                        <span className="badge">{s.short}</span>
-                        <span className="name">{s.name}</span>
-                        <span className="bar" />
-                        <span className="k"><span>In preparation</span></span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {list.map(s => getSubject(s.slug) ? (
+                  <Link className="subjrow" href={`/s/${s.slug}`} key={s.slug}>
+                    <span className="code">{s.short}</span>
+                    <span className="name">{s.name}</span>
+                    <span className="meter" aria-hidden><span style={{ width: (s.answers ? Math.round(100 * s.correct / s.answers) : 0) + '%' }} /></span>
+                    <span className="k num">{s.answers ? <><b>{pct(s.correct, s.answers)}</b> of {s.answers}</> : 'not started'}</span>
+                  </Link>
+                ) : (
+                  <div className="subjrow off" key={s.slug}>
+                    <span className="code">{s.short}</span><span className="name">{s.name}</span><span /><span className="k">In preparation</span>
+                  </div>
+                ))}
               </section>
             );
           })}
         </div>
-        <div className="side">
-          <div className="widget">
-            <h3>Worth another look</h3>
-            {d.weak.length ? (
-              <ul>{d.weak.map(w => {
-                const mod = getSubject(w.slug)!;
-                const t = mod.types.find(x => x.key === w.type);
-                return <li key={w.slug + w.type}><Link href={`/s/${w.slug}/cycle?topic=${t?.topic || ''}`}>{mod.short}: {t?.name || w.type}</Link><span className="v weak">{Math.round(100 * w.rate)}%</span></li>;
-              })}</ul>
-            ) : <div className="empty">Shown after three answers per type.</div>}
-          </div>
-          <div className="widget">
-            <h3>Recent mock exams</h3>
-            {d.mocks.length ? (
-              <ul>{d.mocks.map((m, i) => (
-                <li key={i}><Link href={`/s/${m.slug}/mock`}>{getSubject(m.slug)?.short || m.slug}, {new Date(m.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Link><span className="v">{m.score.toFixed(2)} / {m.max}</span></li>
-              ))}</ul>
-            ) : <div className="empty">No mock exams yet.</div>}
-          </div>
-        </div>
+        <aside className="side">
+          <h3>Practise next</h3>
+          {d.weak.length > 1 ? (
+            <ul>{d.weak.slice(1).map(w => {
+              const mod = getSubject(w.slug)!;
+              const t = mod.types.find(x => x.key === w.type);
+              return <li key={w.slug + w.type}><Link href={`/s/${w.slug}/cycle?topic=${t?.topic || ''}`}><small>{mod.short}</small>{t?.name || w.type}</Link><span className="v weak num">{Math.round(100 * w.rate)}%</span></li>;
+            })}</ul>
+          ) : <div className="empty">Listed after three answers per question type.</div>}
+          <h3>Mock exams</h3>
+          {d.mocks.length ? (
+            <ul>{d.mocks.map((m, i) => (
+              <li key={i}><Link href={`/s/${m.slug}/mock`}><small>{getSubject(m.slug)?.short || m.slug}</small>{new Date(m.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Link><span className="v num">{m.score.toFixed(1)} / {m.max}</span></li>
+            ))}</ul>
+          ) : <div className="empty">None taken yet.</div>}
+        </aside>
       </div>
     </div>
   );

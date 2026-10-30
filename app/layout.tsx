@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Bricolage_Grotesque, Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
 import Logo from '@/components/Logo';
 import './globals.css';
 
 const sans = Inter({ subsets: ['latin'], variable: '--font-sans', style: ['normal', 'italic'], display: 'swap' });
+const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
 
 export const metadata: Metadata = {
   title: { default: 'learn', template: '%s · learn' },
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={sans.variable}>
+    <html lang="en" className={`${sans.variable} ${display.variable}`}>
       <body>
         <div className="gate">
           <div>
