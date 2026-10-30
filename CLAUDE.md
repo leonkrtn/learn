@@ -19,7 +19,7 @@ New subjects are code modules plus seed content. Follow the exam-practice-builde
 
 ## Conventions
 
-- Design: serif (Source Serif 4) for content, IBM Plex Sans for interface text; black on white, thin rules, square corners, green/red only for feedback. No layout shifts: reserve space for feedback and counters, round SVG coordinates so server and client markup match.
+- Design (Personio-like): Inter for everything; warm light-grey background (`--bg`) with white rounded cards (`.panel`, 16 px radius), thin warm rules, pill buttons; one blue accent (`--accent`) for primary actions, active navigation and charts; green/red only for feedback. Tokens live in `:root` in `app/globals.css`; the logo is `components/Logo.tsx`, nav icons are `components/Icons.tsx`. No layout shifts: reserve space for feedback and counters, round SVG coordinates so server and client markup match.
 - Screens narrower than 1024 px get a notice instead of the app.
 - Writes go through RLS as the signed-in user; `record_attempt` updates attempts, type statistics and the review schedule in one call.
 - Do not edit `supabase/setup.sql` or the content migration by hand; regenerate them.

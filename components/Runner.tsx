@@ -131,7 +131,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   if (!cur) {
     return (
       <div className="page">
-        <div className="endbox">
+        <div className="endbox panel">
           {mode.kind === 'review'
             ? <><h2>Nothing to review</h2><p>Question types you get wrong show up here again a day later, then after 3, 7, 16 and 35 days, always with new numbers. Come by whenever it suits you.</p>{tally.a > 0 && <p className="note">This round: {tally.c} of {tally.a} answers correct.</p>}</>
             : <><h2>No question types selected</h2><p>Turn on at least one type in <Link href={`/s/${mod.slug}/settings`}>Settings</Link>.</p></>}
@@ -143,7 +143,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   if (done) {
     return (
       <div className="page">
-        <div className="endbox">
+        <div className="endbox panel">
           <h2>Session complete</h2>
           <div className="score">{rate(tally)}</div>
           <p>{tally.c} of {tally.a} answers correct across {sessionLen} questions.</p>
@@ -162,7 +162,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
 
   return (
     <div className="with-rail">
-      <div>
+      <div className="panel qpanel">
         <div className="meta">
           <div className="qno">
             {cycleInfo ? `Question ${cycleInfo.pos} of ${cycleInfo.size}` : sessionLen ? `Question ${n + 1}` : `Question ${n + 1}`}
@@ -180,7 +180,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             {graded ? (sessionLen && n + 1 >= sessionLen ? 'See results' : 'Next question') : 'Check'}
           </button>
         </div>
-        <p className="note" style={{ marginTop: 26 }}>{mod.answerNote}</p>
+        <p className="note answernote">{mod.answerNote}</p>
       </div>
       <aside className="rail">
         <div className="block">

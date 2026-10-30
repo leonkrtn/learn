@@ -122,7 +122,7 @@ export default function Study({ deckName, cards, newLimit }: { deckName: string;
           )}
         </div>
       ) : (
-        <div className="endbox">
+        <div className="endbox panel">
           <h2>Done for now</h2>
           <p>{done ? `You reviewed ${done} cards.` : 'Nothing to study in this deck right now.'} Cards come back on their own when it is a good time to repeat them.</p>
           <Link className="btn" href={`/s/${mod.slug}/cards`} onClick={() => router.refresh()}>Back to decks</Link>

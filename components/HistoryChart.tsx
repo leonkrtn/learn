@@ -56,15 +56,15 @@ export default function HistoryChart({ rows }: { rows: Day[] }) {
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Accuracy by day">
           {[0, 0.25, 0.5, 0.75, 1].map(t => (
             <g key={t}>
-              <line x1={L} x2={W - R} y1={sy(t)} y2={sy(t)} stroke="#ececea" />
-              <text x={L - 8} y={sy(t) + 4} textAnchor="end" fontSize="12" fill="#5f5f5f">{t * 100}%</text>
+              <line x1={L} x2={W - R} y1={sy(t)} y2={sy(t)} stroke="#ebeae6" />
+              <text x={L - 8} y={sy(t) + 4} textAnchor="end" fontSize="12" fill="#676a75">{t * 100}%</text>
             </g>
           ))}
-          <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#111" />
-          {days.map((d, i) => i % step === 0 && <text key={'x' + i} x={sx(i)} y={H - B + 18} textAnchor="middle" fontSize="12" fill="#5f5f5f">{fmtDay(d.day)}</text>)}
-          {days.map((d, i) => d.answers > 0 && <circle key={'d' + i} cx={sx(i)} cy={sy(d.correct / d.answers)} r={4} fill="#b5b5b0" stroke="#fff" strokeWidth={2} />)}
-          <path d={path} fill="none" stroke="#111" strokeWidth={2} strokeLinejoin="round" />
-          {hover != null && <line x1={sx(hover)} x2={sx(hover)} y1={T} y2={H - B} stroke="#111" strokeDasharray="2 3" />}
+          <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#d6d5d0" />
+          {days.map((d, i) => i % step === 0 && <text key={'x' + i} x={sx(i)} y={H - B + 18} textAnchor="middle" fontSize="12" fill="#676a75">{fmtDay(d.day)}</text>)}
+          {days.map((d, i) => d.answers > 0 && <circle key={'d' + i} cx={sx(i)} cy={sy(d.correct / d.answers)} r={4} fill="#a9bbf3" stroke="#fff" strokeWidth={2} />)}
+          <path d={path} fill="none" stroke="#2952e3" strokeWidth={2.5} strokeLinejoin="round" />
+          {hover != null && <line x1={sx(hover)} x2={sx(hover)} y1={T} y2={H - B} stroke="#676a75" strokeDasharray="2 3" />}
           {days.map((_, i) => <rect key={'h' + i} x={sx(i) - (W - L - R) / days.length / 2} y={T} width={(W - L - R) / days.length} height={H - T - B} fill="transparent" {...hit(i)} />)}
         </svg>
         {h && hover != null && (
@@ -81,16 +81,16 @@ export default function HistoryChart({ rows }: { rows: Day[] }) {
         <svg viewBox={`0 0 ${W} 160`} role="img" aria-label="Answers per day">
           {[0, niceMax / 2, niceMax].map(t => (
             <g key={t}>
-              <line x1={L} x2={W - R} y1={sb(t)} y2={sb(t)} stroke="#ececea" />
-              <text x={L - 8} y={sb(t) + 4} textAnchor="end" fontSize="12" fill="#5f5f5f">{t}</text>
+              <line x1={L} x2={W - R} y1={sb(t)} y2={sb(t)} stroke="#ebeae6" />
+              <text x={L - 8} y={sb(t) + 4} textAnchor="end" fontSize="12" fill="#676a75">{t}</text>
             </g>
           ))}
           {days.map((d, i) => d.answers > 0 && (
-            <path key={'b' + i} fill={hover === i ? '#111' : '#3a3a3a'}
+            <path key={'b' + i} fill={hover === i ? '#1c3aa6' : '#2952e3'}
               d={`M${sx(i) - bw / 2} ${sb(0)} V${sb(d.answers) + 3} q0 -3 3 -3 H${sx(i) + bw / 2 - 3} q3 0 3 3 V${sb(0)} Z`} />
           ))}
-          <line x1={L} x2={W - R} y1={sb(0)} y2={sb(0)} stroke="#111" />
-          {days.map((d, i) => i % step === 0 && <text key={'x' + i} x={sx(i)} y={160 - B + 18} textAnchor="middle" fontSize="12" fill="#5f5f5f">{fmtDay(d.day)}</text>)}
+          <line x1={L} x2={W - R} y1={sb(0)} y2={sb(0)} stroke="#d6d5d0" />
+          {days.map((d, i) => i % step === 0 && <text key={'x' + i} x={sx(i)} y={160 - B + 18} textAnchor="middle" fontSize="12" fill="#676a75">{fmtDay(d.day)}</text>)}
           {days.map((_, i) => <rect key={'h' + i} x={sx(i) - (W - L - R) / days.length / 2} y={T} width={(W - L - R) / days.length} height={160 - T - B} fill="transparent" {...hit(i)} />)}
         </svg>
         {h && hover != null && h.answers > 0 && (

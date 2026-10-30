@@ -6,7 +6,7 @@ import TheoryQuiz from '@/components/TheoryQuiz';
 /** Ownership before and after the round: one stacked bar per row, holders labelled directly. */
 function OwnershipBars({ rows }: { rows: { title: string; parts: [string, number][] }[] }) {
   const W = 520, rowH = 116, gap = 2;
-  const fills: Record<string, string> = { Founder: '#111111', Angels: '#8a8a8a', VC: '#cfcfca' };
+  const fills: Record<string, string> = { Founder: '#2952e3', Angels: '#8fa6f0', VC: '#d6d5d0' };
   return (
     <svg viewBox={`0 0 ${W} ${rows.length * rowH + 8}`} role="img" aria-label="Ownership before and after the round">
       {rows.map((r, k) => {
@@ -15,14 +15,14 @@ function OwnershipBars({ rows }: { rows: { title: string; parts: [string, number
         const y0 = k * rowH + 18;
         return (
           <g key={r.title}>
-            <text x={0} y={y0 - 4} fontSize="14" fontWeight={600} fill="#111">{r.title}</text>
+            <text x={0} y={y0 - 4} fontSize="14" fontWeight={600} fill="#101114">{r.title}</text>
             {r.parts.map(([label, v]) => {
               const w = Math.round(Math.max(0, v / total * W - gap) * 10) / 10;
               const g = (
                 <g key={label}>
-                  <rect x={x} y={y0 + 6} width={w} height={40} fill={fills[label] || '#111'} />
-                  {w > 44 && <text x={x} y={y0 + 66} fontSize="13" fill="#111">{label}</text>}
-                  {w > 44 && <text x={x} y={y0 + 84} fontSize="13" fill="#5f5f5f">{pct(v / total, 1)}</text>}
+                  <rect x={x} y={y0 + 6} width={w} height={40} fill={fills[label] || '#2952e3'} />
+                  {w > 44 && <text x={x} y={y0 + 66} fontSize="13" fill="#101114">{label}</text>}
+                  {w > 44 && <text x={x} y={y0 + 84} fontSize="13" fill="#676a75">{pct(v / total, 1)}</text>}
                 </g>
               );
               x += w + gap;
