@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Bricolage_Grotesque, Inter } from 'next/font/google';
+import { Instrument_Sans, Schibsted_Grotesk } from 'next/font/google';
 import type { ReactNode } from 'react';
 import Logo from '@/components/Logo';
 import './globals.css';
 
-const sans = Inter({ subsets: ['latin'], variable: '--font-sans', style: ['normal', 'italic'], display: 'swap' });
-const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
+const sans = Instrument_Sans({ subsets: ['latin'], variable: '--font-sans', style: ['normal', 'italic'], display: 'swap' });
+const display = Schibsted_Grotesk({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
 
 export const metadata: Metadata = {
   title: { default: 'learn', template: '%s · learn' },
