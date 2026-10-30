@@ -19,7 +19,7 @@ New subjects are code modules plus seed content. Follow the exam-practice-builde
 
 ## Conventions
 
-- Design (Personio-like): Inter for everything; warm light-grey background (`--bg`) with white rounded cards (`.panel`, 16 px radius), thin warm rules, pill buttons; one blue accent (`--accent`) for primary actions, active navigation and charts; green/red only for feedback. Tokens live in `:root` in `app/globals.css`; the logo is `components/Logo.tsx`, nav icons are `components/Icons.tsx`. No layout shifts: reserve space for feedback and counters, round SVG coordinates so server and client markup match.
+- Design: liquid glass over a graph-paper background. Surfaces use `--glass-fill`/`--glass-dense`, `--shadow` (rim + drop) and the shared `backdrop-filter` list at the top of `app/globals.css`; rows inside a glass surface are separated by rules, not boxed again. Bricolage Grotesque (`--display`) for headings, Inter for text. One blue accent (`--accent`) for primary actions, the active nav item and charts; green/red only for feedback. No stat tiles, no uppercase tracked labels, no decorative badges. The logo is `components/Logo.tsx`, nav icons are `components/Icons.tsx`. No layout shifts: reserve space for feedback and counters, round SVG coordinates so server and client markup match.
 - Screens narrower than 1024 px get a notice instead of the app.
 - Writes go through RLS as the signed-in user; `record_attempt` updates attempts, type statistics and the review schedule in one call.
 - Do not edit `supabase/setup.sql` or the content migration by hand; regenerate them.

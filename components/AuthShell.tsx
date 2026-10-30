@@ -1,26 +1,31 @@
 import type { ReactNode } from 'react';
 import Logo from './Logo';
 
+/** Sign-in and sign-up: the form, and next to it a real question as it looks in practice. */
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="auth">
-      <div className="right">
-        <div className="authtop"><Logo size={32} /></div>
+      <div className="authform glass">
+        <Logo size={30} />
         {children}
-        <div className="foot">Progress is stored per account and synced across devices.</div>
+        <p className="foot">Progress is stored per account and synced across devices.</p>
       </div>
-      <div className="left">
-        <div className="pitch">
-          <h2>Practise for written exams with questions that are new every time.</h2>
-          <p>Flashcards on a spaced schedule, worked explanations of the hard topics, and mock exams with the real paper&rsquo;s structure.</p>
-          <ul>
-            <li>Answers within 2% count as correct</li>
-            <li>Decimal comma or decimal point, either works</li>
-            <li>Weak question types come back more often</li>
-          </ul>
+      <figure className="sample">
+        <div className="samplecard glass">
+          <div className="sh"><b>Question 4</b><span>Interest deduction and income limit · Lecture 2</span></div>
+          <p>Ashby Technologies has EBIT of €2,350m and interest expense of €915m. The corporate tax rate is 21%. Interest deduction is limited to 30% of EBIT.</p>
+          <div className="sq">
+            <span>a) What is the allowed interest deduction?</span>
+            <span className="unit">€m</span><span className="ans ok">705</span>
+          </div>
+          <div className="sq">
+            <span>b) What are the tax savings from leverage?</span>
+            <span className="unit">€m</span><span className="ans bad">192,15</span>
+          </div>
+          <div className="sfb">Correct answer: €148.05m</div>
         </div>
-        <div className="shapes" aria-hidden><span /><span /><span /></div>
-      </div>
+        <figcaption>Every question is generated with new numbers. Answers within 2% count, with a decimal comma or point.</figcaption>
+      </figure>
     </div>
   );
 }

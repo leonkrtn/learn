@@ -138,7 +138,7 @@ export default function CheatsheetView({ entries: initial, readOnly, author, sha
           if (readOnly && !list.length) return null;
           if (q && !list.length) return null;
           return (
-            <section key={String(g.id)} className={'sheetgroup' + (over === 'end:' + g.id ? ' dropping' : '')} {...dropProps(g, null)}>
+            <section key={String(g.id)} className={'sheetgroup' + (!list.length && !addingHere ? ' isempty' : '') + (over === 'end:' + g.id ? ' dropping' : '')} {...dropProps(g, null)}>
               <div className="sgh">
                 <h2>{g.name}</h2>
                 {!readOnly && <button type="button" className="act" onClick={() => { setAdding(g.id); setEditing(null); }}><Icon name="plus" size={15} />Add</button>}
@@ -170,7 +170,7 @@ export default function CheatsheetView({ entries: initial, readOnly, author, sha
                   {e.body && <Rich text={e.body} className="cebody" />}
                 </article>
               ))}
-              {!list.length && !addingHere && <div className="sgempty">Nothing here yet.</div>}
+              
             </section>
           );
         })}
