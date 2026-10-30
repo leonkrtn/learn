@@ -10,7 +10,32 @@ export type Note = {
   id: string; subject_slug: string; deck_id: string | null; page: number | null; parent_id: string | null;
   user_id: string; body: string; is_public: boolean; created_at: string; updated_at: string;
   author: string; votes: number; voted: boolean;
+  /** Pin on the slide, as fractions of its width and height */
+  x: number | null; y: number | null;
 };
+
+export type Pin = { x: number; y: number };
+
+/** Shared between the slide and its notes: the pin being placed for a new note, and which note is hovered. */
+export type PinCtl = {
+  draft: Pin | null;
+  placing: boolean;
+  setPlacing: (on: boolean) => void;
+  clear: () => void;
+  hover: string | null;
+  setHover: (id: string | null) => void;
+};
+
+/** Top-level notes on a slide, in thread order: most votes first, then oldest. */
+export const topNotes = (notes: Note[] | null, page: number | null) =>
+  (notes || []).filter(n => n.page === page && !n.parent_id).sort((a, b) => b.votes - a.votes || a.created_at.localeCompare(b.created_at));
+
+/** Pinned notes numbered 1, 2, … in thread order, so the numbers on the slide match the thread. */
+export function pinNumbers(notes: Note[] | null, page: number | null) {
+  const m = new Map<string, number>();
+  topNotes(notes, page).filter(n => n.x != null).forEach((n, i) => m.set(n.id, i + 1));
+  return m;
+}
 
 export type NotesApi = ReturnType<typeof useNotes>;
 
@@ -38,8 +63,8 @@ export function useNotes(subject: string, deckId: string | null) {
   const sb = supabaseBrowser();
   return {
     notes, error, reload,
-    post: (page: number | null, body: string, isPublic: boolean, parentId: string | null = null) =>
-      run(sb.from('slide_notes').insert({ subject_slug: subject, deck_id: deckId, page, body, is_public: isPublic, parent_id: parentId })),
+    post: (page: number | null, body: string, isPublic: boolean, parentId: string | null = null, pin: Pin | null = null) =>
+      run(sb.from('slide_notes').insert({ subject_slug: subject, deck_id: deckId, page, body, is_public: isPublic, parent_id: parentId, x: pin?.x ?? null, y: pin?.y ?? null })),
     edit: (id: string, body: string) => run(sb.from('slide_notes').update({ body, updated_at: new Date().toISOString() }).eq('id', id)),
     remove: (id: string) => run(sb.from('slide_notes').delete().eq('id', id)),
     vote: (n: Note) => run(n.voted ? sb.from('note_votes').delete().eq('note_id', n.id) : sb.from('note_votes').insert({ note_id: n.id })),
@@ -54,7 +79,7 @@ export function useNotes(subject: string, deckId: string | null) {
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /** Notes on one slide (page) or, with page null, on the subject in general: top-level notes by votes, replies underneath. */
-export function NoteThread({ api, page, me, admin, cheat, compact }: {
+export function NoteThread({ api, page, me, admin, cheat, compact, pin }: {
   api: NotesApi;
   page: number | null;
   me: string;
@@ -62,9 +87,12 @@ export function NoteThread({ api, page, me, admin, cheat, compact }: {
   /** Lecture and title used when a note is copied into the cheatsheet. */
   cheat: { topic: string | null; title: string };
   compact?: boolean;
+  /** Pins on the slide; without it notes are shown without numbers and new notes cannot be pinned. */
+  pin?: PinCtl;
 }) {
   const all = (api.notes || []).filter(n => n.page === page);
-  const top = all.filter(n => !n.parent_id).sort((a, b) => b.votes - a.votes || a.created_at.localeCompare(b.created_at));
+  const top = topNotes(api.notes, page);
+  const nums = pinNumbers(api.notes, page);
   const replies = (id: string) => all.filter(n => n.parent_id === id);
   const [open, setOpen] = useState(!compact);
 
@@ -79,17 +107,21 @@ export function NoteThread({ api, page, me, admin, cheat, compact }: {
     <div className="thread">
       {api.notes === null ? <div className="note">Loading notes…</div> : top.length === 0 && <div className="note empty">No notes yet. Add the first one.</div>}
       {top.map(n => (
-        <NoteItem key={n.id} n={n} api={api} me={me} admin={admin} cheat={cheat}>
+        <NoteItem key={n.id} n={n} api={api} me={me} admin={admin} cheat={cheat} num={nums.get(n.id)} pin={pin}>
           {replies(n.id).map(r => <NoteItem key={r.id} n={r} api={api} me={me} admin={admin} cheat={cheat} reply />)}
         </NoteItem>
       ))}
-      <Composer onPost={(body, pub) => api.post(page, body, pub)} />
+      <Composer pin={page != null ? pin : undefined} onPost={async (body, pub) => {
+        const ok = await api.post(page, body, pub, null, pin?.draft ?? null);
+        if (ok) pin?.clear();
+        return ok;
+      }} />
       {api.error && <p className="err">{api.error}</p>}
     </div>
   );
 }
 
-function Composer({ onPost, reply, onCancel }: { onPost: (body: string, pub: boolean) => Promise<boolean>; reply?: boolean; onCancel?: () => void }) {
+function Composer({ onPost, reply, onCancel, pin }: { onPost: (body: string, pub: boolean) => Promise<boolean>; reply?: boolean; onCancel?: () => void; pin?: PinCtl }) {
   const [body, setBody] = useState('');
   const [pub, setPub] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -110,6 +142,13 @@ function Composer({ onPost, reply, onCancel }: { onPost: (body: string, pub: boo
             <button type="button" className={!pub ? 'on' : ''} aria-pressed={!pub} onClick={() => setPub(false)}>Only me</button>
           </div>
         )}
+        {pin && (
+          pin.draft
+            ? <span className="pinset"><span className="pinmark draft" aria-hidden />Marked <button type="button" className="linkbtn" onClick={() => pin.setPlacing(true)}>Move</button><button type="button" className="linkbtn" onClick={pin.clear}>Remove</button></span>
+            : <button type="button" className={'act' + (pin.placing ? ' on' : '')} onClick={() => pin.setPlacing(!pin.placing)} title="Click a spot on the slide this note is about">
+                <Icon name="pin" size={15} />{pin.placing ? 'Click on the slide…' : 'Mark on slide'}
+              </button>
+        )}
         <span className="spacer" />
         {onCancel && <button type="button" className="linkbtn" onClick={onCancel}>Cancel</button>}
         <button type="button" className="btn small" disabled={!body.trim() || busy} onClick={submit}>{reply ? 'Reply' : 'Post note'}</button>
@@ -118,8 +157,11 @@ function Composer({ onPost, reply, onCancel }: { onPost: (body: string, pub: boo
   );
 }
 
-function NoteItem({ n, api, me, admin, cheat, reply, children }: {
+function NoteItem({ n, api, me, admin, cheat, reply, children, num, pin }: {
   n: Note; api: NotesApi; me: string; admin: boolean; cheat: { topic: string | null; title: string }; reply?: boolean; children?: React.ReactNode;
+  /** Number of this note's pin on the slide */
+  num?: number;
+  pin?: PinCtl;
 }) {
   const mine = n.user_id === me;
   const [editing, setEditing] = useState(false);
@@ -130,8 +172,10 @@ function NoteItem({ n, api, me, admin, cheat, reply, children }: {
   const edited = n.updated_at.slice(0, 19) !== n.created_at.slice(0, 19);
 
   return (
-    <div className={'noteitem' + (reply ? ' isreply' : '')}>
+    <div className={'noteitem' + (reply ? ' isreply' : '') + (num && pin?.hover === n.id ? ' hl' : '')}
+      onMouseEnter={num && pin ? () => pin.setHover(n.id) : undefined} onMouseLeave={num && pin ? () => pin.setHover(null) : undefined}>
       <div className="notehead">
+        {num && <span className="pinmark" aria-label={`Pin ${num} on the slide`}>{num}</span>}
         <span className="avatar small" aria-hidden>{n.author.slice(0, 1).toUpperCase()}</span>
         <b>{mine ? 'You' : n.author}</b>
         <span className="muted">{when(n.created_at)}{edited ? ' · edited' : ''}</span>

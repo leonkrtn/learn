@@ -560,8 +560,42 @@ input.textin:focus, .field select:focus { outline: none; border-color: var(--acc
 }
 .texed textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
 .texbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--field); border-bottom: 0; border-radius: var(--r-sm) var(--r-sm) 0 0; background: var(--soft); }
-.texbar button { min-width: 30px; height: 28px; padding: 0 7px; border: 0; border-radius: 6px; background: none; color: var(--ink-2); font-size: 13.5px; }
-.texbar button:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.texbar button { display: inline-flex; align-items: center; gap: 5px; min-width: 30px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--ink-2); font-size: 13.5px; font-weight: 500; }
+.texbar button:hover, .texbar button.on { background: var(--accent-soft); color: var(--accent-ink); }
+.texbar .glyph { font-size: 15px; line-height: 1; }
+.texbar .sep { width: 1px; height: 18px; margin: 0 4px; background: var(--rule-strong); }
+.texhint code, .formulabar code { font-size: 0.95em; background: var(--hover); border-radius: 4px; padding: 0 4px; }
+
+/* suggestions while typing /beta, the symbol picker and the visual formula editor */
+.taw { position: relative; }
+.suggest {
+  position: absolute; left: 8px; bottom: calc(100% + 4px); z-index: 20; min-width: 17rem; margin: 0; padding: 4px; list-style: none;
+  background: var(--glass-dense); border-radius: 12px; box-shadow: var(--shadow), 0 18px 36px -18px rgba(16, 17, 20, 0.45);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+}
+.suggest li { display: grid; grid-template-columns: 2rem auto 1fr; justify-items: start; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+.suggest li.on { background: var(--accent-soft); }
+.suggest .sg { justify-self: center; font-size: 18px; color: var(--ink); }
+.suggest .muted { justify-self: end; white-space: nowrap; }
+.suggest code { font-size: 12.5px; color: var(--ink-2); }
+.suggest .muted { font-size: 12px; }
+.picker { border: 1px solid var(--field); border-bottom: 0; padding: 10px; background: var(--glass-dense); }
+.picker .searchbox { min-width: 0; height: 36px; }
+.pickbody { max-height: 15rem; overflow-y: auto; margin-top: 8px; }
+.pickbody h5 { font-size: 12px; color: var(--muted); font-weight: 600; margin: 8px 2px 4px; }
+.pickgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 3px; }
+.pickgrid button { height: 34px; border: 0; border-radius: 7px; background: rgba(255, 255, 255, 0.7); font-size: 17px; color: var(--ink); }
+.pickgrid button.word { grid-column: span 3; font-size: 12.5px; font-weight: 600; }
+.pickgrid button:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.formula { border: 1px solid var(--accent); border-bottom: 0; padding: 12px 12px 8px; background: #fff; }
+.mfhost { min-height: 48px; display: flex; align-items: center; }
+.mfhost math-field { width: 100%; font-size: 22px; padding: 6px 10px; border: 1px solid var(--field); border-radius: var(--r-sm); background: #fff; --caret-color: var(--accent); --selection-background-color: var(--accent-soft); --contains-highlight-background-color: rgba(41, 82, 227, 0.06); }
+.mfhost math-field:focus-within { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.mfhost math-field::part(virtual-keyboard-toggle), .mfhost math-field::part(menu-toggle) { display: none; }
+.formulabar { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.formulabar .note { font-size: 12.5px; }
+.formulabar .pv { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.formulabar .pv input { accent-color: var(--accent); margin: 0; }
 .texbar .pv { display: flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 13px; color: var(--muted); }
 .texbar .pv input { accent-color: var(--accent); margin: 0; }
 .texpreview { margin-top: 8px; padding: 10px 14px; border: 1px dashed var(--rule-strong); border-radius: var(--r-sm); background: var(--soft); }
@@ -583,7 +617,9 @@ input.textin:focus, .field select:focus { outline: none; border-color: var(--acc
 .act.vote.on { color: var(--accent); background: var(--accent-soft); }
 .replies { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
 .composer { display: flex; flex-direction: column; gap: 8px; }
-.composerbar { display: flex; align-items: center; gap: 10px; }
+.composerbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.composerbar > * { white-space: nowrap; }
+.composerbar .btn { margin-left: auto; }
 .notestoggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 999px; background: var(--glass-fill); color: var(--ink-2); font-size: 13.5px; font-weight: 500; }
 .notestoggle:hover { border-color: var(--accent); color: var(--accent-ink); }
 
@@ -616,7 +652,12 @@ input.textin:focus, .field select:focus { outline: none; border-color: var(--acc
 .slideframe { padding: 10px; overflow: hidden; }
 .pdfpage { position: relative; width: 100%; background: var(--soft); border-radius: 8px; overflow: hidden; }
 .pdfpage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.slidenav { display: flex; align-items: center; justify-content: space-between; margin: 14px 0; font-size: 14.5px; color: var(--muted); }
+.slidenav { display: flex; align-items: center; gap: 6px; margin: 14px 0; font-size: 14.5px; color: var(--muted); }
+.pager-in { display: inline-flex; align-items: center; gap: 10px; }
+.pager-in .iconbtn { margin: 0; padding: 0; width: 34px; justify-content: center; }
+.pager-in .iconbtn:disabled { opacity: 0.4; cursor: default; }
+.act.on { color: var(--accent-ink); background: var(--accent-soft); }
+.act.star.on .icon { color: var(--accent); }
 .slidenav .btn { gap: 4px; }
 .slidenav b { color: var(--ink); }
 .thumbs { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; }
@@ -624,7 +665,62 @@ input.textin:focus, .field select:focus { outline: none; border-color: var(--acc
 .thumb:hover { border-color: var(--field-hover); }
 .thumb.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--ring); }
 .thumb .pdfpage { border-radius: 6px; }
-.thumb .tn { display: block; font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 3px; }
+.thumb .tn { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.thumb .tn .icon { color: var(--accent); }
+
+/* pins: numbered markers on the slide, matching the numbers in the thread */
+.pinlayer { position: absolute; inset: 0; }
+.pinlayer.placing { cursor: crosshair; background: rgba(41, 82, 227, 0.06); box-shadow: inset 0 0 0 2px var(--accent); }
+.pinmark {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px #fff, 0 4px 10px -3px rgba(16, 17, 20, 0.5);
+}
+.pinmark.onslide { position: absolute; transform: translate(-50%, -50%); cursor: default; transition: transform 120ms ease; }
+.pinmark.onslide.hl { transform: translate(-50%, -50%) scale(1.35); box-shadow: 0 0 0 2px #fff, 0 0 0 6px var(--ring); }
+.pinmark.draft { background: #fff; box-shadow: 0 0 0 2px var(--accent), 0 4px 10px -3px rgba(16, 17, 20, 0.5); }
+.pinmark.draft::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.pinset .pinmark.draft { width: 16px; height: 16px; margin-right: 6px; }
+.pinset .pinmark.draft::after { width: 6px; height: 6px; }
+.pinhint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 5px 12px; border-radius: 999px; background: rgba(20, 22, 30, 0.78); color: #fff; font-size: 12.5px; white-space: nowrap; pointer-events: none; }
+.pinset { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--accent-ink); font-weight: 500; }
+.pinset .linkbtn { font-size: 13px; padding: 4px 6px; }
+.noteitem.hl { background: var(--accent-soft); border-radius: 10px; box-shadow: 0 0 0 8px var(--accent-soft); }
+.notehead .pinmark { width: 20px; height: 20px; font-size: 11px; box-shadow: none; }
+
+/* maximised slides */
+.focus {
+  position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; gap: var(--gutter); padding: var(--gutter);
+  background: rgba(238, 237, 232, 0.82); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%);
+}
+.focusbar {
+  flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 12px 0 20px; border-radius: 18px;
+  background: var(--glass-fill); box-shadow: var(--shadow); font-size: 14.5px; color: var(--muted);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+}
+.focusbar .ft { color: var(--ink); font-family: var(--display); font-size: 16px; font-weight: 600; max-width: 26rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+.focusbar b { color: var(--ink); }
+.focusbar .iconbtn { margin: 0; }
+.focusbody { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gutter); }
+.focusbody.withnotes { grid-template-columns: minmax(0, 1fr) 420px; }
+.fit { width: 100%; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.focusslide { border-radius: 14px; overflow: hidden; background: #fff; box-shadow: var(--shadow); }
+.focusslide .pdfpage { border-radius: 0; }
+.focusnotes {
+  min-height: 0; overflow-y: auto; padding: 18px 22px 20px; border-radius: var(--r-lg);
+  background: var(--glass-dense); box-shadow: var(--shadow);
+}
+.focusnotes h3 { font-size: 16px; margin: 0 0 12px; }
+
+/* starred slides overview */
+.starlist { display: flex; flex-direction: column; gap: 16px; }
+.stargroup { padding: 16px 20px 18px; }
+.stargroup .sgh h2 { font-size: 17px; margin: 0; display: flex; align-items: baseline; gap: 10px; }
+.stargrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 12px; }
+.starthumb { display: block; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px var(--rule); }
+.starthumb:hover { box-shadow: 0 0 0 2px var(--accent); }
+.starthumb .pdfpage { border-radius: 0; }
+.starmeta { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 13.5px; color: var(--ink-2); }
 .thumb .tc { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
 .slidestack { display: flex; flex-direction: column; gap: 18px; max-width: 980px; }
 .slidecard { padding: 14px 18px 18px; }

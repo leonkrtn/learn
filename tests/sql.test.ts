@@ -140,3 +140,24 @@ test('cheatsheets are private until shared', async () => {
   const upd = await as(db, U2, () => db.query("update public.cheat_entries set title = 'x'"));
   assert.equal(upd.affectedRows, 0);
 });
+
+test('pins sit on a slide inside its bounds, stars are private', async () => {
+  const db = await boot();
+  const deck = await as(db, U1, async () => {
+    await db.query("insert into storage.objects (bucket_id, name) values ('slides', 'fvcs/p.pdf')");
+    const d = await db.query<{ id: string }>("insert into public.slide_decks (subject_slug, topic, title, storage_path, pages) values ('fvcs', '2', 'L2', 'fvcs/p.pdf', 8) returning id");
+    return d.rows[0].id;
+  });
+  await as(db, U2, () => db.query(`insert into public.slide_notes (subject_slug, deck_id, page, body, x, y) values ('fvcs', '${deck}', 2, 'here', 0.25, 0.6)`));
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.slide_notes (subject_slug, deck_id, page, body, x, y) values ('fvcs', '${deck}', 2, 'off', 1.4, 0.6)`)));
+  await assert.rejects(as(db, U2, () => db.query("insert into public.slide_notes (subject_slug, body, x, y) values ('fvcs', 'general with pin', 0.5, 0.5)")));
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.slide_notes (subject_slug, deck_id, page, body, x) values ('fvcs', '${deck}', 2, 'half', 0.5)`)));
+  const pin = await as(db, U1, () => db.query<{ x: number; y: number }>('select x, y from public.slide_notes_view'));
+  assert.deepEqual([pin.rows[0].x, pin.rows[0].y], [0.25, 0.6]);
+  await as(db, U1, () => db.query(`insert into public.slide_stars (deck_id, page) values ('${deck}', 3), ('${deck}', 5)`));
+  const mine = await as(db, U1, () => db.query<{ page: number }>('select page from public.slide_stars order by page'));
+  assert.deepEqual(mine.rows.map(r => r.page), [3, 5]);
+  const theirs = await as(db, U2, () => db.query('select * from public.slide_stars'));
+  assert.equal(theirs.rows.length, 0);
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.slide_stars (user_id, deck_id, page) values ('${U1}', '${deck}', 1)`)));
+});

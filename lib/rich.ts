@@ -49,22 +49,3 @@ export function renderRich(src: string): string {
   // Display formulas stand on their own lines, so their paragraph wrapper is dropped.
   return out.join('').replace(/<p>(\u0000\d+\u0000)<\/p>/g, '$1').replace(/\u0000(\d+)\u0000/g, (_, i: string) => math[+i]);
 }
-
-/** LaTeX snippets for the formula toolbar: inserted text and where the cursor lands (offset from the start). */
-export const TEX_TOOLS: { label: string; title: string; text: string; caret: number }[] = [
-  { label: '$x$', title: 'Inline formula', text: '$$', caret: 1 },
-  { label: '$$', title: 'Formula on its own line', text: '\n$$\n\n$$\n', caret: 4 },
-  { label: 'a/b', title: 'Fraction', text: '\\frac{}{}', caret: 6 },
-  { label: 'xₙ', title: 'Subscript', text: '_{}', caret: 2 },
-  { label: 'xⁿ', title: 'Superscript', text: '^{}', caret: 2 },
-  { label: '√', title: 'Square root', text: '\\sqrt{}', caret: 6 },
-  { label: 'Σ', title: 'Sum', text: '\\sum_{t=1}^{T} ', caret: 15 },
-  { label: '·', title: 'Multiplication dot', text: ' \\cdot ', caret: 7 },
-  { label: '≈', title: 'Approximately', text: ' \\approx ', caret: 9 },
-  { label: '( )', title: 'Large brackets', text: '\\left(  \\right)', caret: 7 },
-  { label: 'β', title: 'beta', text: '\\beta', caret: 5 },
-  { label: 'σ', title: 'sigma', text: '\\sigma', caret: 6 },
-  { label: 'τ', title: 'tau', text: '\\tau', caret: 4 },
-  { label: 'ρ', title: 'rho', text: '\\rho', caret: 4 },
-  { label: 'Δ', title: 'Delta', text: '\\Delta', caret: 6 },
-];

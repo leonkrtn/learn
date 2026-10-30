@@ -80,7 +80,9 @@ create table if not exists public.note_votes (
 );
 
 -- Notes with author name, vote count and whether the reader voted; row level security of the base tables applies.
-create or replace view public.slide_notes_view with (security_invoker = true) as
+-- Dropped first so setup.sql stays re-runnable after later migrations add columns.
+drop view if exists public.slide_notes_view;
+create view public.slide_notes_view with (security_invoker = true) as
 select n.id, n.subject_slug, n.deck_id, n.page, n.parent_id, n.user_id, n.body, n.is_public, n.created_at, n.updated_at,
        coalesce(p.display_name, 'Student') as author,
        (select count(*) from public.note_votes v where v.note_id = n.id)::integer as votes,

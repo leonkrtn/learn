@@ -19,7 +19,7 @@ export default function SlidesIndex({ decks, me, admin, error }: { decks: Deck[]
   const notes = useNotes(mod.slug, null);
   return (
     <div className="page">
-      <div className="pagehead"><h1>Slides</h1><span className="aside">{decks.length} file{decks.length === 1 ? '' : 's'}</span></div>
+      <div className="pagehead"><h1>Slides</h1><span className="aside"><Link href={`/s/${mod.slug}/slides/starred`}>Starred slides</Link> · {decks.length} file{decks.length === 1 ? '' : 's'}</span></div>
       <p className="lede">The lecture slides, one page per slide with notes underneath. Notes are public by default; switch to “Only me” for private ones. Good notes can go straight into your cheatsheet.</p>
       {error && <p className="err">{error}</p>}
       {admin && <Upload />}
