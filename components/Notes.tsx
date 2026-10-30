@@ -105,7 +105,9 @@ export function NoteThread({ api, page, me, admin, cheat, compact, pin }: {
   }
   return (
     <div className="thread">
-      {api.notes === null ? <div className="note">Loading notes…</div> : top.length === 0 && <div className="note empty">No notes yet. Add the first one.</div>}
+      {api.notes === null
+        ? <div aria-label="Loading notes"><span className="skel w40" /><span className="skel w80" /><span className="skel w60" /></div>
+        : top.length === 0 && <div className="note empty">No notes yet. Add the first one.</div>}
       {top.map(n => (
         <NoteItem key={n.id} n={n} api={api} me={me} admin={admin} cheat={cheat} num={nums.get(n.id)} pin={pin}>
           {replies(n.id).map(r => <NoteItem key={r.id} n={r} api={api} me={me} admin={admin} cheat={cheat} reply />)}
@@ -199,13 +201,15 @@ function NoteItem({ n, api, me, admin, cheat, reply, children, num, pin }: {
             </button>
           )}
           {!reply && <button type="button" className="act" onClick={() => setReplying(r => !r)}><Icon name="reply" size={15} />Reply</button>}
-          <button type="button" className="act" onClick={async () => { if (await api.toCheatsheet(n, cheat.topic, cheat.title)) setCopied(true); }} disabled={copied}>
-            <Icon name="sheet" size={15} />{copied ? 'In your cheatsheet' : 'To cheatsheet'}
+          <button type="button" className={'act quiet' + (copied ? '' : ' iconly')} onClick={async () => { if (await api.toCheatsheet(n, cheat.topic, cheat.title)) setCopied(true); }} disabled={copied}
+            title="Copy to your cheatsheet" aria-label="Copy to your cheatsheet">
+            <Icon name="sheet" size={15} />{copied && 'In your cheatsheet'}
           </button>
-          {mine && <button type="button" className="act" onClick={() => setEditing(true)}><Icon name="edit" size={15} />Edit</button>}
+          {mine && <button type="button" className="act quiet iconly" onClick={() => setEditing(true)} title="Edit" aria-label="Edit"><Icon name="edit" size={15} /></button>}
           {(mine || admin) && (
-            <button type="button" className={'act' + (armed ? ' danger' : '')} onClick={() => armed ? api.remove(n.id) : setArmed(true)} onBlur={() => setArmed(false)}>
-              <Icon name="trash" size={15} />{armed ? 'Click again to delete' : 'Delete'}
+            <button type="button" className={'act quiet' + (armed ? ' danger' : ' iconly')} onClick={() => armed ? api.remove(n.id) : setArmed(true)} onBlur={() => setArmed(false)}
+              title="Delete" aria-label={armed ? 'Click again to delete' : 'Delete'}>
+              <Icon name="trash" size={15} />{armed && 'Click again to delete'}
             </button>
           )}
         </div>

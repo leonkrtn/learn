@@ -185,19 +185,21 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
       <aside className="rail">
         <div className="block">
           <h4>{cycleInfo ? `Round ${cycleInfo.round}` : 'This session'}</h4>
-          <div className="big">{rate(tally)}</div>
-          <dl><dt>Answers</dt><dd>{tally.a}</dd><dt>Correct</dt><dd>{tally.c}</dd></dl>
-        </div>
-        <div className="block">
-          <h4>This question type</h4>
+          {tally.a ? (
+            <div className="big">{rate(tally)}<small>{tally.c} of {tally.a} correct</small></div>
+          ) : <div className="quiet-big">No answers yet</div>}
+          {(sessionLen || cycleInfo) && (
+            <div className="meter" aria-hidden><span style={{ width: `${Math.round(100 * (cycleInfo ? cycleInfo.pos / cycleInfo.size : (n + 1) / sessionLen!))}%` }} /></div>
+          )}
+          <h4 className="sub">This question type</h4>
           <dl>
             <dt>Answered before</dt><dd>{st?.answers ?? 0}</dd>
-            <dt>Rate</dt><dd>{st && st.answers ? Math.round(100 * st.correct / st.answers) + '%' : '—'}</dd>
+            {st && st.answers > 0 && <><dt>Your rate</dt><dd>{Math.round(100 * st.correct / st.answers)}%</dd></>}
             <dt>Lecture</dt><dd>{cur.type.topic}</dd>
           </dl>
+          {theory && <Link className="raillink" href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link>}
+          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>d</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
         </div>
-        {theory && <div className="block"><h4>Theory</h4><Link href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link></div>}
-        <div className="note">Enter checks and moves on. In multiple choice, press a–d, or t/f.</div>
       </aside>
     </div>
   );

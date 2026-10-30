@@ -3,18 +3,19 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { groupsOf, inGroup, matches, type Entry } from './CheatsheetView';
 import Icon from './Icons';
 import Rich from './Rich';
 import { useSubject } from './SubjectContext';
 
-/** While practising (practice, cycle, review, mock exam): a button that slides in your cheatsheet, read-only, with search. */
+/** Top-bar button (or Alt+C, which stays clear of the a–d answer keys) that slides in your cheatsheet, read-only, with search; on every subject page but the cheatsheet itself. */
 export default function CheatDrawer() {
   const { mod } = useSubject();
   const path = usePathname();
   const base = '/s/' + mod.slug;
-  const active = path === base || ['/cycle', '/review', '/mock'].some(p => path === base + p);
+  const active = !path.startsWith(base + '/cheatsheet');
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [q, setQ] = useState('');
@@ -28,19 +29,26 @@ export default function CheatDrawer() {
   }, [open, mod.slug]);
 
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (['TEXTAREA', 'MATH-FIELD'].includes(t.tagName) || t.isContentEditable)) return;
+      if (e.key === 'Escape' && open) setOpen(false);
+      // Works from an answer box too; e.code, because Alt+C types another character on a Mac.
+      if (e.code === 'KeyC' && e.altKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setOpen(o => !o); }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [active, open]);
 
   if (!active) return null;
   return (
     <>
-      <button type="button" className="drawerbtn" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open} title="Your cheatsheet (Alt+C)">
         <Icon name="sheet" size={18} />Cheatsheet
       </button>
-      {open && (
+      {/* In a portal: the top bar's backdrop filter would otherwise become the drawer's containing block. */}
+      {open && createPortal(
         <aside className="drawer" aria-label="My cheatsheet">
           <div className="drawerhead">
             <b>My cheatsheet</b>
@@ -50,7 +58,7 @@ export default function CheatDrawer() {
           </div>
           <label className="searchbox"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search" autoFocus /></label>
           <div className="drawerbody">
-            {entries === null ? <p className="note">Loading…</p> : !entries.length ? (
+            {entries === null ? <div aria-label="Loading"><span className="skel w40" /><span className="skel w80" /><span className="skel w60" /></div> : !entries.length ? (
               <p className="note">Your cheatsheet for {mod.short} is empty. <Link href={`${base}/cheatsheet`}>Add entries</Link> or copy notes from the slides.</p>
             ) : groupsOf(mod.topics).map(g => {
               const list = inGroup(entries, g, mod.topics).filter(e => matches(e, q));
@@ -63,7 +71,8 @@ export default function CheatDrawer() {
               );
             })}
           </div>
-        </aside>
+        </aside>,
+        document.body,
       )}
     </>
   );
