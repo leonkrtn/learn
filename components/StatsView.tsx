@@ -41,7 +41,7 @@ export default function StatsView({ mocks }: { mocks: PastMock[] }) {
   return (
     <div className="page">
       <div className="pagehead"><h1>Statistics</h1><span className="aside">{A} answers · {rate(A, C)} correct</span></div>
-      <div style={{ minHeight: 560 }}>{days ? <HistoryChart rows={days} /> : null}</div>
+      <div className="panel chartpanel">{days ? <HistoryChart rows={days} /> : null}</div>
 
       <h2 className="sec">By lecture</h2>
       <table className="stats">

@@ -10,7 +10,7 @@ export default async function FormulasPage({ params }: { params: Promise<{ slug:
   return (
     <div className="page">
       <div className="pagehead"><h1>Formula sheet</h1><span className="aside">Exactly what you get in the exam</span></div>
-      <Sheet />
+      <div className="panel doc"><Sheet /></div>
     </div>
   );
 }

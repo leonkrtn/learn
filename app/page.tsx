@@ -1,4 +1,5 @@
 import DashboardView, { type DashData } from '@/components/DashboardView';
+import { HomeSidebar } from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 import { getCatalog } from '@/lib/queries';
 import { requireUser } from '@/lib/supabase/server';
@@ -33,9 +34,12 @@ export default async function Dashboard() {
     mocks: (mocks.data || []).map(m => ({ slug: m.subject_slug, score: +m.score, max: +m.max_score, date: m.created_at })),
   };
   return (
-    <>
-      <TopBar email={user.email || ''} />
-      <DashboardView d={data} />
-    </>
+    <div className="shell">
+      <HomeSidebar subjects={data.subjects.filter(s => getSubject(s.slug)).map(s => ({ slug: s.slug, short: s.short, name: s.name }))} />
+      <div className="content">
+        <TopBar email={user.email || ''} />
+        <DashboardView d={data} />
+      </div>
+    </div>
   );
 }

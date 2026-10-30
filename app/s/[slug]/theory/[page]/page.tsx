@@ -16,11 +16,13 @@ export default async function TheoryPage({ params }: { params: Promise<{ slug: s
         <h1>Lecture {p.topic} · {mod.topics.find(t => t.id === p.topic)?.name}</h1>
         <span className="aside"><Link href={`/s/${slug}/cycle?topic=${p.topic}`}>Practise this lecture</Link></span>
       </div>
-      <h2 style={{ fontSize: 24, margin: '26px 0 14px', fontWeight: 600 }}>{p.title}</h2>
-      <Body />
-      <div className="actions" style={{ borderTop: '1px solid var(--rule)', paddingTop: 20, marginTop: 50 }}>
-        <span>{prev && <Link href={`/s/${slug}/theory/${prev.slug}`}>← Lecture {prev.topic}</Link>}</span>
-        <span>{next && <Link href={`/s/${slug}/theory/${next.slug}`}>Lecture {next.topic} →</Link>}</span>
+      <article className="panel doc">
+        <h2 className="doctitle">{p.title}</h2>
+        <Body />
+      </article>
+      <div className="pager">
+        <span>{prev && <Link className="btn ghost small" href={`/s/${slug}/theory/${prev.slug}`}>← Lecture {prev.topic}</Link>}</span>
+        <span>{next && <Link className="btn ghost small" href={`/s/${slug}/theory/${next.slug}`}>Lecture {next.topic} →</Link>}</span>
       </div>
     </div>
   );

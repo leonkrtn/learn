@@ -126,7 +126,7 @@ export default function MockExam({ past }: { past: PastMock[] }) {
         <span>{result ? `${fmtPts(result.total)} / ${spec.maxPts} points` : <>Time remaining <span className={'time' + (left < 600 ? ' low' : '')}>{mm}:{String(ss).padStart(2, '0')}</span></>}</span>
       </div>
       {result && (
-        <div className="endbox">
+        <div className="endbox panel">
           <h2>Result</h2>
           <div className="score">{fmtPts(result.total)} <span>/ {spec.maxPts}</span></div>
           {spec.grade && <p>{spec.grade(result.total)}. Time used: {result.minutes} minutes.</p>}
