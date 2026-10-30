@@ -45,7 +45,9 @@ export default function Sidebar() {
         {item('/cards', 'Flashcards', 'cards')}
         {item('/theory', 'Theory', 'theory')}
         {item('/formulas', 'Formula sheet', 'formula')}
+        {item('/slides', 'Slides', 'slides')}
         <div className="group">You</div>
+        {item('/cheatsheet', 'My cheatsheet', 'sheet')}
         {item('/stats', 'Statistics', 'stats')}
         {item('/settings', 'Settings', 'settings')}
       </nav>

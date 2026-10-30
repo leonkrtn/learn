@@ -12,14 +12,19 @@ async function boot() {
   await db.exec(`
     create role anon; create role authenticated;
     create schema auth;
-    create table auth.users (id uuid primary key);
+    create table auth.users (id uuid primary key, email text);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.uid', true), '')::uuid $$;
     grant usage on schema auth to authenticated;
     grant execute on function auth.uid() to authenticated;
-    insert into auth.users values ('${U1}'), ('${U2}');
+    insert into auth.users values ('${U1}', 'claude@wa-profis.de'), ('${U2}', 'jane.doe@example.com');
+    create schema storage;
+    create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+    create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+    alter table storage.objects enable row level security;
   `);
   await db.exec(readFileSync('supabase/setup.sql', 'utf8'));
-  await db.exec(`grant usage on schema public to authenticated; grant all on all tables in schema public to authenticated;`);
+  await db.exec(`grant usage on schema public to authenticated; grant all on all tables in schema public to authenticated;
+    grant usage on schema storage to authenticated; grant all on all tables in schema storage to authenticated;`);
   return db;
 }
 
@@ -80,4 +85,58 @@ test('decks: official visible to all, own decks private, overview counts', async
   const mine = ov.rows.find(r => r.name === 'Mine')!;
   assert.deepEqual([mine.total, mine.fresh, mine.due, mine.new_today], [2, 1, 1, 1]);
   await as(db, U1, () => db.query("select public.reset_subject_stats('fvcs')"));
+});
+
+test('slides: only the admin uploads, notes are public or private, replies follow their parent', async () => {
+  const db = await boot();
+  const prof = await db.query<{ display_name: string }>('select display_name from public.profiles order by display_name');
+  assert.deepEqual(prof.rows.map(r => r.display_name), ['claude', 'jane.doe']);
+  await assert.rejects(as(db, U2, () => db.query("insert into public.slide_decks (subject_slug, topic, title, storage_path, pages) values ('fvcs', '1', 'L1', 'fvcs/x.pdf', 10)")));
+  await assert.rejects(as(db, U2, () => db.query("insert into storage.objects (bucket_id, name) values ('slides', 'fvcs/x.pdf')")));
+  const deck = await as(db, U1, async () => {
+    await db.query("insert into storage.objects (bucket_id, name) values ('slides', 'fvcs/x.pdf')");
+    const d = await db.query<{ id: string }>("insert into public.slide_decks (subject_slug, topic, title, storage_path, pages) values ('fvcs', '1', 'L1', 'fvcs/x.pdf', 10) returning id");
+    return d.rows[0].id;
+  });
+  const ids = await as(db, U2, async () => {
+    const pub = await db.query<{ id: string }>(`insert into public.slide_notes (subject_slug, deck_id, page, body) values ('fvcs', '${deck}', 3, 'MM I: $V_L = V_U$') returning id`);
+    const priv = await db.query<{ id: string }>(`insert into public.slide_notes (subject_slug, deck_id, page, body, is_public) values ('fvcs', '${deck}', 3, 'mine', false) returning id`);
+    await db.query("insert into public.slide_notes (subject_slug, body) values ('fvcs', 'general note')");
+    return { pub: pub.rows[0].id, priv: priv.rows[0].id };
+  });
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.slide_notes (subject_slug, page, body) values ('fvcs', 3, 'page without deck')`)));
+  const seen = await as(db, U1, () => db.query<{ body: string; author: string }>('select body, author from public.slide_notes_view order by body'));
+  assert.deepEqual(seen.rows.map(r => r.body), ['MM I: $V_L = V_U$', 'general note'], 'private notes stay private');
+  assert.equal(seen.rows[0].author, 'jane.doe');
+  await as(db, U1, async () => {
+    await db.query(`insert into public.slide_notes (subject_slug, deck_id, page, parent_id, body) values ('fvcs', '${deck}', 3, '${ids.pub}', 'reply')`);
+    await db.query(`insert into public.note_votes (note_id) values ('${ids.pub}')`);
+  });
+  await assert.rejects(as(db, U1, () => db.query(`insert into public.slide_notes (subject_slug, deck_id, page, parent_id, body) values ('fvcs', '${deck}', 3, '${ids.priv}', 'sneaky')`)));
+  await assert.rejects(as(db, U1, () => db.query(`insert into public.note_votes (note_id) values ('${ids.priv}')`)));
+  const v = await as(db, U2, () => db.query<{ votes: number; voted: boolean }>(`select votes, voted from public.slide_notes_view where id = '${ids.pub}'`));
+  assert.deepEqual([v.rows[0].votes, v.rows[0].voted], [1, false]);
+  // Others cannot edit, the admin can delete for moderation.
+  const upd = await as(db, U1, () => db.query(`update public.slide_notes set body = 'x' where id = '${ids.pub}'`));
+  assert.equal(upd.affectedRows, 0);
+  await as(db, U1, () => db.query(`delete from public.slide_notes where id = '${ids.pub}'`));
+  const left = await db.query<{ n: number }>('select count(*)::int as n from public.slide_notes where deck_id is not null');
+  assert.equal(left.rows[0].n, 1, 'deleting a note removes its replies');
+});
+
+test('cheatsheets are private until shared', async () => {
+  const db = await boot();
+  await as(db, U1, async () => {
+    await db.query("insert into public.cheat_entries (subject_slug, topic, title, body, sort) values ('fvcs', '2', 'WACC', '$$r_{wacc}$$', 1), ('fvcs', null, 'General', 'text', 2)");
+  });
+  const hidden = await as(db, U2, () => db.query('select * from public.cheat_entries'));
+  assert.equal(hidden.rows.length, 0);
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.cheat_entries (user_id, subject_slug, title) values ('${U1}', 'fvcs', 'forged')`)));
+  await as(db, U1, () => db.query("insert into public.cheatsheets (subject_slug, shared) values ('fvcs', true)"));
+  const shared = await as(db, U2, () => db.query<{ author: string; entries: number }>('select author, entries from public.shared_cheatsheets'));
+  assert.deepEqual(shared.rows.map(r => [r.author, r.entries]), [['claude', 2]]);
+  const visible = await as(db, U2, () => db.query('select * from public.cheat_entries'));
+  assert.equal(visible.rows.length, 2);
+  const upd = await as(db, U2, () => db.query("update public.cheat_entries set title = 'x'"));
+  assert.equal(upd.affectedRows, 0);
 });

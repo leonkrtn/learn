@@ -23,3 +23,5 @@ New subjects are code modules plus seed content. Follow the exam-practice-builde
 - Screens narrower than 1024 px get a notice instead of the app.
 - Writes go through RLS as the signed-in user; `record_attempt` updates attempts, type statistics and the review schedule in one call.
 - Do not edit `supabase/setup.sql` or the content migration by hand; regenerate them.
+- Slides: PDFs live in the private Storage bucket `slides`; only the admin (`public.is_admin()`, email set in `supabase/migrations/20261030000000_slides_cheatsheets.sql`) uploads. Notes (`slide_notes`, read via `slide_notes_view`) are per slide or, with `deck_id` null, per subject. The pdf.js worker is copied to `public/vendor` on install.
+- User text (notes, cheatsheet entries) is rendered only through `lib/rich.ts` (escaped Markdown subset + KaTeX with trust off); never insert it as raw HTML.
