@@ -30,6 +30,7 @@ export function PdfCanvas({ doc, n, ratio, eager, children }: { doc: PDFDocument
   const canvas = useRef<HTMLCanvasElement>(null);
   const [near, setNear] = useState(!!eager);
   const [width, setWidth] = useState(0);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const el = box.current;
@@ -54,13 +55,13 @@ export function PdfCanvas({ doc, n, ratio, eager, children }: { doc: PDFDocument
       const c = canvas.current;
       c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
       task = page.render({ canvasContext: c.getContext('2d')!, viewport: vp });
-      task.promise.catch(() => {});
+      task.promise.then(() => { if (!cancelled) setReady(true); }, () => {});
     });
     return () => { cancelled = true; task?.cancel(); };
   }, [doc, n, near, width]);
 
   return (
-    <div ref={box} className="pdfpage" style={{ aspectRatio: String(1 / ratio) }}>
+    <div ref={box} className={'pdfpage' + (ready ? ' ready' : '')} style={{ aspectRatio: String(1 / ratio) }}>
       <canvas ref={canvas} aria-label={`Slide ${n}`} />
       {children}
     </div>

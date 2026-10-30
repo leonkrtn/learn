@@ -1,8 +1,9 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import Icon from './Icons';
 
-/** Top bar: current location on the left, account on the right. */
-export default function TopBar({ email, crumbs }: { email: string; crumbs?: { href?: string; label: string }[] }) {
+/** Top bar: current location on the left, page actions and account on the right. */
+export default function TopBar({ email, crumbs, actions }: { email: string; crumbs?: { href?: string; label: string }[]; actions?: ReactNode }) {
   const initials = (email.split('@')[0].match(/[a-z0-9]/gi) || ['?']).slice(0, 2).join('').toUpperCase();
   return (
     <header className="topbar">
@@ -13,6 +14,7 @@ export default function TopBar({ email, crumbs }: { email: string; crumbs?: { hr
       </nav>
       <div className="spacer" />
       <div className="right">
+        {actions}
         <span className="avatar" aria-hidden>{initials}</span>
         <span className="who">{email}</span>
         <form action="/auth/signout" method="post"><button className="iconbtn" type="submit" title="Sign out"><Icon name="signout" size={18} /><span>Sign out</span></button></form>
