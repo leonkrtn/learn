@@ -13,6 +13,8 @@ export type Question = {
   html: string;
   parts: Part[];
   pts?: number;
+  /** Worked solution (generator HTML), shown after checking. */
+  solution?: string;
 };
 
 export type ConceptMc = { q: string; correct: string[]; distractors: string[] };

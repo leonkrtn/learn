@@ -5,6 +5,7 @@ const P: Record<string, ReactNode> = {
   practice: <><circle cx="12" cy="12" r="8.5" /><path d="m10 8.5 5.5 3.5-5.5 3.5z" /></>,
   cycle: <><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1" /><path d="M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.5 3.5v3.4h-3.4" /><path d="M6.5 20.5v-3.4h3.4" /></>,
   review: <><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4.5v3.8h3.8" /><path d="M12 8v4.2l2.8 1.8" /></>,
+  ps: <><path d="M10 6.5h10M10 12h10M10 17.5h10" /><path d="m3.5 6.5 1.5 1.5 2.5-3M3.5 12l1.5 1.5 2.5-3M3.5 17.5l1.5 1.5 2.5-3" /></>,
   mock: <><rect x="5" y="3.5" width="14" height="17" rx="2.5" /><path d="M9 3.5V5h6V3.5" /><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4" /></>,
   cards: <><rect x="3.5" y="7" width="13" height="13" rx="2.5" /><path d="M7.5 7V5.5A2 2 0 0 1 9.5 3.5h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H16.5" /></>,
   theory: <><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" /><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" /></>,

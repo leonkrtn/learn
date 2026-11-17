@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { allTypes } from '@/lib/subject';
 import { getSubject } from '@/subjects';
 
 export type DashSubject = { slug: string; name: string; short: string; trimester: number; answers: number; correct: number };
@@ -18,7 +19,8 @@ export default function DashboardView({ d }: { d: DashData }) {
   const A = ready.reduce((a, s) => a + s.answers, 0), C = ready.reduce((a, s) => a + s.correct, 0);
   const worst = d.weak[0];
   const wMod = worst && getSubject(worst.slug)!;
-  const wType = worst && wMod!.types.find(x => x.key === worst.type);
+  const wType = worst && allTypes(wMod!).find(x => x.key === worst.type);
+  const wSet = worst && wMod!.problemSets?.find(p => p.types.some(t => t.key === worst.type));
   const last = d.mocks[0];
   return (
     <div className="dash">
@@ -26,7 +28,9 @@ export default function DashboardView({ d }: { d: DashData }) {
         {worst ? (
           <>
             <h1>{Math.round(100 * worst.rate)}% on {wType?.name || worst.type}</h1>
-            <p className="greet">Your weakest question type, in {wMod!.name}. <Link href={`/s/${worst.slug}/cycle?topic=${wType?.topic || ''}`}>Practise lecture {wType?.topic}</Link></p>
+            <p className="greet">Your weakest question type, in {wMod!.name}. {wSet
+              ? <Link href={`/s/${worst.slug}/ps?run=1&set=${wSet.id}`}>Practise problem set {wSet.id}</Link>
+              : <Link href={`/s/${worst.slug}/cycle?topic=${wType?.topic || ''}`}>Practise lecture {wType?.topic}</Link>}</p>
           </>
         ) : A ? (
           <><h1>{A} answers, {pct(C, A)} correct</h1><p className="greet">Weak spots show up here after three answers per question type.</p></>
@@ -69,8 +73,9 @@ export default function DashboardView({ d }: { d: DashData }) {
           {d.weak.length > 1 ? (
             <ul>{d.weak.slice(1).map(w => {
               const mod = getSubject(w.slug)!;
-              const t = mod.types.find(x => x.key === w.type);
-              return <li key={w.slug + w.type}><Link href={`/s/${w.slug}/cycle?topic=${t?.topic || ''}`}><small>{mod.short}</small>{t?.name || w.type}</Link><span className="v weak num">{Math.round(100 * w.rate)}%</span></li>;
+              const t = allTypes(mod).find(x => x.key === w.type);
+              const ps = mod.problemSets?.find(p => p.types.some(x => x.key === w.type));
+              return <li key={w.slug + w.type}><Link href={ps ? `/s/${w.slug}/ps?run=1&set=${ps.id}` : `/s/${w.slug}/cycle?topic=${t?.topic || ''}`}><small>{mod.short}</small>{t?.name || w.type}</Link><span className="v weak num">{Math.round(100 * w.rate)}%</span></li>;
             })}</ul>
           ) : <div className="empty">Listed after three answers per question type.</div>}
           <h3>Mock exams</h3>
