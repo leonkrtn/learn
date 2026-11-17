@@ -6,6 +6,7 @@ import { SUBJECTS } from '../subjects';
 import { allTypes } from '../lib/subject';
 import { canRepeat, sameWithNewNumbers } from '../lib/engine/repeat';
 import type { Question } from '../lib/engine/types';
+import { SET_SIZE, drawItems, insertRepeat, isUsable, poolKey, reviewItems, type QSet } from '../lib/engine/sets';
 import fvcs from '../subjects/fvcs';
 import { BANK } from '../subjects/fvcs/concepts';
 import { BANK as FV_BANK } from '../subjects/fv/concepts';
@@ -266,4 +267,32 @@ test('"same question, new numbers" keeps the variant and sub-questions of every 
       }
     }
   }
+});
+
+test('question sets: 20 drawn, survive JSON, repeat takes a slot, pool changes invalidate', () => {
+  const mod = fi, ctx = { bank: BANKS.fi };
+  const pool = mod.types.filter(t => t.topic === '1');
+  const sig = poolKey(pool.map(t => t.key));
+  assert.equal(sig, poolKey([...pool.map(t => t.key)].reverse()));
+  assert.notEqual(sig, poolKey(pool.slice(1).map(t => t.key)));
+  const items = drawItems(pool, ctx, {}, SET_SIZE);
+  assert.equal(items.length, SET_SIZE);
+  for (let i = 1; i < items.length; i++) assert.notEqual(items[i].type, items[i - 1].type, 'no type twice in a row');
+  const s: QSet = JSON.parse(JSON.stringify({ pool: sig, items, pos: 3 }));
+  const usable = (x: QSet, p: string): boolean => isUsable(x, p, mod.types);
+  assert.ok(usable(s, sig));
+  assert.ok(!usable(s, 'other'));
+  assert.ok(!usable({ ...s, items: [{ type: 'nope', q: items[0].q }] }, sig));
+  const extra = { type: items[3].type, q: items[3].q };
+  const r = insertRepeat(s, extra, () => { throw new Error('no refill mid-set'); });
+  assert.equal(r.items.length, SET_SIZE);
+  assert.equal(r.pos, 4);
+  assert.equal(r.items[4], extra);
+  assert.equal(r.items[SET_SIZE - 1], s.items[SET_SIZE - 2], 'the last unseen question makes room');
+  const end = insertRepeat({ ...s, pos: SET_SIZE - 1 }, extra, n => drawItems(pool, ctx, {}, n));
+  assert.equal(end.pos, 0);
+  assert.equal(end.items[0], extra);
+  assert.equal(end.items.length, SET_SIZE);
+  const rev = reviewItems([{ type_key: 'L1.capm', box: 2 }, { type_key: 'L2.apt', box: 0 }, { type_key: 'gone', box: 0 }], mod.types, ctx, SET_SIZE);
+  assert.deepEqual(rev.map(x => x.type), mod.types.some(t => t.key === 'L2.apt') ? ['L2.apt', 'L1.capm'] : ['L1.capm']);
 });

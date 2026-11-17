@@ -1,0 +1,74 @@
+// Fixed question sets: questions are drawn 20 at a time and kept (with the answers given) until the set is done,
+// so a set looks the same after a reload or on another device. Pure helpers; storage lives in the Runner.
+import { gradeQuestion } from './grade';
+import { pickAdaptive, type EmaMap } from './select';
+import type { Answers, Question, TypeDef } from './types';
+
+export const SET_SIZE = 20;
+
+export type SetItem = { type: string; q: Question; answers?: Answers; checked?: boolean };
+/** `pos` may equal `items.length`: the set is finished and the next one has not been drawn yet. */
+export type QSet = { pool: string; items: SetItem[]; pos: number };
+
+/** Short fingerprint of a question pool, so a change in the enabled types starts a new set. */
+export function poolKey(keys: string[]): string {
+  let h = 5381;
+  for (const c of [...keys].sort().join(',')) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0;
+  return keys.length + ':' + h.toString(36);
+}
+
+const gen = (t: TypeDef, ctx: Parameters<TypeDef['gen']>[0]): Question | null => { try { return t.gen(ctx); } catch { return null; } };
+
+/** Adaptive draw of `n` questions from `pool` (topics evenly, weak types more often, no type twice in a row). */
+export function drawItems(pool: TypeDef[], ctx: Parameters<TypeDef['gen']>[0], ema: EmaMap, n: number, last: { type?: string; topic?: string } = {}): SetItem[] {
+  const out: SetItem[] = [];
+  for (let t = 0; out.length < n && pool.length && t < n * 3; t++) {
+    const type = pickAdaptive(pool, ema, last);
+    last = { type: type.key, topic: type.topic };
+    const q = gen(type, ctx);
+    if (q) out.push({ type: type.key, q });
+  }
+  return out;
+}
+
+/** One question per due type, lowest box first. */
+export function reviewItems(due: { type_key: string; box: number }[], types: TypeDef[], ctx: Parameters<TypeDef['gen']>[0], n: number): SetItem[] {
+  const out: SetItem[] = [];
+  for (const d of [...due].sort((a, b) => a.box - b.box)) {
+    if (out.length >= n) break;
+    const t = types.find(x => x.key === d.type_key);
+    const q = t && gen(t, ctx);
+    if (q) out.push({ type: t.key, q });
+  }
+  return out;
+}
+
+/** A stored set is usable if it was drawn from the same pool and every type still exists. */
+export function isUsable(s: QSet | null | undefined, pool: string, types: TypeDef[]): s is QSet {
+  if (!s || s.pool !== pool || !Array.isArray(s.items) || !s.items.length) return false;
+  if (!Number.isInteger(s.pos) || s.pos < 0 || s.pos > s.items.length) return false;
+  const keys = new Set(types.map(t => t.key));
+  return s.items.every(it => it && keys.has(it.type) && it.q && Array.isArray(it.q.parts) && it.q.parts.length > 0);
+}
+
+/**
+ * Puts a repeat of the current question right after it. It counts as one of the set's questions, so the last
+ * unseen question makes room; on the last question it opens the next set (`refill` supplies the rest).
+ */
+export function insertRepeat(s: QSet, item: SetItem, refill: (n: number) => SetItem[]): QSet {
+  if (s.pos >= s.items.length - 1) return { pool: s.pool, items: [item, ...refill(SET_SIZE - 1)], pos: 0 };
+  const items = [...s.items.slice(0, s.pos + 1), item, ...s.items.slice(s.pos + 1)];
+  if (items.length > SET_SIZE) items.pop();
+  return { ...s, items, pos: s.pos + 1 };
+}
+
+/** Answers and correct parts over the checked questions of a set. */
+export function setTally(s: QSet | null, tolerance: number): { a: number; c: number } {
+  let a = 0, c = 0;
+  for (const it of s?.items || []) {
+    if (!it.checked) continue;
+    const g = gradeQuestion(it.q, it.answers || {}, tolerance);
+    a += g.a; c += g.c;
+  }
+  return { a, c };
+}
