@@ -5,8 +5,10 @@ import { pickAdaptive, type EmaMap } from './select';
 import type { Answers, Question, TypeDef } from './types';
 
 export const SET_SIZE = 20;
+/** Upper bound when repeats are added to a set whose questions have all been seen (matches the table's check). */
+export const SET_MAX = 40;
 
-export type SetItem = { type: string; q: Question; answers?: Answers; checked?: boolean };
+export type SetItem = { type: string; q: Question; answers?: Answers; checked?: boolean; seen?: boolean };
 /** `pos` may equal `items.length`: the set is finished and the next one has not been drawn yet. */
 export type QSet = { pool: string; items: SetItem[]; pos: number };
 
@@ -51,14 +53,29 @@ export function isUsable(s: QSet | null | undefined, pool: string, types: TypeDe
   return s.items.every(it => it && keys.has(it.type) && it.q && Array.isArray(it.q.parts) && it.q.parts.length > 0);
 }
 
+/** Shown at least once; sets stored before `seen` existed count everything up to the position. */
+export const isSeen = (s: QSet, i: number) => i <= s.pos || !!s.items[i]?.seen || !!s.items[i]?.checked;
+
+/** Moves to question `i` (clamped) and marks it seen. */
+export function goTo(s: QSet, i: number): QSet {
+  const pos = Math.max(0, Math.min(i, s.items.length - 1));
+  return { ...s, pos, items: s.items.map((x, j) => j === pos && !x.seen ? { ...x, seen: true } : x) };
+}
+
 /**
- * Puts a repeat of the current question right after it. It counts as one of the set's questions, so the last
- * unseen question makes room; on the last question it opens the next set (`refill` supplies the rest).
+ * Puts a repeat of the current question right after it and moves there. It counts as one of the set's questions,
+ * so the last unseen question makes room; on the last question it opens the next set (`refill` supplies the rest).
  */
 export function insertRepeat(s: QSet, item: SetItem, refill: (n: number) => SetItem[]): QSet {
-  if (s.pos >= s.items.length - 1) return { pool: s.pool, items: [item, ...refill(SET_SIZE - 1)], pos: 0 };
-  const items = [...s.items.slice(0, s.pos + 1), item, ...s.items.slice(s.pos + 1)];
-  if (items.length > SET_SIZE) items.pop();
+  const seen = { ...item, seen: true };
+  if (s.pos >= s.items.length - 1 || s.items.length >= SET_MAX) return { pool: s.pool, items: [seen, ...refill(SET_SIZE - 1)], pos: 0 };
+  const items = [...s.items.slice(0, s.pos + 1), seen, ...s.items.slice(s.pos + 1)];
+  if (items.length > SET_SIZE) {
+    // Never drop a question that was already shown; with none left unseen the set grows by one.
+    let k = -1;
+    for (let j = items.length - 1; j > s.pos + 1; j--) if (!isSeen({ ...s, items }, j)) { k = j; break; }
+    if (k >= 0) items.splice(k, 1);
+  }
   return { ...s, items, pos: s.pos + 1 };
 }
 
