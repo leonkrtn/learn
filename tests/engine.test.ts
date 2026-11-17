@@ -9,12 +9,15 @@ import { BANK as FV_BANK } from '../subjects/fv/concepts';
 import { BANK as FI_BANK } from '../subjects/fi/concepts';
 import { BANK as IFD_BANK } from '../subjects/ifd/concepts';
 import { BANK as FD_BANK } from '../subjects/fd/concepts';
+import { BANK as PIF_BANK } from '../subjects/pif/concepts';
 import { binom, bs, impliedVol, Phi } from '../subjects/fd/generators';
 import { renderRich } from '../lib/rich';
 import { clearRating, ratingOf, RATING_NAMES, solveFace } from '../subjects/ifd/generators';
 import fi from '../subjects/fi';
+import pif from '../subjects/pif';
+import { colL, normSInv, taxOf, code } from '../subjects/pif/generators';
 
-const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK, ifd: IFD_BANK, fd: FD_BANK };
+const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK, ifd: IFD_BANK, fd: FD_BANK, pif: PIF_BANK };
 
 test('parseNum accepts comma and point formats', () => {
   const cases: [string, number][] = [
@@ -188,6 +191,32 @@ test('FI mock exam follows the sample exam: 26 questions, 100 marks', () => {
     const ex = fi.mock!.build({ bank: FI_BANK });
     assert.deepEqual(ex.parts.map(p => p.qs.length), [19, 3, 3, 2]);
     assert.deepEqual(ex.parts.map(p => p.qs.reduce((a, q) => a + (q.pts || 0), 0)), [38, 27, 21, 14]);
+  }
+});
+
+test('PIF reproduces the class numbers', () => {
+  // ProgFin-3 and the workbook: 20 000 → 4 273.405 (row 6), 30 000 → 7 800.805 (row 8).
+  assert.ok(Math.abs(taxOf(20000) - 4273.405) < 1e-6);
+  assert.ok(Math.abs(taxOf(30000) - 7800.805) < 1e-6);
+  assert.ok(Math.abs(taxOf(7479) - 7479 * 0.145) < 1e-9);
+  // NORM.INV(0.975, 0, 0.01) ≈ 0.0196; NORM.S.INV(0.5) = 0.
+  assert.ok(Math.abs(normSInv(0.975) - 1.959964) < 1e-5);
+  assert.ok(Math.abs(normSInv(0.025) + 1.959964) < 1e-5);
+  assert.ok(Math.abs(normSInv(0.5)) < 1e-12);
+  assert.equal(colL(1) + colL(26) + colL(27), 'AZAA');
+  // Slide II: Sharpe with rf = 2%: A (14.14% − 2%) / 19.57% = 0.62, B (14% − 2%) / 15.99% = 0.75.
+  assert.equal(((0.1414 - 0.02) / 0.1957).toFixed(2), '0.62');
+  assert.equal(((0.14 - 0.02) / 0.1599).toFixed(2), '0.75');
+  // Code blocks escape markup and keep string literals out of comment highlighting.
+  assert.equal(code(['If x <> 0 Then MsgBox ("it\'s") \' note']), '<pre class="vba"><code>If x &lt;&gt; 0 Then MsgBox ("it\'s") <span class="c">\' note</span></code></pre>');
+});
+
+test('PIF mock exam: 22 questions, 100 marks in 120 minutes', () => {
+  for (let i = 0; i < 50; i++) {
+    const ex = pif.mock!.build({ bank: PIF_BANK });
+    assert.deepEqual(ex.parts.map(p => p.qs.length), [12, 10, 4]);
+    assert.deepEqual(ex.parts.map(p => p.qs.reduce((a, q) => a + (q.pts || 0), 0)), [24, 40, 36]);
+    assert.deepEqual(ex.parts.map(p => p.pts), [24, 40, 36]);
   }
 });
 
