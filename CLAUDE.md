@@ -12,10 +12,19 @@ New subjects are code modules plus seed content. Follow the exam-practice-builde
    - `cards.ts`: official flashcards with stable `key`s.
    - `FormulaSheet.tsx`: exactly the sheet handed out in the exam.
    - `theory/`: one client component per topic (steps, formulas, a `Lab` with sliders, worked example, `.pitfall` blocks, `<TheoryQuiz topic=… />`), registered in `theory/index.ts`.
-   - `index.ts`: the `SubjectModule` (topics, types with weights, `typeKeyOf`, optional `mock` spec with the real paper's structure).
+   - `explain/`: one explanation per question type (see "Question-type explanations" below), merged in `explain/index.ts`.
+   - `index.ts`: the `SubjectModule` (topics, types with weights, `typeKeyOf`, optional `mock` spec with the real paper's structure, `explain`).
 2. Register the module in `subjects/index.ts`.
 3. Add the subject, its trimester, bank and deck to `scripts/build-seed.ts`, run `npm run seed:sql`, and run the new content migration (or `supabase/setup.sql`) in Supabase.
 4. Extend `tests/engine.test.ts` so every new generator runs a few hundred times with finite answers, then `npm test` and `npm run build`.
+
+## Question-type explanations
+
+Every question type in `allTypes(mod)` (lecture and problem-set types, concept types included) needs an explanation in `subjects/<slug>/explain/`. A wrong answer in practice, review, problem sets or the mock exam shows "Explain this question type", which opens it in a lightbox (`components/Explain.tsx`). Whenever you add a question type, add its explanation in the same change; `tests/explain.test.ts` fails for any type without one.
+
+- Write it with the `ex` template from `lib/explain.ts`: sections `@task`, `@idea`, `@steps` (numbered list), `@example`, `@solution` (numbered list), `@answer`, `@pitfalls` (bullet list). Markdown with `$…$` formulas, `| tables |` and `~~~` code blocks; `\`` gives an inline-code backtick, `\$` a literal dollar sign.
+- The worked example uses fixed numbers in the exact format of the generated question; compute every number, do not estimate. Keep € amounts outside formulas (KaTeX has no € glyph).
+- A problem-set type that practises the same calculation as a lecture type maps to it by key (`'PS2.rating': 'L2.riskyDebt'`); give it its own explanation when the task differs.
 
 ## Conventions
 
