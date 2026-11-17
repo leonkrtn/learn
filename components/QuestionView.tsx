@@ -76,6 +76,12 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
                         autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" aria-label={'Answer ' + LET[i]}
                         readOnly={locked} value={(answers[i] as string) ?? ''} onChange={e => set(i, e.target.value)} onKeyDown={onKey} />
                     </div>
+                  ) : p.type === 'choice' && p.options.length > 6 ? (
+                    <select className={'selin' + (r ? (r.ok ? ' ok' : ' bad') : '')} aria-label={'Answer ' + LET[i]} disabled={locked}
+                      value={typeof answers[i] === 'number' ? String(answers[i]) : ''} onChange={e => e.target.value !== '' && set(i, +e.target.value)}>
+                      <option value="">Choose…</option>
+                      {p.options.map((o, j) => <option key={j} value={j}>{o}</option>)}
+                    </select>
                   ) : p.type === 'choice' ? (
                     <div className={'seg' + (p.options.some(o => o.length > 14) ? ' stack' : '')}>
                       {p.options.map((o, j) => {
