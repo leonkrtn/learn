@@ -222,6 +222,10 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 4px
 .qtext ul { margin: 0 0 14px; padding-left: 24px; }
 .qtext li { margin: 2px 0; }
 .qtext blockquote { margin: 6px 0 18px; padding: 10px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 var(--r-sm) var(--r-sm) 0; font-style: italic; }
+/* VBA code in questions, theory pages and the formula sheet; comments in a lighter ink. */
+pre.vba { margin: 6px 0 18px; padding: 12px 16px; max-width: 820px; overflow-x: auto; background: var(--soft); border: 1px solid var(--rule); border-radius: var(--r-sm); font: 13.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); white-space: pre; tab-size: 4; }
+pre.vba code { font: inherit; background: none; padding: 0; border-radius: 0; }
+pre.vba .c { color: var(--faint); }
 table.data { border-collapse: collapse; margin: 6px 0 20px; font-size: 15.5px; font-variant-numeric: tabular-nums lining-nums; }
 table.data th, table.data td { padding: 8px 14px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 table.data thead th { border-bottom: 1px solid var(--rule-strong); font-weight: 600; color: var(--ink-2); }
