@@ -12,11 +12,9 @@ export type Settings = {
   enabled: string[] | null;
   /** Enabled problem-set type keys; null means all. */
   ps: string[] | null;
-  mode: 'endless' | 'session';
-  sessionLen: number;
   newPerDay: number;
 };
-export const DEFAULT_SETTINGS: Settings = { enabled: null, ps: null, mode: 'endless', sessionLen: 20, newPerDay: 20 };
+export const DEFAULT_SETTINGS: Settings = { enabled: null, ps: null, newPerDay: 20 };
 
 export type TypeStat = { answers: number; correct: number; ema: number };
 export type DueItem = { type_key: string; topic: string; due_at: string; box: number };
@@ -30,6 +28,9 @@ type Ctx = {
   due: DueItem[];
   record: (typeKey: string, topic: string, mode: string, total: number, correct: number, detail?: unknown) => void;
   syncError: string | null;
+  /** Lecture of the question on screen, so the cheatsheet drawer can file a new entry under it. */
+  focusTopic: string | null;
+  setFocusTopic: (t: string | null) => void;
 };
 
 const SubjectCtx = createContext<Ctx | null>(null);
@@ -53,6 +54,7 @@ export function SubjectProvider({ slug, bank, initialSettings, initialStats, ini
   const [stats, setStats] = useState(initialStats);
   const [due, setDue] = useState(initialDue);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [focusTopic, setFocusTopic] = useState<string | null>(null);
 
   const saveSettings = useCallback(async (s: Settings) => {
     setSettings(s);
@@ -80,6 +82,7 @@ export function SubjectProvider({ slug, bank, initialSettings, initialStats, ini
     }).then(({ error }) => setSyncError(error ? 'Your last answer was not saved: ' + error.message : null));
   }, [slug]);
 
-  const value = useMemo(() => ({ mod, bank, settings, saveSettings, stats, due, record, syncError }), [mod, bank, settings, saveSettings, stats, due, record, syncError]);
+  const value = useMemo(() => ({ mod, bank, settings, saveSettings, stats, due, record, syncError, focusTopic, setFocusTopic }),
+    [mod, bank, settings, saveSettings, stats, due, record, syncError, focusTopic]);
   return <SubjectCtx.Provider value={value}>{children}</SubjectCtx.Provider>;
 }

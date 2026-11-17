@@ -860,6 +860,10 @@ input.textin:focus, .field select:focus { outline: none; border-color: var(--acc
 .dentry { padding: 10px 0; border-bottom: 1px solid var(--rule); }
 .dentry b { display: block; font-size: 14px; margin-bottom: 4px; }
 .dentry .rich { font-size: 14.5px; }
+.dentry.fresh { box-shadow: inset 2px 0 0 var(--right); padding-left: 10px; }
+.drawerbody > .centry.editing { margin: 2px 0 14px; }
+.drawer .editrow { flex-wrap: wrap; }
+.drawer .editrow .field.grow { flex: 1 1 100%; }
 
 /* ---------- print: only the cheatsheet, dense A4 ---------- */
 @media print {

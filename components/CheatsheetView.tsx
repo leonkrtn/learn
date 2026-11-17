@@ -221,7 +221,7 @@ function DeleteButton({ onDelete }: { onDelete: () => void }) {
   );
 }
 
-function EntryEditor({ initial, topics, onSave, onCancel }: {
+export function EntryEditor({ initial, topics, onSave, onCancel }: {
   initial: { title: string; body: string; topic: string | null };
   topics: { id: string; name: string }[];
   onSave: (v: { title: string; body: string; topic: string | null }) => Promise<void>;

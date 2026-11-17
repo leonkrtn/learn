@@ -32,15 +32,6 @@ export default function SettingsForm() {
       <div style={{ height: 22 }} />
       <ProfileName />
       <fieldset>
-        <legend>Practice mode</legend>
-        <label className="opt"><input type="radio" name="mode" checked={s.mode === 'endless'} onChange={() => setS({ ...s, mode: 'endless' })} /> Endless: one question after another</label>
-        <label className="opt"><input type="radio" name="mode" checked={s.mode === 'session'} onChange={() => setS({ ...s, mode: 'session' })} /> Session of
-          <select value={s.sessionLen} onChange={e => setS({ ...s, mode: 'session', sessionLen: +e.target.value })}>
-            {[10, 15, 20, 30, 40].map(n => <option key={n} value={n}>{n}</option>)}
-          </select> questions, then a score</label>
-      </fieldset>
-
-      <fieldset>
         <legend>Question types</legend>
         <p className="note" style={{ marginTop: 0 }}>Each lecture and each question type can be switched on its own, for example to drill only one calculation. Lectures are drawn equally often; types you get wrong come back more often, always with new numbers.</p>
         <div className="actions" style={{ justifyContent: 'flex-start', margin: '6px 0 14px' }}>

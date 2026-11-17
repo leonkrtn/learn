@@ -40,7 +40,7 @@ test('setup.sql applies twice and seeds content', async () => {
   assert.deepEqual(n.rows.map(r => r.s), ['fd', 'fi', 'fv', 'fvcs', 'ifd', 'pif']);
   assert.equal(n.rows.find(r => r.s === 'fvcs')!.n, 216);
   const tri = await db.query<{ slug: string; t: number }>('select slug, trimester_id as t from public.subjects order by slug');
-  assert.deepEqual(tri.rows.map(r => r.slug + ':' + r.t), ['fd:2', 'fi:2', 'fv:2', 'fvcs:1', 'ifd:2']);
+  assert.deepEqual(tri.rows.map(r => r.slug + ':' + r.t), ['fd:2', 'fi:2', 'fv:2', 'fvcs:1', 'ifd:2', 'pif:2']);
   const c = await db.query<{ n: number }>('select count(*)::int as n from public.cards');
   assert.ok(c.rows[0].n >= 50);
 });
@@ -162,4 +162,19 @@ test('pins sit on a slide inside its bounds, stars are private', async () => {
   const theirs = await as(db, U2, () => db.query('select * from public.slide_stars'));
   assert.equal(theirs.rows.length, 0);
   await assert.rejects(as(db, U2, () => db.query(`insert into public.slide_stars (user_id, deck_id, page) values ('${U1}', '${deck}', 1)`)));
+});
+
+test('practice_sets: one row per scope, private, cleared by reset', async () => {
+  const db = await boot();
+  const up = (pos: number) => db.query(`insert into public.practice_sets (subject_slug, scope, pool, items, pos) values ('fvcs', 'practice', 'p', '[{"type":"L1.mm2","q":{}}]', ${pos})
+    on conflict (user_id, subject_slug, scope) do update set items = excluded.items, pos = excluded.pos, updated_at = now()`);
+  await as(db, U1, async () => { await up(0); await up(1); });
+  const mine = await as(db, U1, () => db.query<{ pos: number }>('select pos from public.practice_sets'));
+  assert.deepEqual(mine.rows.map(r => r.pos), [1]);
+  const other = await as(db, U2, () => db.query('select * from public.practice_sets'));
+  assert.equal(other.rows.length, 0, 'RLS hides other users’ sets');
+  await assert.rejects(as(db, U1, () => db.query("insert into public.practice_sets (subject_slug, scope, pool, items) values ('fvcs', 'review', 'p', '{}')")));
+  await as(db, U1, () => db.query("select public.reset_subject_stats('fvcs')"));
+  const left = await db.query('select * from public.practice_sets');
+  assert.equal(left.rows.length, 0);
 });
