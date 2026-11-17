@@ -33,6 +33,9 @@ export type ProblemSet = {
   source?: string;
 };
 
+/** Entry of a suggested exam cheatsheet: Markdown with $…$ formulas, rendered by lib/rich.ts. `topic` is a lecture id, null for general. */
+export type SheetBlock = { topic: string | null; title: string; body: string };
+
 export type SubjectModule = {
   slug: string;
   name: string;
@@ -47,6 +50,8 @@ export type SubjectModule = {
   /** Questions in the format of the problem sets, practised on their own page. */
   problemSets?: ProblemSet[];
   FormulaSheet: ComponentType;
+  /** Suggested cheatsheet for the exam (one A4 sheet, front and back), printable or copied entry by entry. */
+  cheatsheet?: SheetBlock[];
   theory: TheoryPage[];
   answerNote: string;
 };

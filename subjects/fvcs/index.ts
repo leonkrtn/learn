@@ -3,6 +3,7 @@ import { resetNames } from '@/lib/engine/gen-helpers';
 import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { MockExam, SubjectModule } from '@/lib/subject';
 import { LECTURES } from './concepts';
+import { CHEATSHEET } from './cheatsheet';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
 import { THEORY } from './theory';
@@ -115,6 +116,7 @@ const fvcs: SubjectModule = {
     grade: s => (Math.round(s * 10) / 10).toFixed(1) + ' on the 0–20 scale' + (s >= 9.5 ? ', pass' : ', fail'),
   },
   FormulaSheet,
+  cheatsheet: CHEATSHEET,
   theory: THEORY,
   answerNote: 'Enter numbers without units. Percentages may be entered as 12.5 or 0.125. Decimal comma and decimal point both work. Use the minus sign for negative values.',
 };

@@ -8,10 +8,13 @@ import { BANK } from '../subjects/fvcs/concepts';
 import { BANK as FV_BANK } from '../subjects/fv/concepts';
 import { BANK as FI_BANK } from '../subjects/fi/concepts';
 import { BANK as IFD_BANK } from '../subjects/ifd/concepts';
+import { BANK as FD_BANK } from '../subjects/fd/concepts';
+import { binom, bs, impliedVol, Phi } from '../subjects/fd/generators';
+import { renderRich } from '../lib/rich';
 import { clearRating, ratingOf, RATING_NAMES, solveFace } from '../subjects/ifd/generators';
 import fi from '../subjects/fi';
 
-const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK, ifd: IFD_BANK };
+const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK, ifd: IFD_BANK, fd: FD_BANK };
 
 test('parseNum accepts comma and point formats', () => {
   const cases: [string, number][] = [
@@ -130,6 +133,45 @@ test('IFD reproduces the quiz and lecture numbers', () => {
   assert.ok(Math.abs(solveFace([700, 400, 200], [0.3, 0.6, 0.1], 245) - 250) < 1e-6);
   // Effort with debt: 0.6F + 0.4·75 = 100.
   assert.ok(Math.abs(solveFace([125, 75, 0], [0.6, 0.4, 0], 100) - 116.6667) < 1e-3);
+});
+
+test('FD reproduces the lecture and problem set 1 numbers', () => {
+  const near = (a: number, b: number, tol: number, what: string) => assert.ok(Math.abs(a - b) < tol, `${what}: ${a} vs ${b}`);
+  // Lecture: one-period call, S0 = 100, u = 1.2712, d = 0.8521, r = 6.18%, X = 110 → 8.07.
+  near(binom({ S: 100, X: 110, n: 1, u: 1.2712, d: 0.8521, growth: 1.0618, disc: 1 / 1.0618 }).V[0][0], 8.07, 0.01, 'one period');
+  // Lecture: American put, u = 1.1752, d = 0.8857, r = 3.04%, X = 110 → 11.79, exercised at the down node.
+  const am = binom({ S: 100, X: 110, n: 2, u: 1.1752, d: 0.8857, growth: 1.0304, disc: 1 / 1.0304, put: true, american: true });
+  near(am.V[0][0], 11.79, 0.01, 'American put'); assert.ok(am.ex[1][1] && !am.ex[1][0]);
+  // Lecture: four periods, u = 1.1, d = 0.95, r = 5%, X = 120: the slide rounds π to 0.67 and gets 6.5; exactly π = 2/3 and 6.39.
+  near(binom({ S: 100, X: 120, n: 4, u: 1.1, d: 0.95, growth: 1.05, disc: 1 / 1.05 }).V[0][0], 6.39, 0.005, 'four periods');
+  // Hull's textbook values: S = 42, X = 40, r = 10%, σ = 20%, T = 0.5 → c = 4.76, p = 0.81.
+  const h = bs(42, 40, 0.5, 0.1, 0.2); near(h.c, 4.76, 0.005, 'BS call'); near(h.p, 0.81, 0.005, 'BS put');
+  near(impliedVol(h.c, 42, 40, 0.5, 0.1), 0.2, 1e-4, 'implied vol'); near(Phi(1.96), 0.975, 1e-4, 'Phi');
+  // PS1 2A: put interval for strike 15 → 6.70 to 7.30.
+  near(4 - 12 + 15 * Math.exp(-0.02), 6.70, 0.01, 'p ask'); near(4.6 - 12 + 15 * Math.exp(-0.02), 7.30, 0.01, 'p bid');
+  // PS1 6: real-world 20.2%, risk-neutral 18.6%.
+  const T = 3 / 52, sq = 0.4 * Math.sqrt(T);
+  near(Phi((Math.log(11 / 12) + (0.2 - 0.08) * T) / sq), 0.202, 0.001, 'real-world'); near(bs(11, 12, T, 0.1, 0.4).Nd2, 0.186, 0.001, 'risk-neutral');
+  // PS1 7, 8 and 9: lead product 861.66, Nokia K 822.16, α 11.34.
+  near(1000 * Math.exp(-0.15) + bs(500, 300, 3, 0.05, 0.03 * Math.sqrt(52), -0.04).p, 861.66, 0.05, 'lead');
+  const nk = bs(10, 10, 2 / 12, 0.04, 0.5); near(950 / (Math.exp(-0.04 / 6) + (nk.c + nk.p) / 10), 822.16, 0.05, 'Nokia');
+  near((950 - 900 * Math.exp(-0.04 / 6)) / bs(5, 10, 2 / 12, 0.04, 0.6).p, 11.34, 0.01, 'alpha');
+});
+
+test('suggested cheatsheets: known lectures, unique titles, formulas that KaTeX can render', () => {
+  for (const mod of Object.values(SUBJECTS)) {
+    const blocks = mod.cheatsheet || [];
+    assert.ok(blocks.length > 5, mod.slug + ' has no suggested cheatsheet');
+    assert.equal(new Set(blocks.map(b => b.title)).size, blocks.length, mod.slug + ': duplicate titles');
+    for (const b of blocks) {
+      assert.ok(b.topic === null || mod.topics.some(t => t.id === b.topic), mod.slug + ': unknown lecture ' + b.topic);
+      const html = renderRich(b.body);
+      assert.ok(!/katex-error/.test(html), mod.slug + ' / ' + b.title + ': ' + (html.match(/katex-error[^>]*>([^<]*)/)?.[1] || ''));
+      // Every $ left in the text must be an escaped dollar sign (\$) of the source, not a formula that failed to render.
+      const dollars = (html.replace(/<[^>]+>/g, '').match(/\$/g) || []).length, escaped = (b.body.match(/\\\$/g) || []).length;
+      assert.equal(dollars, escaped, mod.slug + ' / ' + b.title + ': unrendered $');
+    }
+  }
 });
 
 test('mock exam has the real structure and 20 points', () => {

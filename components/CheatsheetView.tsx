@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import Icon from './Icons';
 import Rich from './Rich';
+import SheetPreview, { FillMeter, SheetFlow, type SheetGroup } from './SheetPreview';
 import { useSubject } from './SubjectContext';
 import TexEditor from './TexEditor';
 
@@ -20,6 +21,11 @@ export function groupsOf(topics: { id: string; name: string }[]): Group[] {
 /** Entries of one group, in order; entries whose lecture no longer exists fall back to General. */
 export function inGroup(entries: Entry[], g: Group, topics: { id: string }[]) {
   return entries.filter(e => g.id === null ? !e.topic || !topics.some(t => t.id === e.topic) : e.topic === g.id).sort((a, b) => a.sort - b.sort);
+}
+
+/** Entries grouped by lecture for the A4 layout. */
+export function sheetGroups(entries: Entry[], groups: Group[], topics: { id: string }[]): SheetGroup[] {
+  return groups.map(g => ({ key: String(g.id), name: g.name, items: inGroup(entries, g, topics).map(e => ({ id: e.id, title: e.title, body: e.body })) }));
 }
 
 export function matches(e: Entry, q: string) {
@@ -42,6 +48,10 @@ export default function CheatsheetView({ entries: initial, readOnly, author, sha
   const [over, setOver] = useState<string | null>(null);
   const [copied, setCopied] = useState<Set<string>>(new Set());
   const groups = useMemo(() => groupsOf(mod.topics), [mod.topics]);
+  const sheet = useMemo(() => sheetGroups(entries, groups, mod.topics), [entries, groups, mod.topics]);
+  const [pages, setPages] = useState<number | null>(null);
+  const [preview, setPreview] = useState(false);
+  const title = `${mod.short} · ${mod.name}`;
 
   const fail = (m: string) => { setErr(m); return false; };
 
@@ -119,17 +129,21 @@ export default function CheatsheetView({ entries: initial, readOnly, author, sha
       <div className="sheetbar">
         <label className="searchbox"><Icon name="search" size={18} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search your entries" /></label>
         <span className="spacer" />
+        {entries.length > 0 && <FillMeter pages={pages} />}
         {!readOnly && (
           <>
             <label className="switch" title="Classmates can read a shared cheatsheet and copy entries from it">
               <input type="checkbox" checked={shared} onChange={toggleShare} /><span className="track" /><span>Shared with classmates</span>
             </label>
+            {mod.cheatsheet && <Link className="btn ghost small" href={`/s/${mod.slug}/cheatsheet/suggested`}><Icon name="sheet" size={16} />Suggested sheet</Link>}
+            <button type="button" className="btn ghost small" aria-pressed={preview} onClick={() => setPreview(p => !p)} disabled={!entries.length}>{preview ? 'Hide A4 preview' : 'A4 preview'}</button>
             <button type="button" className="btn ghost small" onClick={() => window.print()} disabled={!entries.length}><Icon name="print" size={16} />Print A4</button>
             <button type="button" className="btn small" onClick={() => { setAdding(null); setEditing(null); }}><Icon name="plus" size={16} />New entry</button>
           </>
         )}
       </div>
       {err && <p className="err">{err}</p>}
+      {entries.length > 0 && <SheetPreview title={title} groups={sheet} onMeasure={setPages} offscreen={!preview} />}
 
       <div className="sheetgroups">
         {groups.map(g => {
@@ -193,7 +207,7 @@ export default function CheatsheetView({ entries: initial, readOnly, author, sha
         </>
       )}
 
-      <PrintSheet entries={entries} title={`${mod.short} · ${mod.name}`} groups={groups} topics={mod.topics} />
+      <div className="cheatprint" aria-hidden><div className="cpcols"><SheetFlow title={title} groups={sheet} /></div></div>
     </div>
   );
 }
@@ -233,32 +247,6 @@ function EntryEditor({ initial, topics, onSave, onCancel }: {
         <span className="spacer" />
         <button type="button" className="linkbtn" onClick={onCancel}>Cancel</button>
         <button type="button" className="btn small" disabled={!ok || busy} onClick={submit}>Save entry</button>
-      </div>
-    </div>
-  );
-}
-
-/** Hidden on screen; the only thing printed. Dense multi-column A4 layout. */
-function PrintSheet({ entries, title, groups, topics }: { entries: Entry[]; title: string; groups: Group[]; topics: { id: string }[] }) {
-  return (
-    <div className="cheatprint" aria-hidden>
-      <div className="cph">{title}</div>
-      <div className="cpcols">
-        {groups.map(g => {
-          const list = inGroup(entries, g, topics);
-          if (!list.length) return null;
-          return (
-            <section key={String(g.id)}>
-              <h3>{g.name}</h3>
-              {list.map(e => (
-                <div key={e.id} className="cpe">
-                  {e.title && <b>{e.title}</b>}
-                  {e.body && <Rich text={e.body} />}
-                </div>
-              ))}
-            </section>
-          );
-        })}
       </div>
     </div>
   );
