@@ -87,7 +87,7 @@ function buildExam(ctx: GenCtx): MockExam {
 }
 
 const problemSets: ProblemSet[] = PROBLEM_SETS.map(ps => ({
-  id: ps.id, title: ps.title, topic: ps.topic,
+  id: ps.id, title: ps.title, topic: ps.topic, source: ps.source,
   types: ps.types.map(t => ({ key: t.key, name: t.name, topic: ps.topic, weight: 1, gen: fresh(t.gen), fromPs: t.fromPs })),
 }));
 

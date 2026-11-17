@@ -6,6 +6,8 @@ import { C, N, P, Q, chance, co, eur, fmtNum, p_, pick, poss, rint, roundTo, rst
 import { CANNOT, mcNum, mcText, mcVec, shortAnswer as shortAnswerOf, type Vec } from '@/lib/engine/mc';
 import type { ConceptMc, Part, Question } from '@/lib/engine/types';
 import { BANK } from './concepts';
+import * as V from './ps-var';
+import * as F from './ps5';
 
 const pp = (x: number, d = 2) => P(x, d);
 const usd = (x: number, d = 0) => (x < 0 ? '−' : '') + '$' + fmtNum(Math.abs(x), d);
@@ -50,7 +52,20 @@ export function PS1_fair(): Question {
   if (Math.abs(fc - fair) < 0.003) fc = roundTo(fair + 0.0125, 0.0025);
   const html = p_(`${name} has a forecasted return of ${pp(fc)}, a standard deviation of ${pp(sd, 0)} and a beta of ${fmtNum(beta)}. The T-bill rate is ${pp(rf)} and the market risk premium is ${pp(mrp)}.`);
   const sol0 = p_(`The CAPM gives the fair (required) return from beta alone: ${pp(rf)} + ${fmtNum(beta)} × ${pp(mrp)} = ${pp(fair)}. The standard deviation does not matter, because only systematic risk is priced.`);
-  if (chance(0.55)) {
+  const inv = rint(0, 4);
+  if (inv === 0) {
+    const al = fc - fair, bImp = (fc - rf) / mrp;
+    return mcNum('PS1.fair', '1', p_(`${name} has a forecasted return of ${pp(fc)} and a beta of ${fmtNum(beta)}. The T-bill rate is ${pp(rf)} and the market risk premium is ${pp(mrp)}. For which beta would the forecast be a fair CAPM return, i.e. the alpha zero?`), bImp,
+      [beta, fc / mrp, (fc - rf) / (rf + mrp), beta + al / mrp * 2, mrp / (fc - rf)], x => fmtNum(x, 3),
+      { sol: p_(`Set ${pp(fc)} = ${pp(rf)} + β × ${pp(mrp)}: β = (${pp(fc)} − ${pp(rf)}) / ${pp(mrp)} = ${fmtNum(bImp, 4)}. With the actual beta of ${fmtNum(beta)} the alpha is ${pp(al)}.`), step: 0.1 });
+  }
+  if (inv === 1) {
+    const al = fc - fair;
+    return mcNum('PS1.fair', '1', p_(`An analyst reports an alpha of ${pp(al)} for ${name}, whose beta is ${fmtNum(beta)}. The T-bill rate is ${pp(rf)} and the market risk premium is ${pp(mrp)}. What return does the analyst forecast?`), fc,
+      [fair, fair - al, rf + al, beta * mrp + al, rf + beta * (rf + mrp) + al], x => pp(x),
+      { sol: p_(`Forecast = fair return + alpha = (${pp(rf)} + ${fmtNum(beta)} × ${pp(mrp)}) + ${par(pp(al))} = ${pp(fair)} + ${par(pp(al))} = ${pp(fc)}.`) });
+  }
+  if (inv === 2) {
     return mcNum('PS1.fair', '1', html + p_(`What is the fair equity return for ${name} according to the CAPM?`), fair,
       [fc, rf + beta * (mrp - rf), beta * mrp, rf + mrp, rf + beta * (rf + mrp), rf + sd / 0.2 * mrp], x => pp(x), { sol: sol0 });
   }
@@ -256,6 +271,12 @@ export function PS2_surprise(): Question {
   if (real.some((r, i) => Math.abs(r - exp[i]) < 0.002)) return PS2_surprise();
   const be = [rstep(-1, 2, 0.05), rstep(-3.5, 1.5, 0.25)], er = rstep(0.04, 0.12, 0.0025), s = real.map((r, i) => r - exp[i]);
   const ans = er + be[0] * s[0] + be[1] * s[1];
+  if (chance(0.35) && Math.abs(be[1]) > 0.2) {
+    const rr = roundTo(ans, 0.0005), s2 = (rr - er - be[0] * s[0]) / be[1], f2 = exp[1] + s2;
+    const h = p_(`An economy has two factors driving equity returns: ${f[0][0]} (${f[0][1]}) and ${f[1][0]} (${f[1][1]}). Expected ${f[0][1]} is ${pp(exp[0])} and expected ${f[1][1]} is ${pp(exp[1])}. A stock in ${name} has an expected return of ${pp(er)}, a beta on ${f[0][1]} of ${fmtNum(be[0])} and a beta on ${f[1][1]} of ${fmtNum(be[1])}. This year ${f[0][1]} came in at ${pp(real[0])} and the stock returned ${pp(rr)} with no firm-specific news. What value of ${f[1][1]} was realised?`);
+    const sl = p_(`r = E[r] + β<sub>1</sub>(F<sub>1</sub> − E[F<sub>1</sub>]) + β<sub>2</sub>(F<sub>2</sub> − E[F<sub>2</sub>]). The ${f[0][1]} surprise is ${pp(s[0])}, so the ${f[1][1]} surprise is (${pp(rr)} − ${pp(er)} − ${fmtNum(be[0])} × ${pp(s[0])}) / ${par(fmtNum(be[1]))} = ${pp(s2)}, and ${f[1][1]} = ${pp(exp[1])} + ${par(pp(s2))} = ${pp(f2)}.`);
+    return mcNum('PS2.surprise', '2', h, f2, [s2, exp[1] - s2, (rr - er) / be[1], exp[1] + (rr - er) / be[1], (rr - er - be[0] * real[0]) / be[1]], x => pp(x), { sol: sl, step: 0.005 });
+  }
   const html = p_(`An economy has two factors driving equity returns: ${f[0][0]} (${f[0][1]}) and ${f[1][0]} (${f[1][1]}). Expected ${f[0][1]} is ${pp(exp[0])} and expected ${f[1][1]} is ${pp(exp[1])}. A stock in ${name} has an expected return of ${pp(er)}, a beta on ${f[0][1]} of ${fmtNum(be[0])} and a beta on ${f[1][1]} of ${fmtNum(be[1])}. What is your expected return for the stock in a year in which ${f[0][1]} turns out at ${pp(real[0])} and ${f[1][1]} at ${pp(real[1])}?`);
   const sol = p_(`Only surprises move returns away from their expectation. Surprises: ${f[0][1]} ${pp(real[0])} − ${pp(exp[0])} = ${pp(s[0])}, ${f[1][1]} ${pp(real[1])} − ${pp(exp[1])} = ${pp(s[1])}. E[r | F] = ${pp(er)} + ${fmtNum(be[0])} × ${pp(s[0])} + (${fmtNum(be[1])}) × ${pp(s[1])} = ${pp(ans)}.`);
   return mcNum('PS2.surprise', '2', html, ans,
@@ -406,6 +427,20 @@ export function PS3_tstat(): Question {
   const [z, lvl] = pick([[1.96, '5%'], [1.96, '5%'], [1.645, '10%'], [2.576, '1%']] as [number, string][]);
   const n = (z * se / a) ** 2;
   if (n < 12 || n > 20000) return PS3_tstat();
+  const v = rint(0, 3);
+  if (v === 0) {
+    const months = pick([24, 36, 60, 120, 240]), aMin = z * se / Math.sqrt(months);
+    return mcNum('PS3.tstat', '3', p_(`A manager has a standard deviation of monthly residuals of ${pp(se)}. Assuming a regression always picks the true values, what monthly alpha must she produce for it to be significant at the ${lvl} level (t > ${z}) after ${months} months?`), aMin,
+      [z * se / months, se / Math.sqrt(months), z * se * Math.sqrt(months) / 100, z * se / Math.sqrt(months / 12)], x => pp(x, 3),
+      { sol: p_(`t = α√N/σ<sub>e</sub> > ${z} ⇔ α > ${z} × ${pp(se)} / √${months} = ${pp(aMin, 3)} per month.`), closest: true });
+  }
+  if (v === 1) {
+    const [z2, conf] = pick([[1.645, '90%'], [1.96, '95%'], [2.576, '99%']] as [number, string][]), n2 = (z2 * se / a) ** 2;
+    if (n2 < 6 || n2 > 20000) return PS3_tstat();
+    return mcNum('PS3.tstat', '3', p_(`Warren is a portfolio manager who produces a negative alpha of ${pp(a)} per month with a residual standard deviation of ${pp(se)}. Assuming a regression always picks the true values, how many months does it take his boss to reject the null of no skill or incompetence in a two-tailed test at the ${conf} confidence level?`), n2,
+      [z2 * se / a, (se / a) ** 2, n2 / 12, ((z2 === 1.645 ? 1.28 : z2 === 1.96 ? 1.645 : 2.33) * se / a) ** 2, 2 * n2], x => fmtNum(x, 0),
+      { sol: p_(`Two-tailed at ${conf}: |t| > ${z2}. |t| = |α|√N/σ<sub>e</sub> > ${z2} ⇔ N > (${z2} × ${pp(se)} / ${pp(a)})² = ${fmtNum(n2, 1)} months, about ${fmtNum(n2 / 12, 1)} years. Incompetence is as hard to detect as skill.`), closest: true });
+  }
   const html = p_(`${name} is a skilled investor able to produce a true alpha of ${pp(a)} a month with a standard deviation of monthly residuals of ${pp(se)}. Assuming that a regression always picks the true alpha, how many months will it take for the t-statistic to be significant at the ${lvl} level (t > ${z})?`);
   const sol = p_(`t = α/(σ/√N) > ${z} ⇔ N > (${z} × ${pp(se)} / ${pp(a)})² = ${fmtNum(n, 2)} months, about ${fmtNum(n / 12, 1)} years.`);
   const zs = [1.645, 1.96, 2.576].filter(x => x !== z);
@@ -426,7 +461,15 @@ export function PS3_attribution(): Question {
     table(['', 'Benchmark weights', 'Benchmark returns', 'Portfolio weights', 'Portfolio returns'], ['Equity', 'Bonds', 'Cash'].map((nm, i) => [nm, fmtNum(wB[i]), pp(rB[i], 0), fmtNum(wP[i]), pp(rP[i], 0)]));
   const wrongs = [aa, ss, retP - retB, sum(i => (wP[i] - wB[i]) * rP[i]), sum(i => wB[i] * (rP[i] - rB[i])), retP, retB];
   const sol = p_(`The bogey returns ${pp(retB)} and P returns ${pp(retP)}, a difference of ${pp(retP - retB)}. Asset allocation: Σ(w<sub>P</sub> − w<sub>B</sub>)r<sub>B</sub> = ${pp(aa)}. Security selection: Σw<sub>P</sub>(r<sub>P</sub> − r<sub>B</sub>) = ${pp(ss)}. The two add up to the total difference.`);
-  if (chance(0.5)) return mcNum('PS3.attribution', '3', html + p_('What is the contribution of asset allocation to the performance of the portfolio?'), aa, wrongs, x => pp(x, 1), { sol, closest: true, step: 0.004 });
+  const va = rint(0, 3);
+  if (va === 2) return mcNum('PS3.attribution', '3', html + p_('By how much did the portfolio beat (or trail) its benchmark?'), retP - retB, wrongs.filter(x => x !== retP - retB), x => pp(x, 1), { sol, closest: true, step: 0.004 });
+  if (va === 3) {
+    const k = rint(0, 1), nm = ['equity', 'bond'][k], sel = wP[k] * (rP[k] - rB[k]), all = (wP[k] - wB[k]) * rB[k];
+    if (Math.abs(sel) < 0.0005) return PS3_attribution();
+    return mcNum('PS3.attribution', '3', html + p_(`What is the contribution of security selection within the ${nm} class?`), sel, [all, wB[k] * (rP[k] - rB[k]), rP[k] - rB[k], ss, (wP[k] - wB[k]) * rP[k]], x => pp(x, 2),
+      { sol: sol + p_(`Within ${nm}: w<sub>P</sub>(r<sub>P</sub> − r<sub>B</sub>) = ${fmtNum(wP[k])} × (${pp(rP[k], 0)} − ${par(pp(rB[k], 0))}) = ${pp(sel)}; its allocation effect is (${fmtNum(wP[k])} − ${fmtNum(wB[k])}) × ${pp(rB[k], 0)} = ${pp(all)}.`), step: 0.004 });
+  }
+  if (va === 0) return mcNum('PS3.attribution', '3', html + p_('What is the contribution of asset allocation to the performance of the portfolio?'), aa, wrongs, x => pp(x, 1), { sol, closest: true, step: 0.004 });
   return mcNum('PS3.attribution', '3', html + p_('What is the contribution of security selection to the performance of the portfolio?'), ss, wrongs, x => pp(x, 1), { sol, closest: true, step: 0.004 });
 }
 
@@ -775,7 +818,7 @@ export const PS6_concept = () => shortAnswer('PS6.short', '6');
 // ---------------------------------------------------------------------
 
 export type PsTypeSpec = { key: string; name: string; gen: () => Question; fromPs: boolean };
-export type PsSpec = { id: string; topic: string; title: string; types: PsTypeSpec[] };
+export type PsSpec = { id: string; topic: string; title: string; source?: string; types: PsTypeSpec[] };
 
 const T = (key: string, name: string, gen: () => Question, fromPs = true): PsTypeSpec => ({ key, name, gen, fromPs });
 
@@ -792,6 +835,10 @@ export const PROBLEM_SETS: PsSpec[] = [
     T('PS1.cml', 'CML, CAL and risk aversion', PS1_cml, false),
     T('PS1.sim', 'Single-index model: covariance and residual risk', PS1_sim, false),
     T('PS1.liquidity', 'Liquidity-adjusted CAPM', PS1_liquidity, false),
+    T('PS1.simBeta', 'Beta, R² and residual risk from variances', V.PS1_simBeta, false),
+    T('PS1.smlInfer', 'SML from two correctly priced stocks', V.PS1_smlInfer, false),
+    T('PS1.portfolioBeta', 'Portfolio beta and target beta with T-bills', V.PS1_portfolioBeta, false),
+    T('PS1.rewardRisk', 'Reward-to-risk ratio and risk contributions', V.PS1_rewardRisk, false),
     T('PS1.short', 'Short answers', PS1_concept, false),
   ] },
   { id: '2', topic: '2', title: 'APT', types: [
@@ -802,6 +849,11 @@ export const PROBLEM_SETS: PsSpec[] = [
     T('PS2.longShort', 'Long-short alpha portfolio', PS2_longShort),
     T('PS2.diversify', 'Diversification of specific risk', PS2_diversify, false),
     T('PS2.emh', 'Forms of market efficiency', PS2_emh, false),
+    T('PS2.tracking', 'Tracking portfolios and riskless arbitrage', V.PS2_tracking, false),
+    T('PS2.zeroBetaArb', 'Zero-beta arbitrage portfolio', V.PS2_zeroBetaArb, false),
+    T('PS2.residualGroups', 'Residual risk with unequal weights', V.PS2_residualGroups, false),
+    T('PS2.ff3', 'Fama-French three-factor return and alpha', V.PS2_ff3, false),
+    T('PS2.tbApt', 'Treynor-Black versus APT', V.PS2_tbApt, false),
     T('PS2.short', 'Short answers', PS2_concept, false),
   ] },
   { id: '3', topic: '3', title: 'Portfolio performance measurement', types: [
@@ -812,6 +864,12 @@ export const PROBLEM_SETS: PsSpec[] = [
     T('PS3.ratios', 'Sharpe, Treynor, Jensen and M²', PS3_ratios, false),
     T('PS3.dwr', 'Time- and dollar-weighted returns', PS3_dwr, false),
     T('PS3.whichMeasure', 'Which measure fits?', PS3_whichMeasure, false),
+    T('PS3.m2Steps', 'M² step by step', V.PS3_m2Steps, false),
+    T('PS3.inverse', 'Measures solved backwards', V.PS3_inverse, false),
+    T('PS3.rank', 'Rankings by Sharpe, Treynor and alpha', V.PS3_rank, false),
+    T('PS3.hfWeight', 'Weight in a single active fund', V.PS3_hfWeight, false),
+    T('PS3.timing', 'Market timing', V.PS3_timing, false),
+    T('PS3.mrar', 'Morningstar risk-adjusted return', V.PS3_mrar, false),
   ] },
   { id: '4', topic: '4', title: 'Active portfolio management', types: [
     T('PS4.tbWeights', 'Treynor-Black weights of two stocks', PS4_tbWeights),
@@ -823,7 +881,26 @@ export const PROBLEM_SETS: PsSpec[] = [
     T('PS4.activeWeight', 'Weight of the active portfolio', PS4_activeWeight, false),
     T('PS4.sharpe', 'Sharpe ratio of the optimal portfolio', PS4_sharpe, false),
     T('PS4.te', 'Benchmark risk', PS4_te, false),
+    T('PS4.tbSteps', 'Treynor-Black with three stocks', V.PS4_tbSteps, false),
+    T('PS4.kkw', 'Alpha forecasts adjusted for precision', V.PS4_kkw, false),
+    T('PS4.blPosterior', 'Black-Litterman posterior from forecast covariances', V.PS4_blPosterior, false),
+    T('PS4.feeInverse', 'Value of active management solved backwards', V.PS4_feeInverse, false),
     T('PS4.short', 'Short answers', PS4_concept, false),
+  ] },
+  { id: '5', topic: '5', title: 'Mean-variance portfolios and estimation error', source: 'the slides', types: [
+    T('PS5.tangency', 'Optimal risky portfolio and complete portfolio', F.PS5_tangency),
+    T('PS5.gmv', 'Global minimum-variance portfolio', F.PS5_gmv),
+    T('PS5.params', 'Number of parameters to estimate', F.PS5_params),
+    T('PS5.shrink', 'Shrinkage of weights, means and covariances', F.PS5_shrink),
+    T('PS5.ppp', 'Parametric portfolio policy', F.PS5_ppp),
+    T('PS5.galton', 'Galton correction of inputs', F.PS5_galton),
+    T('PS5.scenario', 'Mean, risk and correlation from scenarios', F.PS5_scenario, false),
+    T('PS5.utility', 'Mean-variance utility and risk aversion', F.PS5_utility, false),
+    T('PS5.cal', 'Capital allocation line and optimal y*', F.PS5_cal, false),
+    T('PS5.twoAsset', 'Two-asset portfolios: risk, implied correlation, ρ = −1', F.PS5_twoAsset, false),
+    T('PS5.errorMax', 'Error maximisation', F.PS5_errorMax, false),
+    T('PS5.trueFalse', 'True or false', F.PS5_trueFalse, false),
+    T('PS5.short', 'Short answers (incl. N assets in matrix form)', F.PS5_short, false),
   ] },
   { id: '6', topic: '6', title: 'Hedge funds', types: [
     T('PS6.compare', 'Mutual funds versus hedge funds', PS6_compare),
@@ -834,5 +911,9 @@ export const PROBLEM_SETS: PsSpec[] = [
     T('PS6.hwm', 'High-water mark', PS6_hwm, false),
     T('PS6.fof', 'Incentive fees in a fund of funds', PS6_fof, false),
     T('PS6.lagBeta', 'Stale prices and Scholes-Williams beta', PS6_lagBeta, false),
+    T('PS6.grossNeeded', 'Gross return needed after fees', V.PS6_grossNeeded, false),
+    T('PS6.parity', 'Futures parity and arbitrage', V.PS6_parity, false),
+    T('PS6.hwmRecover', 'Climbing back to the high-water mark', V.PS6_hwmRecover, false),
+    T('PS6.hedgeInverse', 'Portable alpha solved backwards', V.PS6_hedgeInverse, false),
   ] },
 ];
