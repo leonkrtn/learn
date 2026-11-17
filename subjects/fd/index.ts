@@ -4,6 +4,7 @@ import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { ProblemSet, SubjectModule } from '@/lib/subject';
 import { CHEATSHEET } from './cheatsheet';
 import { LECTURES } from './concepts';
+import { EXPLAIN } from './explain';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
 import { PROBLEM_SETS } from './ps';
@@ -72,6 +73,7 @@ const fd: SubjectModule = {
   // Wrong answers on a practice question link to the theory page of its lecture.
   theory: THEORY.map(p => ({ ...p, types: [...p.types, ...problemSets.filter(s => s.topic === p.topic).flatMap(s => s.types.map(t => t.key))] })),
   cheatsheet: CHEATSHEET,
+  explain: EXPLAIN,
   answerNote: 'Enter numbers without units. Prices and amounts in euros (index options in index points); deltas, α and contract numbers as plain numbers. Rates, probabilities and volatilities may be entered as 12.5 or 0.125. Continuous compounding, days/365 and months/12 unless the question says otherwise. Decimal comma and decimal point both work.',
 };
 

@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { ConceptBank, GenCtx, Question, Topic, TypeDef } from './engine/types';
+import type { ExplainMap } from './explain';
 
 export type MockPart = { title: string; pts: number; note?: string; qs: Question[] };
 export type MockExam = { parts: MockPart[] };
@@ -53,6 +54,8 @@ export type SubjectModule = {
   /** Suggested cheatsheet for the exam (one A4 sheet, front and back), printable or copied entry by entry. */
   cheatsheet?: SheetBlock[];
   theory: TheoryPage[];
+  /** One explanation with a worked example for every type in `allTypes`, opened from a wrong answer. */
+  explain: ExplainMap;
   answerNote: string;
 };
 

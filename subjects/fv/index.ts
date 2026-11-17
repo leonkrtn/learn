@@ -4,6 +4,7 @@ import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { SubjectModule } from '@/lib/subject';
 import { LECTURES } from './concepts';
 import { CHEATSHEET } from './cheatsheet';
+import { EXPLAIN } from './explain';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
 import { THEORY } from './theory';
@@ -46,6 +47,7 @@ const fv: SubjectModule = {
   FormulaSheet,
   cheatsheet: CHEATSHEET,
   theory: THEORY,
+  explain: EXPLAIN,
   answerNote: 'Enter numbers without units. Percentages may be entered as 12.5 or 0.125. Decimal comma and decimal point both work. Use the minus sign for negative values.',
 };
 

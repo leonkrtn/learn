@@ -4,6 +4,7 @@ import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { ProblemSet, SubjectModule } from '@/lib/subject';
 import { LECTURES } from './concepts';
 import { CHEATSHEET } from './cheatsheet';
+import { EXPLAIN } from './explain';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
 import { PROBLEM_SETS } from './ps';
@@ -54,6 +55,7 @@ const ifd: SubjectModule = {
   problemSets,
   FormulaSheet,
   cheatsheet: CHEATSHEET,
+  explain: EXPLAIN,
   // Wrong answers on a practice question link to the theory page of its lecture.
   theory: THEORY.map(p => ({ ...p, types: [...p.types, ...problemSets.filter(s => s.topic === p.topic).flatMap(s => s.types.map(t => t.key))] })),
   answerNote: 'Enter numbers without units. Amounts in millions where the question says so (72 for €72 million). Returns may be entered as 15.6 or 0.156. Decimal comma and decimal point both work.',
