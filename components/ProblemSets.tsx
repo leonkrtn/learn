@@ -22,7 +22,7 @@ export default function ProblemSets({ set, run }: { set?: string; run?: boolean 
     return (
       <>
         <div className="pagehead" style={{ maxWidth: 880 }}>
-          <h1>{ps ? `Problem set ${ps.id}: ${ps.title}` : 'Problem sets'}</h1>
+          <h1>{ps ? `${ps.label ?? 'Problem set ' + ps.id}: ${ps.title}` : 'Problem sets'}</h1>
           <span className="aside"><Link href={`/s/${mod.slug}/ps`}>Change selection</Link></span>
         </div>
         <Runner mode={{ kind: 'ps', set: ps?.id }} />
@@ -51,7 +51,7 @@ export default function ProblemSets({ set, run }: { set?: string; run?: boolean 
   return (
     <div className="page">
       <div className="pagehead"><h1>Problem sets</h1><span className="aside">{all.length} question types</span></div>
-      <p className="lede">Questions in the format of the problem sets: calculations as multiple choice with options A to E, exercises with several parts, and short-answer questions as “which answer fits best”. Each set also covers lecture content the problem set leaves out, in the same format. Every question comes with new numbers and a worked solution.</p>
+      <p className="lede">Questions in the format of the problem sets and quizzes: single calculations as multiple choice with options A to E, cases with several parts as number entry, and short-answer questions as “which answer fits best”. Each set also covers lecture content the exercises leave out, in the same format. Every question comes with new numbers and a worked solution.</p>
       {sets.map(p => {
         const keys = p.types.map(t => t.key);
         const n = keys.filter(k => on.has(k)).length;
@@ -62,22 +62,22 @@ export default function ProblemSets({ set, run }: { set?: string; run?: boolean 
               <label className="opt">
                 <input type="checkbox" checked={n === keys.length} ref={el => { if (el) el.indeterminate = n > 0 && n < keys.length; }}
                   onChange={e => toggle(keys, e.target.checked)} />
-                Problem set {p.id}: {p.title}
+                {p.label ?? 'Problem set ' + p.id}: {p.title}
               </label>
             </legend>
             <div className="cols2">
-              <div>
-                <h3 className="pscol">From the problem set</h3>
+              {p.types.some(t => t.fromPs) && <div>
+                <h3 className="pscol">From {p.source ?? 'the problem set'}</h3>
                 {p.types.filter(t => t.fromPs).map(box)}
-              </div>
-              <div>
-                <h3 className="pscol">More from lecture {p.topic}</h3>
+              </div>}
+              {p.types.some(t => !t.fromPs) && <div>
+                <h3 className="pscol">{p.types.some(t => t.fromPs) ? 'More from lecture ' + p.topic : 'From lecture ' + p.topic + ' (no quiz or exercise yet)'}</h3>
                 {p.types.filter(t => !t.fromPs).map(box)}
-              </div>
+              </div>}
             </div>
             <div className="psfoot">
               <span className="note">{n} of {keys.length} selected · {rate(a, c)}</span>
-              <button type="button" className="btn ghost small" disabled={n === 0} onClick={() => start(p.id)}>Practise set {p.id}</button>
+              <button type="button" className="btn ghost small" disabled={n === 0} onClick={() => start(p.id)}>Practise {(p.label ?? 'set ' + p.id).replace(/^Problem set/, 'set').replace(/^Set/, 'set')}</button>
             </div>
           </fieldset>
         );

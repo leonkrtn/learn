@@ -7,9 +7,11 @@ import fvcs from '../subjects/fvcs';
 import { BANK } from '../subjects/fvcs/concepts';
 import { BANK as FV_BANK } from '../subjects/fv/concepts';
 import { BANK as FI_BANK } from '../subjects/fi/concepts';
+import { BANK as IFD_BANK } from '../subjects/ifd/concepts';
+import { clearRating, ratingOf, RATING_NAMES, solveFace } from '../subjects/ifd/generators';
 import fi from '../subjects/fi';
 
-const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK };
+const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK, ifd: IFD_BANK };
 
 test('parseNum accepts comma and point formats', () => {
   const cases: [string, number][] = [
@@ -89,6 +91,45 @@ test('FI problem sets: every type runs 400 times, A–E options are distinct and
       }
     }
   }
+});
+
+test('problem sets of every subject: unique keys, solutions, distinct options, full marks for the solution', () => {
+  for (const mod of Object.values(SUBJECTS)) {
+    const sets = mod.problemSets || [];
+    const keys = sets.flatMap(p => p.types.map(t => t.key));
+    assert.equal(new Set([...keys, ...mod.types.map(t => t.key)]).size, keys.length + mod.types.length, mod.slug + ': duplicate keys');
+    for (const p of sets) for (const t of p.types) for (let i = 0; i < 300; i++) {
+      const q = t.gen({ bank: BANKS[mod.slug] });
+      assert.equal(q.fam, t.key, t.key + ' produced ' + q.fam);
+      assert.equal(mod.typeKeyOf(q.fam), t.key);
+      assert.ok(q.solution && !/NaN|undefined|Infinity/.test(q.solution), t.key + ' solution');
+      assert.ok(!/NaN|undefined|Infinity/.test(q.html + q.parts.map(x => 'prompt' in x ? x.prompt : '').join('')), t.key + ' text');
+      for (const x of q.parts) {
+        if (x.type === 'num') { assert.ok(Number.isFinite(x.ans), t.key + ': ' + x.prompt); continue; }
+        assert.ok(x.correct >= 0 && x.correct < x.options.length, t.key + ': bad correct index');
+        assert.equal(new Set(x.options).size, x.options.length, t.key + ' repeats an option: ' + x.options.join(' | '));
+      }
+      const answers = Object.fromEntries(q.parts.map((x, j) => [j, x.type === 'num' ? x.ans.toFixed(8).replace('.', ',') : x.correct]));
+      const g = gradeQuestion(q, answers, mod.tolerance);
+      assert.equal(g.c, g.a, t.key);
+    }
+  }
+});
+
+test('IFD reproduces the quiz and lecture numbers', () => {
+  // Arden: €60m raised, 100 or 54 equally likely, r_f 5% → face 72, spread 15% → CC; after the junior issue → B-.
+  const F = solveFace([100, 54], [0.5, 0.5], 60 * 1.05);
+  assert.ok(Math.abs(F - 72) < 1e-6);
+  assert.equal(RATING_NAMES[ratingOf(72 / 60 - 1 - 0.05)], 'CC');
+  const B1 = (0.5 * 72 + 0.5 * 62) / 1.05;
+  assert.equal(RATING_NAMES[ratingOf(72 / B1 - 1 - 0.05)], 'B-');
+  // Additional material, Meridian: spread 5.42% → B.
+  assert.equal(RATING_NAMES[ratingOf(0.0542)], 'B');
+  assert.ok(clearRating(0.15) && clearRating(0.0542));
+  // BluePeak: straight debt face value 250.
+  assert.ok(Math.abs(solveFace([700, 400, 200], [0.3, 0.6, 0.1], 245) - 250) < 1e-6);
+  // Effort with debt: 0.6F + 0.4·75 = 100.
+  assert.ok(Math.abs(solveFace([125, 75, 0], [0.6, 0.4, 0], 100) - 116.6667) < 1e-3);
 });
 
 test('mock exam has the real structure and 20 points', () => {

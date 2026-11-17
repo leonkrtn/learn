@@ -25,7 +25,13 @@ export type TheoryPage = {
 
 /** A question type of a problem set; `fromPs` is false for lecture content the problem set leaves out. */
 export type PsType = TypeDef & { fromPs: boolean };
-export type ProblemSet = { id: string; title: string; topic: string; types: PsType[] };
+export type ProblemSet = {
+  id: string; title: string; topic: string; types: PsType[];
+  /** Heading prefix, "Problem set 1" by default. */
+  label?: string;
+  /** Where the `fromPs` types come from, "the problem set" by default. */
+  source?: string;
+};
 
 export type SubjectModule = {
   slug: string;
