@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import HistoryChart, { type Day } from './HistoryChart';
 import type { PastMock } from './MockExam';
@@ -24,11 +25,11 @@ export default function StatsView({ mocks }: { mocks: PastMock[] }) {
   }, [mod.slug]);
 
   const byTopic = mod.topics.map(t => {
-    const ks = mod.types.filter(x => x.topic === t.id).map(x => x.key);
+    const ks = allTypes(mod).filter(x => x.topic === t.id).map(x => x.key);
     return { t, a: ks.reduce((s, k) => s + (stats[k]?.answers || 0), 0), c: ks.reduce((s, k) => s + (stats[k]?.correct || 0), 0) };
   });
   const A = byTopic.reduce((s, x) => s + x.a, 0), C = byTopic.reduce((s, x) => s + x.c, 0);
-  const types = mod.types.map(t => ({ t, s: stats[t.key] })).filter(x => x.s && x.s.answers > 0);
+  const types = allTypes(mod).map(t => ({ t, s: stats[t.key] })).filter(x => x.s && x.s.answers > 0);
   const weak = types.filter(x => x.s.answers >= 3).sort((a, b) => a.s.correct / a.s.answers - b.s.correct / b.s.answers).slice(0, 6);
 
   async function reset() {
@@ -66,6 +67,17 @@ export default function StatsView({ mocks }: { mocks: PastMock[] }) {
           return <tr key={t.key}><td>{t.name}</td><td>{t.topic}</td><td>{s?.answers || 0}</td><td>{s?.correct || 0}</td><td>{rate(s?.answers || 0, s?.correct || 0)}</td><td>{s ? Math.round(100 * s.ema) + '%' : '—'}</td></tr>;
         })}</tbody>
       </table>
+
+      {(mod.problemSets || []).length > 0 && <>
+        <h2 className="sec">Problem set question types</h2>
+        <table className="stats">
+          <thead><tr><th>Type</th><th>Problem set</th><th>Answers</th><th>Correct</th><th>Rate</th><th>Recent error rate</th></tr></thead>
+          <tbody>{mod.problemSets!.flatMap(p => p.types.map(t => {
+            const s = stats[t.key];
+            return <tr key={t.key}><td>{t.name}</td><td>{p.id}</td><td>{s?.answers || 0}</td><td>{s?.correct || 0}</td><td>{rate(s?.answers || 0, s?.correct || 0)}</td><td>{s ? Math.round(100 * s.ema) + '%' : '—'}</td></tr>;
+          }))}</tbody>
+        </table>
+      </>}
 
       {mocks.length > 0 && <>
         <h2 className="sec">Mock exams</h2>

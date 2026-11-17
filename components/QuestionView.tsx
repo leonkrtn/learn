@@ -94,6 +94,13 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
           })}
         </div>
       )}
+      {q.solution && (
+        // Reserved before checking so nothing moves; keyed so it starts closed for every question.
+        <details className="solution" key={q.html} style={{ visibility: graded ? 'visible' : 'hidden' }}>
+          <summary>Show the solution</summary>
+          <div className="qtext" dangerouslySetInnerHTML={{ __html: wrapTables(q.solution) }} />
+        </details>
+      )}
     </div>
   );
 }

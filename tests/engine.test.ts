@@ -61,6 +61,36 @@ test('grading the generated solutions scores full marks', () => {
   }
 });
 
+test('FI problem sets: every type runs 400 times, A–E options are distinct and the solution scores full marks', () => {
+  const sets = fi.problemSets!;
+  assert.deepEqual(sets.map(p => p.id), ['1', '2', '3', '4', '6']);
+  const keys = sets.flatMap(p => p.types.map(t => t.key));
+  assert.equal(new Set(keys).size, keys.length, 'duplicate problem-set keys');
+  for (const p of sets) {
+    assert.ok(p.types.some(t => t.fromPs) && p.types.some(t => !t.fromPs), 'PS ' + p.id + ' needs both groups');
+    for (const t of p.types) {
+      assert.equal(t.topic, p.topic);
+      for (let i = 0; i < 400; i++) {
+        const q = t.gen({ bank: FI_BANK });
+        assert.equal(q.fam, t.key, t.key + ' produced ' + q.fam);
+        assert.equal(fi.typeKeyOf(q.fam), t.key, t.key + ' maps to another type');
+        assert.ok(q.solution && !/NaN|undefined|Infinity/.test(q.solution), t.key + ' solution: ' + (q.solution || '').slice(0, 200));
+        assert.ok(!/NaN|undefined|Infinity/.test(q.html + q.parts.map(x => 'prompt' in x ? x.prompt : '').join('')), t.key + ' text: ' + q.html.slice(0, 200));
+        for (const x of q.parts) {
+          if (x.type === 'num') { assert.ok(Number.isFinite(x.ans), t.key + ': ' + x.prompt); continue; }
+          assert.ok(x.correct >= 0 && x.correct < x.options.length, t.key + ': bad correct index');
+          assert.equal(new Set(x.options).size, x.options.length, t.key + ' repeats an option: ' + x.options.join(' | '));
+          assert.ok(!x.options.some(o => /NaN|undefined|Infinity/.test(o)), t.key + ' option text');
+          if (x.type === 'mc' && !x.tf && q.parts.length === 1) assert.ok(x.options.length >= 4 && x.options.length <= 5, t.key + ' has ' + x.options.length + ' options');
+        }
+        const answers = Object.fromEntries(q.parts.map((x, j) => [j, x.type === 'num' ? x.ans.toFixed(8).replace('.', ',') : x.correct]));
+        const g = gradeQuestion(q, answers, fi.tolerance);
+        assert.equal(g.c, g.a, t.key);
+      }
+    }
+  }
+});
+
 test('mock exam has the real structure and 20 points', () => {
   for (let i = 0; i < 50; i++) {
     const ex = fvcs.mock!.build({ bank: BANK });

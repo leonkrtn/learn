@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gradeQuestion } from '@/lib/engine/grade';
 import { CycleBag, pickAdaptive } from '@/lib/engine/select';
+import { allTypes } from '@/lib/subject';
 import type { Answers, Graded, Question, TypeDef } from '@/lib/engine/types';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
@@ -11,7 +12,8 @@ import { useSubject } from './SubjectContext';
 export type RunnerMode =
   | { kind: 'practice' }
   | { kind: 'cycle'; topic: string }
-  | { kind: 'review' };
+  | { kind: 'review' }
+  | { kind: 'ps'; set?: string };
 
 type Current = { type: TypeDef; q: Question };
 type Tally = { a: number; c: number };
@@ -27,8 +29,12 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
 
   const pool = useMemo(() => {
     if (mode.kind === 'cycle') return mod.types.filter(t => t.topic === mode.topic && enabled.includes(t));
+    if (mode.kind === 'ps') {
+      const on = settings.ps ? new Set(settings.ps) : null;
+      return (mod.problemSets || []).filter(p => !mode.set || p.id === mode.set).flatMap(p => p.types).filter(t => !on || on.has(t.key));
+    }
     return enabled;
-  }, [mode, mod, enabled]);
+  }, [mode, mod, enabled, settings.ps]);
 
   const bag = useRef<CycleBag | null>(null);
   const reviewQueue = useRef<string[] | null>(null);
@@ -36,7 +42,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   const emaRef = useRef<Record<string, number>>({});
   emaRef.current = Object.fromEntries(Object.entries(stats).map(([k, s]) => [k, s.ema]));
 
-  const sessionLen = mode.kind === 'practice' && settings.mode === 'session' ? settings.sessionLen : null;
+  const sessionLen = (mode.kind === 'practice' || mode.kind === 'ps') && settings.mode === 'session' ? settings.sessionLen : null;
 
   const draw = useCallback((): Current | null => {
     let type: TypeDef | undefined;
@@ -52,7 +58,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
       }
       const k = reviewQueue.current.shift();
       if (!k) return null;
-      type = mod.types.find(t => t.key === k);
+      type = allTypes(mod).find(t => t.key === k);
       if (!type) return draw();
     } else {
       if (!pool.length) return null;
@@ -79,7 +85,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     bag.current = null; reviewQueue.current = null; last.current = {};
     setCur(draw()); setStarted(true); setAnswers({}); setGraded(null); setN(0); setTally({ a: 0, c: 0 }); setByTopic({}); setDone(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode.kind, mode.kind === 'cycle' ? mode.topic : '', pool.length, settings.mode, settings.sessionLen]);
+  }, [mode.kind, mode.kind === 'cycle' ? mode.topic : mode.kind === 'ps' ? mode.set || '' : '', pool.length, settings.mode, settings.sessionLen]);
 
   const check = useCallback(() => {
     if (!cur || graded) return;
@@ -124,6 +130,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   const theory = cur ? mod.theory.find(p => p.types.includes(cur.type.key)) : undefined;
   const st = cur ? stats[cur.type.key] : undefined;
   const topicName = (id: string) => mod.topics.find(t => t.id === id)?.name || id;
+  const unitName = mode.kind === 'ps' ? 'Problem set' : 'Lecture';
   const rate = (t: Tally) => t.a ? Math.round(100 * t.c / t.a) + '%' : '—';
 
   if (!started) return <div className="meta" />;
@@ -134,7 +141,9 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
         <div className="endbox panel">
           {mode.kind === 'review'
             ? <><h2>Nothing to review</h2><p>Question types you get wrong show up here again a day later, then after 3, 7, 16 and 35 days, always with new numbers. Come by whenever it suits you.</p>{tally.a > 0 && <p className="note">This round: {tally.c} of {tally.a} answers correct.</p>}</>
-            : <><h2>No question types selected</h2><p>Turn on at least one type in <Link href={`/s/${mod.slug}/settings`}>Settings</Link>.</p></>}
+            : mode.kind === 'ps'
+              ? <><h2>No question types selected</h2><p>Turn on at least one type on the <Link href={`/s/${mod.slug}/ps`}>problem sets page</Link>.</p></>
+              : <><h2>No question types selected</h2><p>Turn on at least one type in <Link href={`/s/${mod.slug}/settings`}>Settings</Link>.</p></>}
         </div>
       </div>
     );
@@ -148,7 +157,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
           <div className="score">{rate(tally)}</div>
           <p>{tally.c} of {tally.a} answers correct across {sessionLen} questions.</p>
           <table className="stats">
-            <thead><tr><th>Lecture</th><th>Correct</th><th>Rate</th></tr></thead>
+            <thead><tr><th>{unitName}</th><th>Correct</th><th>Rate</th></tr></thead>
             <tbody>{Object.keys(byTopic).sort().map(l => <tr key={l}><td>{l} · {topicName(l)}</td><td>{byTopic[l].c} / {byTopic[l].a}</td><td>{rate(byTopic[l])}</td></tr>)}</tbody>
           </table>
           <button className="btn" type="button" data-primary="1" onClick={() => { setDone(false); setN(0); setTally({ a: 0, c: 0 }); setByTopic({}); setAnswers({}); setGraded(null); setCur(draw()); }}>Start new session</button>
@@ -168,7 +177,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             {cycleInfo ? `Question ${cycleInfo.pos} of ${cycleInfo.size}` : sessionLen ? `Question ${n + 1}` : `Question ${n + 1}`}
             <small>{sessionLen ? `of ${sessionLen} · ` : ''}{cur.type.name}</small>
           </div>
-          <div>{tally.a ? <>Correct: <b>{tally.c}</b> of {tally.a}</> : `Lecture ${cur.type.topic}`}</div>
+          <div>{tally.a ? <>Correct: <b>{tally.c}</b> of {tally.a}</> : `${unitName} ${cur.type.topic}`}</div>
         </div>
         <QuestionView q={cur.q} answers={answers} onChange={setAnswers} graded={graded} onSubmit={check} autoFocus />
         <div className="theorylink" style={{ visibility: wrong && theory ? 'visible' : 'hidden' }}>
@@ -195,10 +204,10 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
           <dl>
             <dt>Answered before</dt><dd>{st?.answers ?? 0}</dd>
             {st && st.answers > 0 && <><dt>Your rate</dt><dd>{Math.round(100 * st.correct / st.answers)}%</dd></>}
-            <dt>Lecture</dt><dd>{cur.type.topic}</dd>
+            <dt>{unitName}</dt><dd>{cur.type.topic}</dd>
           </dl>
           {theory && <Link className="raillink" href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link>}
-          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>d</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
+          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
         </div>
       </aside>
     </div>

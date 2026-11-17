@@ -23,6 +23,10 @@ export type TheoryPage = {
   Component: ComponentType;
 };
 
+/** A question type of a problem set; `fromPs` is false for lecture content the problem set leaves out. */
+export type PsType = TypeDef & { fromPs: boolean };
+export type ProblemSet = { id: string; title: string; topic: string; types: PsType[] };
+
 export type SubjectModule = {
   slug: string;
   name: string;
@@ -34,9 +38,14 @@ export type SubjectModule = {
   /** Maps a generated question's key (e.g. "L1.tf") to the type it counts toward ("L1.concept"). */
   typeKeyOf: (fam: string) => string;
   mock?: MockSpec;
+  /** Questions in the format of the problem sets, practised on their own page. */
+  problemSets?: ProblemSet[];
   FormulaSheet: ComponentType;
   theory: TheoryPage[];
   answerNote: string;
 };
 
 export type { ConceptBank };
+
+/** Lecture types plus problem-set types, for review, statistics and look-ups by key. */
+export const allTypes = (m: SubjectModule): TypeDef[] => [...m.types, ...(m.problemSets || []).flatMap(p => p.types)];

@@ -10,11 +10,13 @@ import type { SubjectModule } from '@/lib/subject';
 export type Settings = {
   /** Enabled type keys; null means all. */
   enabled: string[] | null;
+  /** Enabled problem-set type keys; null means all. */
+  ps: string[] | null;
   mode: 'endless' | 'session';
   sessionLen: number;
   newPerDay: number;
 };
-export const DEFAULT_SETTINGS: Settings = { enabled: null, mode: 'endless', sessionLen: 20, newPerDay: 20 };
+export const DEFAULT_SETTINGS: Settings = { enabled: null, ps: null, mode: 'endless', sessionLen: 20, newPerDay: 20 };
 
 export type TypeStat = { answers: number; correct: number; ema: number };
 export type DueItem = { type_key: string; topic: string; due_at: string; box: number };

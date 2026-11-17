@@ -1,10 +1,11 @@
 import { genConcept, genConceptKind } from '@/lib/engine/concepts';
 import { pick, resetNames } from '@/lib/engine/gen-helpers';
 import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
-import type { MockExam, SubjectModule } from '@/lib/subject';
+import type { MockExam, ProblemSet, SubjectModule } from '@/lib/subject';
 import { LECTURES } from './concepts';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
+import { PROBLEM_SETS } from './ps';
 import { THEORY } from './theory';
 
 const NUMERIC: [key: string, name: string, gen: () => Question][] = [
@@ -85,6 +86,11 @@ function buildExam(ctx: GenCtx): MockExam {
   };
 }
 
+const problemSets: ProblemSet[] = PROBLEM_SETS.map(ps => ({
+  id: ps.id, title: ps.title, topic: ps.topic,
+  types: ps.types.map(t => ({ key: t.key, name: t.name, topic: ps.topic, weight: 1, gen: fresh(t.gen), fromPs: t.fromPs })),
+}));
+
 const fi: SubjectModule = {
   slug: 'fi',
   name: 'Financial Investments',
@@ -100,8 +106,10 @@ const fi: SubjectModule = {
     build: buildExam,
     grade: s => (s / 5).toFixed(1) + ' on the 0–20 scale',
   },
+  problemSets,
   FormulaSheet,
-  theory: THEORY,
+  // Wrong answers on a problem-set question link to the theory page of its lecture.
+  theory: THEORY.map(p => ({ ...p, types: [...p.types, ...problemSets.filter(s => s.topic === p.topic).flatMap(s => s.types.map(t => t.key))] })),
   answerNote: 'Enter numbers without units. Percentages may be entered as 8.33 or 0.0833. Weights and ratios are plain decimals. Decimal comma and decimal point both work.',
 };
 
