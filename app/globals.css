@@ -421,6 +421,9 @@ h2.sec small { font-weight: 400; color: var(--muted); font-size: 14px; margin-le
 .examq .qbody { min-width: 0; }
 .examq .part { grid-template-columns: 1.8rem 1fr auto; }
 .examq .pts { font-size: 13.5px; color: var(--muted); margin-top: 10px; }
+.examq .retry { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--rule); }
+.examq .retry h4 { font-family: var(--display); font-size: 15px; margin: 14px 0 6px; }
+.examq .retry .actions { margin-top: 14px; }
 .timerbar {
   position: sticky; top: var(--topbar); z-index: 10; display: flex; justify-content: space-between; align-items: center;
   padding: 12px 20px; margin-bottom: 8px; font-size: 14.5px; top: calc(var(--topbar) + 8px);

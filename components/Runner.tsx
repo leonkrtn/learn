@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gradeQuestion } from '@/lib/engine/grade';
+import { canRepeat, sameWithNewNumbers } from '@/lib/engine/repeat';
 import { CycleBag, pickAdaptive } from '@/lib/engine/select';
 import { allTypes } from '@/lib/subject';
 import type { Answers, Graded, Question, TypeDef } from '@/lib/engine/types';
@@ -103,6 +104,19 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     window.scrollTo({ top: 0 });
   }, [n, sessionLen, draw]);
 
+  /** Same variant and sub-questions with fresh numbers; counts as a question of its own. */
+  const lastInSession = !!sessionLen && n + 1 >= sessionLen;
+  const repeatable = !!cur && !!graded && !lastInSession && canRepeat(cur.q);
+  const [repeatFailed, setRepeatFailed] = useState(false);
+  const repeat = useCallback(() => {
+    if (!cur || !repeatable) return;
+    const q = sameWithNewNumbers(cur.q, () => cur.type.gen({ bank }));
+    if (!q) { setRepeatFailed(true); return; }
+    setN(k => k + 1); setAnswers({}); setGraded(null); setRepeatFailed(false); setCur({ type: cur.type, q });
+    window.scrollTo({ top: 0 });
+  }, [cur, repeatable, bank]);
+  useEffect(() => setRepeatFailed(false), [cur]);
+
   const skip = useCallback(() => { setAnswers({}); setGraded(null); setCur(draw()); window.scrollTo({ top: 0 }); }, [draw]);
 
   useEffect(() => {
@@ -116,6 +130,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
         if (graded) next(); else check();
         return;
       }
+      if (graded && e.key.toLowerCase() === 'r') { e.preventDefault(); repeat(); return; }
       if (!cur || graded) return;
       const single = cur.q.parts.length === 1 && cur.q.parts[0].type === 'mc' ? cur.q.parts[0] : null;
       if (!single) return;
@@ -125,7 +140,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [cur, graded, check, next]);
+  }, [cur, graded, check, next, repeat]);
 
   const theory = cur ? mod.theory.find(p => p.types.includes(cur.type.key)) : undefined;
   const st = cur ? stats[cur.type.key] : undefined;
@@ -184,7 +199,11 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
           {theory ? <>Revisit the explanation: <Link href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link></> : ' '}
         </div>
         <div className="actions">
-          <button type="button" className="linkbtn" style={{ visibility: graded ? 'hidden' : 'visible' }} onClick={skip}>Skip</button>
+          {graded
+            ? <button type="button" className="linkbtn" style={{ visibility: repeatable ? 'visible' : 'hidden' }} onClick={repeat} disabled={repeatFailed}>
+                {repeatFailed ? 'No variant with new numbers found' : 'Same question, new numbers'}
+              </button>
+            : <button type="button" className="linkbtn" onClick={skip}>Skip</button>}
           <button type="button" className="btn" data-primary="1" onClick={graded ? next : check}>
             {graded ? (sessionLen && n + 1 >= sessionLen ? 'See results' : 'Next question') : 'Check'}
           </button>
@@ -207,7 +226,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             <dt>{unitName}</dt><dd>{cur.type.topic}</dd>
           </dl>
           {theory && <Link className="raillink" href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link>}
-          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
+          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
         </div>
       </aside>
     </div>

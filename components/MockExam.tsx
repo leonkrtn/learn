@@ -3,13 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { gradeQuestion } from '@/lib/engine/grade';
-import type { Answers, Graded } from '@/lib/engine/types';
-import type { MockExam as Exam } from '@/lib/subject';
+import { canRepeat, sameWithNewNumbers } from '@/lib/engine/repeat';
+import type { Answers, Graded, Question } from '@/lib/engine/types';
+import { allTypes, type MockExam as Exam } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
 
 export type PastMock = { id: number; score: number; max_score: number; minutes: number; created_at: string; parts: { title: string; score: number; pts: number }[] };
+
+type Retry = { q: Question; answers: Answers; graded: Graded | null } | 'failed';
 
 type Saved = { exam: Exam; answers: Answers[][]; start: number };
 
@@ -30,6 +33,22 @@ export default function MockExam({ past }: { past: PastMock[] }) {
   const [armed, setArmed] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const submitted = useRef(false);
+  /** After submitting: a question repeated with new numbers, keyed by "part-question". Does not change the exam score. */
+  const [retries, setRetries] = useState<Record<string, Retry>>({});
+
+  const typeOf = (q: Question) => allTypes(mod).find(t => t.key === mod.typeKeyOf(q.fam));
+  const retry = (key: string, q: Question) => {
+    const t = typeOf(q);
+    const nq = t ? sameWithNewNumbers(q, () => t.gen({ bank })) : null;
+    setRetries(r => ({ ...r, [key]: nq ? { q: nq, answers: {}, graded: null } : 'failed' }));
+  };
+  const checkRetry = (key: string) => {
+    const r = retries[key];
+    if (!r || r === 'failed' || r.graded) return;
+    const g = gradeQuestion(r.q, r.answers, mod.tolerance);
+    setRetries(x => ({ ...x, [key]: { ...r, graded: g } }));
+    record(mod.typeKeyOf(r.q.fam), r.q.topic, 'practice', g.a, g.c, { fam: r.q.fam, answers: r.answers });
+  };
 
   useEffect(() => {
     try {
@@ -50,7 +69,7 @@ export default function MockExam({ past }: { past: PastMock[] }) {
     const ex = spec.build({ bank });
     submitted.current = false;
     setExam(ex); setAnswers(ex.parts.map(p => p.qs.map(() => ({})))); setStart(Date.now()); setNow(Date.now());
-    setGraded(null); setResult(null); setArmed(false); setSaveErr(null);
+    setGraded(null); setResult(null); setArmed(false); setSaveErr(null); setRetries({});
     window.scrollTo({ top: 0 });
   };
 
@@ -148,6 +167,26 @@ export default function MockExam({ past }: { past: PastMock[] }) {
                 <QuestionView q={q} answers={answers[i]?.[j] || {}} graded={graded ? graded[i][j] : null} lastEnterBlurs
                   onChange={a => setAnswers(prev => prev.map((row, x) => x !== i ? row : row.map((cell, y) => y === j ? a : cell)))} />
                 <div className="pts">{fmtPts(q.pts || 0)} points{graded ? ` · scored ${fmtPts((q.pts || 0) * graded[i][j].c / graded[i][j].a)}` : ''}</div>
+                {graded && canRepeat(q) && typeOf(q) && (() => {
+                  const key = i + '-' + j, r = retries[key];
+                  return (
+                    <div className="retry">
+                      {r && r !== 'failed' && (
+                        <>
+                          <h4>Same question, new numbers</h4>
+                          <QuestionView q={r.q} answers={r.answers} graded={r.graded} onSubmit={() => checkRetry(key)}
+                            onChange={a => setRetries(x => ({ ...x, [key]: { ...r, answers: a } }))} />
+                        </>
+                      )}
+                      <div className="actions">
+                        <span className="note">{r === 'failed' ? 'No variant with new numbers found.' : r?.graded ? `${r.graded.c} of ${r.graded.a} correct` : ''}</span>
+                        {r && r !== 'failed' && !r.graded
+                          ? <button className="btn" type="button" onClick={() => checkRetry(key)}>Check</button>
+                          : <button className="btn ghost" type="button" onClick={() => retry(key, q)}>{r && r !== 'failed' ? 'Again with new numbers' : 'Same question, new numbers'}</button>}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </section>
           ))}
