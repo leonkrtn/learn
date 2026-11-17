@@ -1,9 +1,9 @@
 // Investment and Financing Decisions: practice in the format of the Moodle quizzes and the practice exercises.
 // Cases with several steps keep numeric entry, single questions are multiple choice A–E with wrong options from
 // typical mistakes. Each set also covers content of the lecture and its additional material that the quizzes leave out.
-import { C, P, Q, chance, fmtNum, p_, pick, rstep, shuffle } from '@/lib/engine/gen-helpers';
+import { C, N, P, Q, chance, chooseParts, fmtNum, p_, pick, rint, roundTo, rstep, shuffle } from '@/lib/engine/gen-helpers';
 import { CANNOT, mcNum, mcText, shortAnswer } from '@/lib/engine/mc';
-import type { Question } from '@/lib/engine/types';
+import type { Part, Question } from '@/lib/engine/types';
 import { BANK } from './concepts';
 import * as G from './generators';
 
@@ -113,6 +113,49 @@ export function PS3_pecking(): Question {
   return mcText('PS3.pecking', '3', G.lemonsText(d) + p_('Which statement is correct?'), right, wrong, sol);
 }
 
+// Quiz: a "star" or "common" hotel, an advertising campaign financed with equity or debt, and what sophisticated
+// investors infer from the choice.
+export function hotelDraw() {
+  for (;;) {
+    const c = G.cur(), H = rstep(40, 100, 10), L = rstep(10, 30, 5);
+    const pS = pick([0.4, 0.5, 0.6]), pC = +(pS - pick([0.2, 0.3])).toFixed(2), up = pick([0.1, 0.15, 0.2]);
+    const q = pick([0.5, 0.5, 0.4, 0.6]), K = rint(2, 8);
+    if (pC < 0.1 || pS + up > 0.9 || K > L || up * (H - L) - K < 1) continue;
+    const val = (p: number) => L + p * (H - L);
+    const VS = val(pS), VC = val(pC), V0 = q * VS + (1 - q) * VC;
+    const VS1 = val(pS + up), VC1 = val(pC + up), pooled = q * VS1 + (1 - q) * VC1, alpha = K / pooled;
+    return { c, H, L, pS, pC, up, q, K, VS, VC, V0, VS1, VC1, pooled, alpha, npv: up * (H - L) - K,
+      eqS: (1 - alpha) * VS1, eqC: (1 - alpha) * VC1, dS: VS1 - K, dC: VC1 - K, sep: K / VC1 };
+  }
+}
+
+const RETAIN = ['less than', 'exactly', 'more than'];
+const WHO = ['Only “star” entrepreneurs', 'Only “common” entrepreneurs', 'Both types'];
+
+export function PS3_hotel(): Question {
+  const d = hotelDraw(), { c } = d, m = (x: number) => c.mil(x, 0);
+  const city = pick(['Springfield', 'Riverton', 'Lakeside', 'Fairview', 'Brookhaven']);
+  const prior = d.q === 0.5 ? 'assign an equal probability to each type' : `believe that the hotel is a “star” with probability ${P(d.q, 0)}`;
+  const html = p_(`An entrepreneur builds the first boutique hotel in an emerging neighbourhood of ${city} and funds it entirely with her own equity. Depending on her relations with travel agencies, the hotel is either a rising “star” or a “common” hotel. A star generates ${m(d.H)} with probability ${P(d.pS, 0)} and ${m(d.L)} otherwise; a common hotel generates ${m(d.H)} with probability ${P(d.pC, 0)} and ${m(d.L)} otherwise. The entrepreneur knows her type; outside investors do not and ${prior}. The discount rate is zero and the hotel generates a single cash flow at the end of the period.`) +
+    p_(`She can launch an advertising campaign costing ${m(d.K)}, which raises the probability of the high cash flow by ${fmtNum(d.up * 100, 0)} percentage points for either type. ${G.inMillions(c)}`);
+  const ret = (t: string, eq: boolean) => C(`Entrepreneurs of ${t} hotels retain … the full NPV of the campaign${eq ? ' (equity)' : ' (debt)'}.`, RETAIN, eq ? (t === '“star”' ? 0 : 2) : 1);
+  const parts = chooseParts([
+    { part: N('What is the market value of the hotel’s equity before the campaign?', d.V0, c.m), w: 0.6 },
+    { part: [N('What is its true value if it is a “star” hotel?', d.VS, c.m), N('… and if it is a “common” hotel?', d.VC, c.m)], w: 0.6 },
+    { part: [N('The campaign is financed with outside equity and investors infer nothing from the choice. True value to a “star” entrepreneur?', d.eqS, c.m), N('… and to a “common” entrepreneur?', d.eqC, c.m)], must: true },
+    { part: [ret('“star”', true), ret('“common”', true)], w: 0.6 },
+    { part: [N('Financed with debt instead (investors still infer nothing): true value of a “star” hotel’s equity?', d.dS, c.m), N('… and of a “common” hotel’s equity?', d.dC, c.m)], w: 0.6 },
+    { part: [ret('“star”', false), ret('“common”', false)], w: 0.35 },
+    { part: [C('Investors are sophisticated. Who would be willing to issue equity?', WHO, 1), C('… and who would be willing to issue debt?', WHO, 2)], w: 0.7 },
+    { part: N('What fraction of the equity would you ask from an entrepreneur who issues equity?', d.sep * 100, 'pct'), w: 0.7 },
+  ], 4, 7);
+  const sol = p_(`True values: star ${f2(d.L)} + ${f2(d.pS)} × ${f2(d.H - d.L)} = ${f2(d.VS)}, common ${f2(d.VC)}; the market prices the average, ${f2(d.q)} × ${f2(d.VS)} + ${f2(1 - d.q)} × ${f2(d.VC)} = ${c.mil(d.V0)}. The campaign adds ${f2(d.up)} × ${f2(d.H - d.L)} = ${f2(d.up * (d.H - d.L))} for ${f2(d.K)}: NPV ${c.mil(d.npv)} for either type (star ${f2(d.VS1)}, common ${f2(d.VC1)}).`) +
+    p_(`Equity at the pooled price: α = ${f2(d.K)} / ${f2(d.pooled)} = ${fmtNum(d.alpha, 4)}. Star keeps ${fmtNum(1 - d.alpha, 4)} × ${f2(d.VS1)} = ${c.mil(d.eqS)}, a gain of ${f2(d.eqS - d.VS)} < ${f2(d.npv)} (the shares are underpriced); common keeps ${c.mil(d.eqC)}, a gain of ${f2(d.eqC - d.VC)} > ${f2(d.npv)}.`) +
+    p_(`Debt: the low cash flow ${f2(d.L)} covers ${f2(d.K)}, so the debt is riskless and fairly priced for both: star ${f2(d.VS1)} − ${f2(d.K)} = ${c.mil(d.dS)}, common ${c.mil(d.dC)}; both keep exactly the NPV.`) +
+    p_(`Sophisticated investors know a star would never sell underpriced equity, so only common hotels issue equity, and both types can issue debt. An equity issuer is a common hotel: α = ${f2(d.K)} / ${f2(d.VC1)} = ${fmtNum(d.sep, 3)} (${pp(d.sep)}).`);
+  return { ...Q('PS3.hotel', '3', html, parts), solution: sol };
+}
+
 const PS3_short = () => shortAnswer('PS3.short', '3', BANK['3'].MC);
 
 // =====================================================================
@@ -183,6 +226,46 @@ export function PS4_terminalMc(): Question {
     { sol: p_(`TV<sub>${T}</sub> = FCF<sub>${T + 1}</sub> / (r − g) = ${f2(fcfT)} × ${fmtNum(1 + g, 3)} / (${pp(r, 0)} − ${pp(g, 1)}) = ${c}${f2(tv)} million, a value at year ${T}.`) });
 }
 
+// Quiz: NPV of a master's degree against staying in the job.
+const MSC_ITEMS: [string, number, string][] = [
+  ['Living costs in the place of study', 2, 'they matter only as far as they differ from the living costs you would have while working'],
+  ['Money and effort spent on preparing the applications', 1, 'they are sunk whichever way you decide'],
+  ['Income taxes', 0, 'only after-tax salaries are cash flows to you'],
+  ['Rent-free access to a family house in the place of study', 0, 'it saves rent you would otherwise pay, an incremental benefit of studying'],
+  ['A student loan at the risk-free rate that you are certain to repay', 1, 'a fairly priced loan has an NPV of zero; it changes the timing, not the value'],
+  ['The graduation party', 1, 'it is consumption worth what it costs, not a cost of the degree'],
+  ['A scholarship that covers part of the tuition', 0, 'it reduces the cash you pay because of the programme'],
+];
+
+export function PS4_msc(): Question {
+  for (;;) {
+    const age = rint(23, 28), D = pick([1, 2, 2]), r = rstep(0.06, 0.09, 0.01), n1 = 65 - age, n2 = n1 - D;
+    const S1 = rstep(25, 40, 1) * 1000, g1 = rstep(0.02, 0.04, 0.001), S2 = roundTo(S1 * rstep(1.2, 1.6, 0.05), 1000), g2 = +(g1 + rstep(0.005, 0.025, 0.001)).toFixed(4);
+    const tuition = rstep(10, 30, 1) * 1000, books = rstep(1, 3, 0.5) * 1000, party = rstep(1, 3, 0.5) * 1000;
+    if (g2 >= r - 0.005) continue;
+    const ga = (C0: number, g: number, n: number) => C0 / (r - g) * (1 - ((1 + g) / (1 + r)) ** n);
+    const pvJob = ga(S1, g1, n1), pvMsc = ga(S2, g2, n2) / (1 + r) ** D, npv = pvMsc - pvJob - tuition - books;
+    const e = (x: number) => '€' + fmtNum(x, 0);
+    const html = p_(`You are deciding whether to join an MSc programme you have been accepted to. You are ${age}, the programme takes ${D === 1 ? 'one year' : 'two years'} and the discount rate is ${pp(r, 0)}.`) + '<ul><li>' + [
+      `If you stay in your job, you earn ${e(S1)} after tax at the end of the first year, growing at ${pp(g1, 1)} a year until you retire after ${n1} years, at 65.`,
+      `Tuition is ${e(tuition)} and books cost ${e(books)}, both paid immediately. You plan a graduation party costing ${e(party)}, worth every penny.`,
+      `Your starting salary after the MSc is ${e(S2)}, paid one year after you finish, growing at ${pp(g2, 1)} a year until you retire, also at 65.`,
+    ].join('</li><li>') + '</li></ul>' + p_('Express amounts in thousands (e.g. 10 for €10,000).');
+    const items = shuffle(MSC_ITEMS).slice(0, rint(2, 4));
+    const opts = ['Yes', 'No', 'It depends'];
+    const parts: Part[] = chooseParts([
+      { part: N('What is the present value of the salaries you give up by leaving your job?', pvJob / 1000, 'k'), w: 0.5 },
+      { part: N('What is the present value today of the salaries after the MSc?', pvMsc / 1000, 'k'), w: 0.5 },
+      { part: N('What is the NPV of pursuing the MSc?', npv / 1000, 'k'), must: true },
+      { part: items.map(([t, a]) => C(`Would this affect the calculation? ${t}`, opts, a)), w: 0.75 },
+    ], 2, 4);
+    const sol = p_(`Growing annuities, PV = C / (r − g) × [1 − ((1 + g)/(1 + r))<sup>n</sup>]. Job: ${e(S1)} / (${pp(r, 0)} − ${pp(g1, 1)}) × [1 − (${fmtNum(1 + g1, 4)}/${fmtNum(1 + r, 2)})<sup>${n1}</sup>] = ${e(pvJob)}. MSc: ${n2} salaries from year ${D + 1}, valued at year ${D} and discounted ${D} year${D > 1 ? 's' : ''}: ${e(S2)} / (${pp(r, 0)} − ${pp(g2, 1)}) × [1 − (${fmtNum(1 + g2, 4)}/${fmtNum(1 + r, 2)})<sup>${n2}</sup>] / ${fmtNum(1 + r, 2)}<sup>${D}</sup> = ${e(pvMsc)}.`) +
+      p_(`NPV = ${e(pvMsc)} − ${e(pvJob)} − ${e(tuition)} − ${e(books)} = ${e(npv)}, or ${fmtNum(npv / 1000, 2)} thousand. The party is left out: it is consumption worth what it costs.`) +
+      p_(items.map(([t, a, why]) => `${t}: <b>${opts[a]}</b>, ${why}.`).join('<br>'));
+    return { ...Q('PS4.msc', '4', html, parts), solution: sol };
+  }
+}
+
 const PS4_short = () => shortAnswer('PS4.short', '4', BANK['4'].MC);
 
 // ---------------------------------------------------------------------
@@ -213,11 +296,13 @@ export const PROBLEM_SETS: PsSpec[] = [
   { id: '3', topic: '3', title: 'Incentives and information', types: [
     T('PS3.effort', 'Effort with own cash, equity and debt (exercise)', retag('PS3.effort', G.L3_effort)),
     T('PS3.kappaMc', 'Largest effort cost for high effort', PS3_kappaMc),
+    T('PS3.hotel', 'Star or common hotel: equity, debt and signalling (quiz)', PS3_hotel),
     T('PS3.lemons', 'Asymmetric information: pooled prices (exercise)', retag('PS3.lemons', G.L3_lemons), false),
     T('PS3.pecking', 'Which security do good types issue?', PS3_pecking, false),
     T('PS3.short', 'Short answers', PS3_short, false),
   ] },
   { id: '4', topic: '4', title: 'Capital budgeting', types: [
+    T('PS4.msc', 'NPV of a master’s degree (quiz)', PS4_msc),
     T('PS4.fcf', 'Free cash flow from financial statements (exercise)', retag('PS4.fcf', G.L4_fcf), false),
     T('PS4.relevant', 'Relevant cash flows', PS4_relevant, false),
     T('PS4.npvMc', 'NPV with incremental cash flows', PS4_npvMc, false),
