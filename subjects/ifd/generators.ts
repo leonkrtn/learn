@@ -9,7 +9,7 @@ const NOTE_PCT = 'Returns and rates may be entered in percent (15.6) or as decim
 
 /** Currency of a question: symbol and the units for amounts in millions and in single units. */
 type Cur = { s: string; m: Unit; u: Unit; mil: (x: number, d?: number) => string; one: (x: number, d?: number) => string };
-function cur(): Cur {
+export function cur(): Cur {
   const s = pick(['€', '$']);
   return {
     s, m: s === '€' ? 'm' : 'musd', u: s === '€' ? 'eur' : 'usd',
@@ -17,7 +17,7 @@ function cur(): Cur {
     one: (x, d = 2) => (x < 0 ? '−' : '') + s + fmtNum(Math.abs(x), d),
   };
 }
-const inMillions = (c: Cur) => `Express amounts in millions (e.g. 10 for ${c.s}10 million).`;
+export const inMillions = (c: Cur) => `Express amounts in millions (e.g. 10 for ${c.s}10 million).`;
 
 /** Smallest face value F with E[min(F, V)] = target (bisection; E is increasing in F). */
 export function solveFace(V: number[], p: number[], target: number): number {
