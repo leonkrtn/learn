@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import { gradeQuestion, isOk, parseNum } from '../lib/engine/grade';
 import { CycleBag, pickAdaptive } from '../lib/engine/select';
 import { SUBJECTS } from '../subjects';
+import { allTypes } from '../lib/subject';
+import { canRepeat, sameWithNewNumbers } from '../lib/engine/repeat';
+import type { Question } from '../lib/engine/types';
 import fvcs from '../subjects/fvcs';
 import { BANK } from '../subjects/fvcs/concepts';
 import { BANK as FV_BANK } from '../subjects/fv/concepts';
@@ -245,4 +248,22 @@ test('adaptive pick never repeats the previous type and favours weak types', () 
     last = { type: t.key, topic: t.topic };
   }
   assert.ok(counts['L1.beta'] > counts['L1.eps'] * 2);
+});
+
+test('"same question, new numbers" keeps the variant and sub-questions of every numeric type', () => {
+  const shape = (q: Question) => q.parts.map(p => p.type + (p.type === 'num' ? ':' + p.unit : ':' + (p.type === 'choice' || p.type === 'mc' ? p.options.length : ''))).join(',');
+  for (const mod of Object.values(SUBJECTS)) {
+    const ctx = { bank: BANKS[mod.slug] };
+    for (const t of allTypes(mod)) {
+      for (let i = 0; i < 4; i++) {
+        const q = t.gen(ctx);
+        if (!canRepeat(q)) { assert.equal(sameWithNewNumbers(q, () => t.gen(ctx)), null); continue; }
+        const r = sameWithNewNumbers(q, () => t.gen(ctx));
+        assert.ok(r, t.key + ': no variant found');
+        assert.equal(r.fam, q.fam, t.key);
+        assert.equal(shape(r), shape(q), t.key);
+        assert.notEqual(r.html + r.parts.map(p => 'prompt' in p ? p.prompt : '').join(''), q.html + q.parts.map(p => 'prompt' in p ? p.prompt : '').join(''), t.key + ': nothing changed');
+      }
+    }
+  }
 });
