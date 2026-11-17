@@ -3,6 +3,7 @@ import { pick, resetNames } from '@/lib/engine/gen-helpers';
 import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { MockExam, ProblemSet, SubjectModule } from '@/lib/subject';
 import { LECTURES } from './concepts';
+import { CHEATSHEET } from './cheatsheet';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
 import { PROBLEM_SETS } from './ps';
@@ -108,6 +109,7 @@ const fi: SubjectModule = {
   },
   problemSets,
   FormulaSheet,
+  cheatsheet: CHEATSHEET,
   // Wrong answers on a problem-set question link to the theory page of its lecture.
   theory: THEORY.map(p => ({ ...p, types: [...p.types, ...problemSets.filter(s => s.topic === p.topic).flatMap(s => s.types.map(t => t.key))] })),
   answerNote: 'Enter numbers without units. Percentages may be entered as 8.33 or 0.0833. Weights and ratios are plain decimals. Decimal comma and decimal point both work.',

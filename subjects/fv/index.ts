@@ -3,6 +3,7 @@ import { resetNames } from '@/lib/engine/gen-helpers';
 import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { SubjectModule } from '@/lib/subject';
 import { LECTURES } from './concepts';
+import { CHEATSHEET } from './cheatsheet';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
 import { THEORY } from './theory';
@@ -43,6 +44,7 @@ const fv: SubjectModule = {
   typeKeyOf: fam => /\.(false|true|tf|open)$/.test(fam) ? fam.replace(/\.[a-z]+$/, '.concept') : fam,
   // No mock exam until the structure of the final exam is known.
   FormulaSheet,
+  cheatsheet: CHEATSHEET,
   theory: THEORY,
   answerNote: 'Enter numbers without units. Percentages may be entered as 12.5 or 0.125. Decimal comma and decimal point both work. Use the minus sign for negative values.',
 };
