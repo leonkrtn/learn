@@ -65,7 +65,7 @@ test('grading the generated solutions scores full marks', () => {
 
 test('FI problem sets: every type runs 400 times, A–E options are distinct and the solution scores full marks', () => {
   const sets = fi.problemSets!;
-  assert.deepEqual(sets.map(p => p.id), ['1', '2', '3', '4', '6']);
+  assert.deepEqual(sets.map(p => p.id), ['1', '2', '3', '4', '5', '6']);
   const keys = sets.flatMap(p => p.types.map(t => t.key));
   assert.equal(new Set(keys).size, keys.length, 'duplicate problem-set keys');
   for (const p of sets) {
