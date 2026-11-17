@@ -3,6 +3,7 @@ import { resetNames } from '@/lib/engine/gen-helpers';
 import type { GenCtx, Question, TypeDef } from '@/lib/engine/types';
 import type { MockExam, SubjectModule } from '@/lib/subject';
 import { CHEATSHEET } from './cheatsheet';
+import { EXPLAIN } from './explain';
 import { LECTURES } from './concepts';
 import FormulaSheet from './FormulaSheet';
 import * as G from './generators';
@@ -93,6 +94,7 @@ const pif: SubjectModule = {
   FormulaSheet,
   cheatsheet: CHEATSHEET,
   theory: THEORY,
+  explain: EXPLAIN,
   answerNote: 'Enter numbers without units. Returns, standard deviations, covariances and ratios as decimals (0.0123); taxes in euros; rates in percent may be entered as 26.5 or 0.265. Decimal comma and decimal point both work.',
 };
 

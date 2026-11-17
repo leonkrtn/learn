@@ -9,6 +9,7 @@ import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, rev
 import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Answers, Graded, TypeDef } from '@/lib/engine/types';
+import ExplainButton from './Explain';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
 
@@ -202,8 +203,8 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.tagName === 'MATH-FIELD' || t.isContentEditable)) return;
-      // Typing in the cheatsheet drawer must not answer or advance the question.
-      if (t?.closest?.('.drawer')) return;
+      // Typing in the cheatsheet drawer or reading an explanation must not answer or advance the question.
+      if (t?.closest?.('.drawer') || document.querySelector('dialog[open]')) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Enter') {
         if (t && t.tagName === 'BUTTON' && !t.dataset.primary) return;
@@ -279,8 +280,9 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
           ))}
         </nav>
         <QuestionView q={item.q} answers={answers} onChange={setAnswers} graded={graded} onSubmit={check} autoFocus />
-        <div className="theorylink" style={{ visibility: wrong && theory ? 'visible' : 'hidden' }}>
-          {theory ? <>Revisit the explanation: <Link href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link></> : ' '}
+        <div className="theorylink" style={{ visibility: wrong ? 'visible' : 'hidden' }}>
+          <ExplainButton typeKey={type.key} hidden={!wrong} />
+          {theory ? <span>Revisit the lecture: <Link href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link></span> : ' '}
         </div>
         <div className="actions">
           <div className="actl">
