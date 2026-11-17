@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gradeQuestion } from '@/lib/engine/grade';
 import { canRepeat, sameWithNewNumbers } from '@/lib/engine/repeat';
 import { CycleBag } from '@/lib/engine/select';
-import { SET_SIZE, drawItems, insertRepeat, isUsable, poolKey, reviewItems, setTally, type QSet, type SetItem } from '@/lib/engine/sets';
+import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, reviewItems, setTally, type QSet, type SetItem } from '@/lib/engine/sets';
 import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Answers, Graded, TypeDef } from '@/lib/engine/types';
@@ -22,8 +22,12 @@ type Tally = { a: number; c: number };
 
 const LET = 'abcdefghij';
 const ANSWER_SAVE_DELAY = 1000;
+/** The lecture cycle keeps this many earlier questions in memory to jump back to. */
+const CYCLE_KEEP = 20;
 
 const patchItem = (s: QSet, p: Partial<SetItem>): QSet => ({ ...s, items: s.items.map((x, i) => i === s.pos ? { ...x, ...p } : x) });
+/** Marks everything up to the position as seen (sets stored before `seen` existed). */
+const markSeen = (s: QSet): QSet => ({ ...s, items: s.items.map((x, i) => i <= s.pos && !x.seen ? { ...x, seen: true } : x) });
 const sameTime = (a: string | null, b: string | null) => !!a && !!b && Date.parse(a) === Date.parse(b);
 
 export default function Runner({ mode }: { mode: RunnerMode }) {
@@ -92,7 +96,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
 
   const update = useCallback((s: QSet, persist = true) => { setSet(s); if (persist) save(s); }, [save]);
 
-  const fresh = useCallback((after?: SetItem): QSet => ({ pool: poolSig, items: fill(stored ? SET_SIZE : 1, after), pos: 0 }), [poolSig, fill, stored]);
+  const fresh = useCallback((after?: SetItem): QSet => goTo({ pool: poolSig, items: fill(stored ? SET_SIZE : 1, after), pos: 0 }, 0), [poolSig, fill, stored]);
 
   /** Loads the stored set, or draws a new one if there is none, it is finished, or the pool changed. */
   const load = useCallback(async (initial: boolean) => {
@@ -104,7 +108,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     const s = data as (QSet & { updated_at: string }) | null;
     if (s && isUsable(s, poolSig, types) && s.pos < s.items.length) {
       savedAt.current = s.updated_at;
-      setSet({ pool: s.pool, items: s.items, pos: s.pos });
+      setSet(markSeen({ pool: s.pool, items: s.items, pos: s.pos }));
     } else if (initial || (s && s.pos >= s.items.length)) {
       const n = fresh();
       update(n, n.items.length > 0 || !!s);
@@ -160,13 +164,23 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   const advance = useCallback(() => {
     if (!set) return;
     const pos = set.pos + 1;
-    if (pos < set.items.length) update({ ...set, pos });
-    else {
+    if (pos < set.items.length) update(goTo(set, pos));
+    else if (!stored) {
+      const items = [...set.items, ...fill(1, set.items[set.items.length - 1])].slice(-CYCLE_KEEP);
+      update(goTo({ ...set, items }, items.length - 1));
+    } else {
       const n = fresh(set.items[set.items.length - 1]);
       update(n.items.length ? n : { ...set, pos }, stored);
     }
     window.scrollTo({ top: 0 });
-  }, [set, fresh, update, stored]);
+  }, [set, fresh, fill, update, stored]);
+
+  /** Back to an earlier question of the set (or forward again to one already shown). */
+  const jump = useCallback((i: number) => {
+    if (!set || i === set.pos || i < 0 || i >= set.items.length || !isSeen(set, i)) return;
+    update(goTo(set, i));
+    window.scrollTo({ top: 0 });
+  }, [set, update]);
 
   /** Same variant and sub-questions with fresh numbers; it becomes the next question of the set. */
   const repeatable = !!item && !!type && !!graded && canRepeat(item.q);
@@ -176,7 +190,8 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     const q = sameWithNewNumbers(item.q, () => type.gen({ bank }));
     if (!q) { setRepeatFailed(true); return; }
     const next: SetItem = { type: type.key, q };
-    update(stored ? insertRepeat(set, next, n => fill(n, next)) : { ...set, items: [next], pos: 0 });
+    update(stored ? insertRepeat(set, next, n => fill(n, next))
+      : goTo({ ...set, items: [...set.items.slice(0, set.pos + 1), next, ...set.items.slice(set.pos + 1)].slice(-CYCLE_KEEP) }, Math.min(set.pos + 1, CYCLE_KEEP - 1)));
     window.scrollTo({ top: 0 });
   }, [set, item, type, repeatable, bank, stored, update, fill]);
   useEffect(() => setRepeatFailed(false), [item]);
@@ -197,6 +212,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
         return;
       }
       if (graded && e.key.toLowerCase() === 'r') { e.preventDefault(); repeat(); return; }
+      if (set && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); jump(set.pos + (e.key === 'ArrowLeft' ? -1 : 1)); return; }
       if (!item || graded) return;
       const single = item.q.parts.length === 1 && item.q.parts[0].type === 'mc' ? item.q.parts[0] : null;
       if (!single) return;
@@ -206,7 +222,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [item, graded, check, advance, repeat, setAnswers]);
+  }, [set, item, graded, check, advance, repeat, jump, setAnswers]);
 
   const theory = type ? mod.theory.find(p => p.types.includes(type.key)) : undefined;
   const st = type ? stats[type.key] : undefined;
@@ -231,29 +247,50 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   }
 
   const cycleInfo = mode.kind === 'cycle' && bag.current ? { pos: bag.current.pos, size: bag.current.size, round: bag.current.round } : null;
-  const progress = cycleInfo ? { pos: cycleInfo.pos, size: cycleInfo.size } : { pos: set!.pos + 1, size: set!.items.length };
+  const cur = set!;
+  const newest = cur.pos === cur.items.length - 1;
+  // The cycle counts its round; when looking back, the header counts the questions kept in memory instead.
+  const progress = cycleInfo && newest ? { pos: cycleInfo.pos, size: cycleInfo.size } : { pos: cur.pos + 1, size: cur.items.length };
   const wrong = graded && graded.c < graded.a;
+  const nav = cur.items.map((it, i) => {
+    if (!isSeen(cur, i)) return 'unseen';
+    if (!it.checked) return 'open';
+    const g = gradeQuestion(it.q, it.answers || {}, mod.tolerance);
+    return g.c === g.a ? 'ok' : 'bad';
+  });
 
   return (
     <div className="with-rail">
       <div className="panel qpanel">
         <div className="meta">
           <div className="qno">
-            Question {progress.pos} of {progress.size}
+            {cycleInfo && !newest ? 'Earlier question' : `Question ${progress.pos} of ${progress.size}`}
             <small>{type.name}</small>
           </div>
           <div>{tally.a ? <>Correct: <b>{tally.c}</b> of {tally.a}</> : `${unitName} ${type.topic}`}</div>
         </div>
+        <nav className="qnav" aria-label="Questions in this set">
+          {nav.map((st, i) => (
+            <button key={i} type="button" className={st + (i === cur.pos ? ' cur' : '')} disabled={st === 'unseen'} onClick={() => jump(i)}
+              aria-current={i === cur.pos ? 'step' : undefined}
+              title={st === 'unseen' ? 'Not reached yet' : `Question ${i + 1}: ${st === 'ok' ? 'correct' : st === 'bad' ? 'not fully correct' : 'not checked'}`}>
+              {i + 1}
+            </button>
+          ))}
+        </nav>
         <QuestionView q={item.q} answers={answers} onChange={setAnswers} graded={graded} onSubmit={check} autoFocus />
         <div className="theorylink" style={{ visibility: wrong && theory ? 'visible' : 'hidden' }}>
           {theory ? <>Revisit the explanation: <Link href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link></> : ' '}
         </div>
         <div className="actions">
-          {graded
-            ? <button type="button" className="linkbtn" style={{ visibility: repeatable ? 'visible' : 'hidden' }} onClick={repeat} disabled={repeatFailed}>
-                {repeatFailed ? 'No variant with new numbers found' : 'Same question, new numbers'}
-              </button>
-            : <button type="button" className="linkbtn" onClick={advance}>Skip</button>}
+          <div className="actl">
+            <button type="button" className="linkbtn" style={{ visibility: cur.pos > 0 ? 'visible' : 'hidden' }} onClick={() => jump(cur.pos - 1)}>← Previous</button>
+            {graded
+              ? <button type="button" className="linkbtn" style={{ visibility: repeatable ? 'visible' : 'hidden' }} onClick={repeat} disabled={repeatFailed}>
+                  {repeatFailed ? 'No variant with new numbers found' : 'Same question, new numbers'}
+                </button>
+              : <button type="button" className="linkbtn" onClick={advance}>Skip</button>}
+          </div>
           <button type="button" className="btn" data-primary="1" onClick={graded ? advance : check}>
             {graded ? 'Next question' : 'Check'}
           </button>
@@ -275,7 +312,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             <dt>{unitName}</dt><dd>{type.topic}</dd>
           </dl>
           {theory && <Link className="raillink" href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link>}
-          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
+          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>←</kbd> <kbd>→</kbd> earlier questions</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
         </div>
       </aside>
     </div>
