@@ -218,7 +218,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
 
   const theory = type ? mod.theory.find(p => p.types.includes(type.key)) : undefined;
   const st = type ? stats[type.key] : undefined;
-  const unitName = mode.kind === 'ps' ? (mod.problemSets?.[0]?.label?.replace(/\s*\S+$/, '') || 'Problem set') : 'Lecture';
+  const unitName = mode.kind === 'ps' ? (mod.problemSets?.[0]?.unit || mod.problemSets?.[0]?.label?.replace(/\s*\S+$/, '') || 'Problem set') : 'Lecture';
   const rate = (t: Tally) => t.a ? Math.round(100 * t.c / t.a) + '%' : '—';
 
   if (!loaded) return <div className="meta" />;

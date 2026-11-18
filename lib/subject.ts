@@ -32,6 +32,8 @@ export type ProblemSet = {
   label?: string;
   /** Where the `fromPs` types come from, "the problem set" by default. */
   source?: string;
+  /** What a type's topic number is called in the runner ("Lecture 4"); derived from the label by default. */
+  unit?: string;
 };
 
 /** Entry of a suggested exam cheatsheet: Markdown with $…$ formulas, rendered by lib/rich.ts. `topic` is a lecture id, null for general. */

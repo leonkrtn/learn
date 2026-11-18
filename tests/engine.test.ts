@@ -20,6 +20,8 @@ import { clearRating, ratingOf, RATING_NAMES, solveFace } from '../subjects/ifd/
 import fi from '../subjects/fi';
 import pif from '../subjects/pif';
 import { colL, normSInv, taxOf, code } from '../subjects/pif/generators';
+import fv from '../subjects/fv';
+import { impliedReturn, rateOf } from '../subjects/fv/gen4';
 
 const BANKS: Record<string, typeof BANK> = { fvcs: BANK, fv: FV_BANK, fi: FI_BANK, ifd: IFD_BANK, fd: FD_BANK, pif: PIF_BANK };
 
@@ -303,4 +305,27 @@ test('question sets: 20 drawn, survive JSON, repeat takes a slot, pool changes i
   assert.equal(back.pos, 1);
   assert.ok(isSeen(back, 4), 'questions after the position stay reachable');
   assert.ok(!isSeen(back, 6));
+});
+
+test('FV reproduces the lecture and exam numbers', () => {
+  // Lecture 4: S&P 500 at 1,468.36, cash flows 4.02% of the index growing 5% for five years, then 4.02% → r ≈ 8.39%.
+  const cf0 = 0.0402 * 1468.36, cfs = [1, 2, 3, 4, 5].map(t => cf0 * Math.pow(1.05, t));
+  assert.ok(Math.abs(impliedReturn(1468.36, cfs, 0.0402) - 0.0839) < 0.0005);
+  // Synthetic rating table: coverage 4.17 → BBB.
+  assert.equal(rateOf(2500 / 600)[1], 'BBB');
+});
+
+test('FV mock exam: 5 + 3 + 10 questions, 100 points, every question maps to a known type', () => {
+  const keys = new Set(allTypes(fv).map(t => t.key));
+  for (let i = 0; i < 200; i++) {
+    const ex = fv.mock!.build({ bank: FV_BANK });
+    assert.deepEqual(ex.parts.map(p => p.pts), [15, 55, 30]);
+    assert.deepEqual(ex.parts.map(p => p.qs.length), [5, 3, 10]);
+    for (const p of ex.parts) {
+      assert.ok(Math.abs(p.qs.reduce((s, q) => s + (q.pts || 0), 0) - p.pts) < 1e-9, p.title + ' points');
+      for (const q of p.qs) assert.ok(keys.has(fv.typeKeyOf(q.fam)), 'unknown type ' + q.fam);
+    }
+    const lectures = ex.parts[2].qs.map(q => q.topic);
+    assert.equal(new Set(lectures).size, 7, 'Part III covers every lecture');
+  }
 });
