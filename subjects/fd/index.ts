@@ -6,6 +6,7 @@ import { CHEATSHEET } from './cheatsheet';
 import { LECTURES } from './concepts';
 import { EXPLAIN } from './explain';
 import FormulaSheet from './FormulaSheet';
+import { L2_diagram, L2_points } from './diagram';
 import * as G from './generators';
 import { PROBLEM_SETS } from './ps';
 import { THEORY } from './theory';
@@ -20,6 +21,8 @@ const NUMERIC: [key: string, name: string, gen: () => Question][] = [
   ['L2.butterfly', 'Cheapest butterfly from bid-ask quotes', G.L2_butterfly],
   ['L2.portfolio', 'Portfolio of options: value and payoff', G.L2_portfolio],
   ['L2.identify', 'Name the strategy', G.L2_identify],
+  ['L2.diagram', 'Read the payoff diagram: strike, costs, break-even', L2_diagram],
+  ['L2.points', 'Points of the payoff diagram without a plot', L2_points],
   ['L3.replicate', 'One-period replication and arbitrage', G.L3_replicate],
   ['L3.twoStep', 'Two-period tree from volatility', G.L3_twoStep],
   ['L3.american', 'American versus European put', G.L3_american],

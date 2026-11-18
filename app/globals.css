@@ -230,6 +230,18 @@ table.data tbody th { text-align: left; font-weight: 400; padding-left: 0; white
 table.data thead th:first-child { text-align: left; padding-left: 0; }
 table.data tbody tr:last-child th, table.data tbody tr:last-child td { border-bottom: 1px solid var(--rule-strong); }
 .tablewrap { overflow-x: auto; }
+/* Payoff diagrams in questions (subjects/fd/diagram.ts): letters only, no values. */
+.payplot { max-width: 540px; margin: 4px 0 16px; }
+.payplot svg { display: block; width: 100%; height: auto; overflow: visible; }
+.payplot .ax { stroke: var(--ink-2); stroke-width: 1.2; }
+.payplot .arrow { fill: var(--ink-2); }
+.payplot .curve { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linejoin: round; }
+.payplot .guide { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 4; }
+.payplot .tick { stroke: var(--ink-2); stroke-width: 1.2; }
+.payplot .dot { fill: var(--ink); }
+.payplot .lt { font: 600 15px var(--display); fill: var(--ink); }
+.payplot .axl { font: 13px var(--sans); fill: var(--muted); }
+.payplot .sub { font-size: 10px; }
 
 .parts { margin-top: 12px; border-top: 1px solid var(--rule); }
 .part { display: grid; grid-template-columns: 2.1rem 1fr auto; column-gap: 16px; align-items: start; padding: 10px 0 4px; border-bottom: 1px solid var(--rule); }
