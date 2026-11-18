@@ -7,7 +7,6 @@ import { canRepeat, sameWithNewNumbers } from '@/lib/engine/repeat';
 import type { Answers, Graded, Question } from '@/lib/engine/types';
 import { allTypes, type MockExam as Exam } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
-import ExplainButton from './Explain';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
 
@@ -168,7 +167,6 @@ export default function MockExam({ past }: { past: PastMock[] }) {
                 <QuestionView q={q} answers={answers[i]?.[j] || {}} graded={graded ? graded[i][j] : null} lastEnterBlurs
                   onChange={a => setAnswers(prev => prev.map((row, x) => x !== i ? row : row.map((cell, y) => y === j ? a : cell)))} />
                 <div className="pts">{fmtPts(q.pts || 0)} points{graded ? ` · scored ${fmtPts((q.pts || 0) * graded[i][j].c / graded[i][j].a)}` : ''}</div>
-                {graded && graded[i][j].c < graded[i][j].a && typeOf(q) && <div className="theorylink"><ExplainButton typeKey={typeOf(q)!.key} /></div>}
                 {graded && canRepeat(q) && typeOf(q) && (() => {
                   const key = i + '-' + j, r = retries[key];
                   return (

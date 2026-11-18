@@ -1,6 +1,6 @@
 // Firm Value and Capital Structure: procedural generators for numeric questions.
 // Every question draws a new fictional firm and new numbers; solutions are computed from the same inputs.
-import { C, N, P, Q, chance, chooseParts, co, eur, fmtNum, mk, p_, pick, poss, r2, rint, roundTo, rstep, sh, shuffle, table, ul, v, type Item } from '@/lib/engine/gen-helpers';
+import { C, N, P, Q, calc, chance, chooseParts, co, eur, fmtNum, mk, p_, pick, poss, r2, rint, roundTo, rstep, sh, shuffle, table, tn, tp, ul, v, withCalc, type Item } from '@/lib/engine/gen-helpers';
 import type { Part, Question } from '@/lib/engine/types';
 
 const PERF = () => v('Assume perfect capital markets.', 'Assume a perfect capital market setting.', 'Capital markets are perfect.', 'Assume there are no taxes, transaction costs or other market imperfections.');
@@ -36,15 +36,28 @@ export function L1_project(): Question {
   const rt = Math.round((rU + D2 / (VU - D2) * (rU - rf)) * 10000) / 10000;
   const k = (rt - rU) / (rU - rf), Dt = VU * k / (1 + k);
   const items: Item[] = [
-    { part: N(v('What is the NPV of this project?', 'Compute the net present value of the project.'), VU - I, 'eur'), w: 0.7 },
-    { part: N(v('If the project is financed entirely with equity, what is the initial market value of the unlevered equity?', 'Suppose the project is sold to investors as an all-equity firm. How much money can be raised in this way?'), VU, 'eur'), w: 0.6 },
-    { part: [N(`What are the cash flows of the levered equity in the ${tpl === 1 ? 'weak economy' : weakW + ' state'}?`, eL, 'eur'), N(`… and in the ${tpl === 1 ? 'strong economy' : strongW + ' state'}?`, eH, 'eur')], w: 0.45 },
-    { part: N(v('According to MM, what is the initial value of the levered equity?', 'What is the market value of the levered equity today?'), E, 'eur'), must: true },
-    { part: N(v('What is the expected return on the levered equity?', 'What expected return will levered equity holders earn?'), rE * 100, 'pct'), w: 0.75 },
-    { part: N(`What is the realized return on levered equity in the ${tpl === 1 ? 'weak economy' : weakW + ' state'}? (Enter a negative return with a minus sign.)`, (eL / E - 1) * 100, 'pct'), w: 0.3 },
-    { part: N(`Instead of ${eur(D)}, how much would the firm have to borrow at the risk-free rate for the expected return on levered equity to equal ${P(rt)}?`, Dt, 'eur'), w: 0.3 },
+    { part: N(v('What is the NPV of this project?', 'Compute the net present value of the project.'), VU - I, 'eur', { key: 'npv' }), w: 0.7 },
+    { part: N(v('If the project is financed entirely with equity, what is the initial market value of the unlevered equity?', 'Suppose the project is sold to investors as an all-equity firm. How much money can be raised in this way?'), VU, 'eur', { key: 'VU' }), w: 0.6 },
+    { part: [N(`What are the cash flows of the levered equity in the ${tpl === 1 ? 'weak economy' : weakW + ' state'}?`, eL, 'eur', { key: 'eL' }), N(`… and in the ${tpl === 1 ? 'strong economy' : strongW + ' state'}?`, eH, 'eur', { key: 'eH' })], w: 0.45 },
+    { part: N(v('According to MM, what is the initial value of the levered equity?', 'What is the market value of the levered equity today?'), E, 'eur', { key: 'E' }), must: true },
+    { part: N(v('What is the expected return on the levered equity?', 'What expected return will levered equity holders earn?'), rE * 100, 'pct', { key: 'rE' }), w: 0.75 },
+    { part: N(`What is the realized return on levered equity in the ${tpl === 1 ? 'weak economy' : weakW + ' state'}? (Enter a negative return with a minus sign.)`, (eL / E - 1) * 100, 'pct', { key: 'rL' }), w: 0.3 },
+    { part: N(`Instead of ${eur(D)}, how much would the firm have to borrow at the risk-free rate for the expected return on levered equity to equal ${P(rt)}?`, Dt, 'eur', { key: 'Dt' }), w: 0.3 },
   ];
-  return Q('L1.project', 1, p_(intro) + p_(debt), chooseParts(items, 3, 5));
+  const cc = calc(), wk = tpl === 1 ? 'weak economy' : weakW + ' state', sg = tpl === 1 ? 'strong economy' : strongW + ' state', rep2 = D * (1 + rf), eE = p * eH + (1 - p) * eL;
+  cc.s(`**Expected cash flow:** $E[CF] = ${tn(p, 2)} \\times ${tn(H)} + ${tn(1 - p, 2)} \\times ${tn(L)} = ${tn(ECF)}$ (€).`);
+  cc.r(`**Unlevered equity value (PV of the project cash flow):** $V^U = \\frac{E[CF]}{1 + r_U} = \\frac{${tn(ECF)}}{1 + ${tn(rU, 4)}} = \\frac{${tn(ECF)}}{${tn(1 + rU, 4)}} = ${tn(VU)}$ (€).`, 'VU', VU);
+  cc.r(`**NPV:** $NPV = V^U - I = ${tn(VU)} - ${tn(I)} = ${tn(VU - I)}$ (€).`, 'npv', VU - I);
+  cc.s(`**Debt repayment:** the loan of €${tn(D, 0)} is repaid with interest, $D (1 + r_f) = ${tn(D)} \\times ${tn(1 + rf, 4)} = ${tn(rep2)}$ (€).`);
+  cc.r(`**Levered equity cash flow, ${wk}:** $${tn(L)} - ${tn(rep2)} = ${tn(eL)}$ (€).`, 'eL', eL);
+  cc.r(`**Levered equity cash flow, ${sg}:** $${tn(H)} - ${tn(rep2)} = ${tn(eH)}$ (€).`, 'eH', eH);
+  cc.r(`**Levered equity value (MM Proposition I):** the firm value stays $V^U$, so $E = V^U - D = ${tn(VU)} - ${tn(D)} = ${tn(E)}$ (€).`, 'E', E);
+  cc.s(`**Expected equity cash flow:** $${tn(p, 2)} \\times ${tn(eH)} + ${tn(1 - p, 2)} \\times ${tn(eL)} = ${tn(eE)}$ (€).`);
+  cc.r(`**Expected return on levered equity:** $r_E = \\frac{E[CF_E]}{E} - 1 = \\frac{${tn(eE)}}{${tn(E)}} - 1 = ${tn(eE / E, 6)} - 1 = ${tn(rE, 6)}$, i.e. $${tp(rE)}$.`, 'rE', rE * 100);
+  cc.r(`**Realised return, ${wk}:** $\\frac{${tn(eL)}}{${tn(E)}} - 1 = ${tn(eL / E, 6)} - 1 = ${tn(eL / E - 1, 6)}$, i.e. $${tp(eL / E - 1)}$.`, 'rL', (eL / E - 1) * 100);
+  cc.s(`**Required debt-equity ratio:** from $r_E = r_U + \\frac{D}{E}(r_U - r_f)$ we get $\\frac{D}{E} = \\frac{r_E - r_U}{r_U - r_f} = \\frac{${tn(rt, 4)} - ${tn(rU, 4)}}{${tn(rU, 4)} - ${tn(rf, 4)}} = \\frac{${tn(rt - rU, 4)}}{${tn(rU - rf, 4)}} = ${tn(k, 6)}$.`);
+  cc.r(`**Borrowing:** $D = V^U \\times \\frac{D/E}{1 + D/E} = ${tn(VU)} \\times \\frac{${tn(k, 6)}}{1 + ${tn(k, 6)}} = ${tn(VU)} \\times ${tn(k / (1 + k), 6)} = ${tn(Dt)}$ (€).`, 'Dt', Dt);
+  return withCalc(Q('L1.project', 1, p_(intro) + p_(debt), chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L1_mm2(): Question {
@@ -66,12 +79,18 @@ export function L1_mm2(): Question {
       `Currently, ${lev0}. Its equity cost of capital is ${P(rE0)} and its debt cost of capital is ${P(rD0)}. Management intends to ${action} such that ${lev1}; the debt cost of capital would then be ${P(rD1)}. ${PERF()}`);
     const ttarget = Math.round((rU + rstep(0.2, 2.0, 0.05) * (rU - rD1)) * 1000) / 1000;
     const items = [
-      { part: N(v(`What is ${poss(name)} current WACC?`, 'What is the firm’s weighted average cost of capital before the transaction?'), rU * 100, 'pct'), w: 0.75 },
-      { part: N(v('What will the equity cost of capital be after the transaction?', 'What is the new equity cost of capital?'), rE1 * 100, 'pct'), must: true },
-      { part: N(v('What is the WACC after the transaction?', 'What will the firm’s WACC be after the transaction?'), rU * 100, 'pct'), w: 0.6 },
-      { part: N(`Assuming the debt cost of capital stays at ${P(rD1)}, at what debt-equity ratio would the equity cost of capital be ${P(ttarget, 1)}?`, (ttarget - rU) / (rU - rD1), 'x'), w: 0.4 },
+      { part: N(v(`What is ${poss(name)} current WACC?`, 'What is the firm’s weighted average cost of capital before the transaction?'), rU * 100, 'pct', { key: 'wacc0' }), w: 0.75 },
+      { part: N(v('What will the equity cost of capital be after the transaction?', 'What is the new equity cost of capital?'), rE1 * 100, 'pct', { key: 'rE1' }), must: true },
+      { part: N(v('What is the WACC after the transaction?', 'What will the firm’s WACC be after the transaction?'), rU * 100, 'pct', { key: 'wacc1' }), w: 0.6 },
+      { part: N(`Assuming the debt cost of capital stays at ${P(rD1)}, at what debt-equity ratio would the equity cost of capital be ${P(ttarget, 1)}?`, (ttarget - rU) / (rU - rD1), 'x', { key: 'deT' }), w: 0.4 },
     ];
-    return Q('L1.mm2', 1, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc(), dv1 = DE1 / (1 + DE1);
+  if (useDV) cc.s(`**Debt-equity ratios:** a debt share of the firm value $D/V$ converts to $\\frac{D}{E} = \\frac{D/V}{1 - D/V}$; after the transaction $\\frac{${tn(dv1, 4)}}{1 - ${tn(dv1, 4)}} = ${tn(DE1, 2)}$ (the percentage in the text is rounded), before it $D/E = ${tn(DE0, 2)}$.`);
+  cc.r(`**Current WACC (= unlevered cost of capital):** $r_{WACC} = \\frac{r_E + (D/E)\\, r_D}{1 + D/E} = \\frac{${tn(rE0, 4)} + ${tn(DE0, 2)} \\times ${tn(rD0, 4)}}{1 + ${tn(DE0, 2)}} = \\frac{${tn(rE0 + DE0 * rD0, 6)}}{${tn(1 + DE0, 2)}} = ${tn(rU, 6)}$, i.e. $${tp(rU)}$.`, 'wacc0', rU * 100);
+  cc.r(`**New equity cost of capital (MM Proposition II):** $r_E = r_U + \\frac{D}{E}(r_U - r_D) = ${tn(rU, 6)} + ${tn(DE1, 2)} \\times (${tn(rU, 6)} - ${tn(rD1, 4)}) = ${tn(rU, 6)} + ${tn(DE1, 2)} \\times ${tn(rU - rD1, 6)} = ${tn(rE1, 6)}$, i.e. $${tp(rE1)}$.`, 'rE1', rE1 * 100);
+  cc.r(`**WACC after the transaction:** $\\frac{r_E + (D/E)\\, r_D}{1 + D/E} = \\frac{${tn(rE1, 6)} + ${tn(DE1, 2)} \\times ${tn(rD1, 4)}}{1 + ${tn(DE1, 2)}} = \\frac{${tn(rE1 + DE1 * rD1, 6)}}{${tn(1 + DE1, 2)}} = ${tn(rU, 6)}$, i.e. $${tp(rU)}$, unchanged because capital structure does not matter.`, 'wacc1', rU * 100);
+  cc.r(`**Debt-equity ratio for the target cost of equity:** $\\frac{D}{E} = \\frac{r_E - r_U}{r_U - r_D} = \\frac{${tn(ttarget, 4)} - ${tn(rU, 6)}}{${tn(rU, 6)} - ${tn(rD1, 4)}} = \\frac{${tn(ttarget - rU, 6)}}{${tn(rU - rD1, 6)}} = ${tn((ttarget - rU) / (rU - rD1), 4)}$.`, 'deT', (ttarget - rU) / (rU - rD1));
+    return withCalc(Q('L1.mm2', 1, p_(intro), chooseParts(items, 3, 4)), cc.steps);
   } else {
     const E0 = rstep(200, 2000, 20), DE0 = rstep(0.1, 0.8, 0.05), D0 = roundTo(E0 * DE0, 10);
     const rD0 = rstep(0.03, 0.06, 0.0025), rE0 = rD0 + rstep(0.04, 0.09, 0.0025);
@@ -81,12 +100,18 @@ export function L1_mm2(): Question {
     const M = mk();
     const intro = `${name} has equity with a market value of ${M(E0)} and debt with a market value of ${M(D0)}. Its equity cost of capital is ${P(rE0)} and its debt cost of capital is ${P(rD0)}. ${name} ${v('announces that it will', 'plans to')} borrow an additional ${M(X)} and use the full amount to repurchase shares. Because of the higher leverage, the cost of all of its debt will rise to ${P(rD1)}. ${PERF()}`;
     const items = [
-      { part: N(v('What is the unlevered cost of capital of the firm?', 'What is the cost of capital of the firm’s assets?'), rU * 100, 'pct'), w: 0.7 },
-      { part: N('What is the debt-equity ratio after the transaction?', D1 / E1, 'x'), w: 0.5 },
-      { part: N(v('What is the equity cost of capital after the transaction?', 'What expected return will equity holders require after the recapitalization?'), rE1 * 100, 'pct'), must: true },
-      { part: N('What is the WACC after the transaction?', rU * 100, 'pct'), w: 0.5 },
+      { part: N(v('What is the unlevered cost of capital of the firm?', 'What is the cost of capital of the firm’s assets?'), rU * 100, 'pct', { key: 'rU' }), w: 0.7 },
+      { part: N('What is the debt-equity ratio after the transaction?', D1 / E1, 'x', { key: 'de1' }), w: 0.5 },
+      { part: N(v('What is the equity cost of capital after the transaction?', 'What expected return will equity holders require after the recapitalization?'), rE1 * 100, 'pct', { key: 'rE1' }), must: true },
+      { part: N('What is the WACC after the transaction?', rU * 100, 'pct', { key: 'wacc1' }), w: 0.5 },
     ];
-    return Q('L1.mm2', 1, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.r(`**Unlevered cost of capital (= WACC):** $r_U = \\frac{E \\, r_E + D \\, r_D}{E + D} = \\frac{${tn(E0)} \\times ${tn(rE0, 4)} + ${tn(D0)} \\times ${tn(rD0, 4)}}{${tn(E0)} + ${tn(D0)}} = \\frac{${tn(E0 * rE0, 4)} + ${tn(D0 * rD0, 4)}}{${tn(E0 + D0)}} = ${tn(rU, 6)}$, i.e. $${tp(rU)}$.`, 'rU', rU * 100);
+  cc.s(`**After the transaction:** debt rises to $D = ${tn(D0)} + ${tn(X)} = ${tn(D1)}$ and equity falls to $E = ${tn(E0)} - ${tn(X)} = ${tn(E1)}$ (€ million).`);
+  cc.r(`**Debt-equity ratio:** $\\frac{D}{E} = \\frac{${tn(D1)}}{${tn(E1)}} = ${tn(D1 / E1, 6)}$.`, 'de1', D1 / E1);
+  cc.r(`**New equity cost of capital:** $r_E = r_U + \\frac{D}{E}(r_U - r_D) = ${tn(rU, 6)} + ${tn(D1 / E1, 6)} \\times (${tn(rU, 6)} - ${tn(rD1, 4)}) = ${tn(rU, 6)} + ${tn(D1 / E1, 6)} \\times ${tn(rU - rD1, 6)} = ${tn(rE1, 6)}$, i.e. $${tp(rE1)}$.`, 'rE1', rE1 * 100);
+  cc.r(`**WACC after the transaction:** $\\frac{E \\, r_E + D \\, r_D}{E + D} = \\frac{${tn(E1)} \\times ${tn(rE1, 6)} + ${tn(D1)} \\times ${tn(rD1, 4)}}{${tn(E1 + D1)}} = \\frac{${tn(E1 * rE1, 4)} + ${tn(D1 * rD1, 4)}}{${tn(E1 + D1)}} = ${tn(rU, 6)}$, i.e. $${tp(rU)}$, unchanged (MM Proposition I).`, 'wacc1', rU * 100);
+    return withCalc(Q('L1.mm2', 1, p_(intro), chooseParts(items, 3, 4)), cc.steps);
   }
 }
 
@@ -102,25 +127,41 @@ export function L1_recap(): Question {
     const intro = `${name} is an all-equity firm with ${fmtNum(Nsh)} million shares outstanding, trading at ${eur(Pr)} per share. Its equity cost of capital is ${P(rU)}. ${name} undertakes a leveraged recapitalization: it borrows at ${P(rD)} and uses the entire proceeds to repurchase shares. After the transaction, ${fmtNum(remain)} million shares remain outstanding. ${PERF()}`;
     const DE = Dd / (remain * Pr);
     const parts = [
-      N('How much did the firm borrow?', Dd, 'm'),
-      N('What is the share price after the transaction?', Pr, 'eur'),
-      N('What is the market value of equity after the transaction?', remain * Pr, 'm'),
-      N('What is the equity cost of capital after the transaction?', (rU + DE * (rU - rD)) * 100, 'pct'),
+      N('How much did the firm borrow?', Dd, 'm', { key: 'borrow' }),
+      N('What is the share price after the transaction?', Pr, 'eur', { key: 'price' }),
+      N('What is the market value of equity after the transaction?', remain * Pr, 'm', { key: 'E1' }),
+      N('What is the equity cost of capital after the transaction?', (rU + DE * (rU - rD)) * 100, 'pct', { key: 'rE1' }),
     ];
-    return Q('L1.recap', 1, p_(intro), parts);
+  const cc = calc();
+  cc.s(`**Shares repurchased:** $${tn(Nsh)} - ${tn(remain)} = ${tn(Nsh - remain)}$ million.`);
+  cc.r(`**Amount borrowed:** the proceeds buy back the shares at the market price, $${tn(Nsh - remain)} \\times ${tn(Pr)} = ${tn(Dd)}$ (€ million).`, 'borrow', Dd);
+  cc.s(`**Firm value before and after:** $V = ${tn(Nsh)} \\times ${tn(Pr)} = ${tn(Nsh * Pr)}$ (€ million); capital structure does not change it (MM Proposition I).`);
+  cc.r(`**Equity value after:** $E = V - D = ${tn(Nsh * Pr)} - ${tn(Dd)} = ${tn(Nsh * Pr - Dd)}$ (€ million).`, 'E1', remain * Pr);
+  cc.r(`**Share price after:** $P = \\frac{E}{\\text{shares}} = \\frac{${tn(remain * Pr)}}{${tn(remain)}} = ${tn(Pr)}$ (€), unchanged.`, 'price', Pr);
+  cc.s(`**Debt-equity ratio:** $\\frac{D}{E} = \\frac{${tn(Dd)}}{${tn(remain * Pr)}} = ${tn(DE, 6)}$.`);
+  cc.r(`**New equity cost of capital:** $r_E = r_U + \\frac{D}{E}(r_U - r_D) = ${tn(rU, 4)} + ${tn(DE, 6)} \\times (${tn(rU, 4)} - ${tn(rD, 4)}) = ${tn(rU, 4)} + ${tn(DE, 6)} \\times ${tn(rU - rD, 4)} = ${tn(rU + DE * (rU - rD), 6)}$, i.e. $${tp(rU + DE * (rU - rD))}$.`, 'rE1', (rU + DE * (rU - rD)) * 100);
+    return withCalc(Q('L1.recap', 1, p_(intro), parts), cc.steps);
   }
   const intro = v(
     `${name} is currently an all-equity firm with ${fmtNum(Nsh)} million shares outstanding that trade at ${eur(Pr)} per share. ${name} plans to increase its leverage by borrowing ${M(D)} and using the funds to repurchase shares. The firm’s current equity cost of capital is ${P(rU)}, and the new debt will carry an interest rate of ${P(rD)}. ${PERF()}`,
     `Assume ${name} has ${fmtNum(Nsh)} million shares outstanding with a market price of ${eur(Pr)} per share and no debt. Its equity holders currently require a return of ${P(rU)}. Management considers borrowing ${M(D)} at ${P(rD)} and using all the borrowed funds to repurchase outstanding shares. ${PERF()}`);
   const items: Item[] = [
-    { part: N(v('How many shares will be repurchased?', 'How many shares can the firm buy back?'), n, 'msh'), w: 0.7 },
-    { part: N('What is the share price after the transaction?', Pr, 'eur'), w: 0.6 },
-    { part: N(v('What is the market value of equity after the transaction?', 'What is the total value of the remaining equity?'), E1, 'm'), w: 0.6 },
-    { part: N('What is the market debt-equity ratio after the transaction?', D / E1, 'x'), w: 0.3 },
-    { part: N(v('What is the equity cost of capital after the transaction?', 'What expected return will the remaining shareholders require?'), rE1 * 100, 'pct'), must: true },
-    { part: N('What is the firm’s WACC after the transaction?', rU * 100, 'pct'), w: 0.3 },
+    { part: N(v('How many shares will be repurchased?', 'How many shares can the firm buy back?'), n, 'msh', { key: 'nrep' }), w: 0.7 },
+    { part: N('What is the share price after the transaction?', Pr, 'eur', { key: 'price' }), w: 0.6 },
+    { part: N(v('What is the market value of equity after the transaction?', 'What is the total value of the remaining equity?'), E1, 'm', { key: 'E1' }), w: 0.6 },
+    { part: N('What is the market debt-equity ratio after the transaction?', D / E1, 'x', { key: 'de' }), w: 0.3 },
+    { part: N(v('What is the equity cost of capital after the transaction?', 'What expected return will the remaining shareholders require?'), rE1 * 100, 'pct', { key: 'rE1' }), must: true },
+    { part: N('What is the firm’s WACC after the transaction?', rU * 100, 'pct', { key: 'wacc' }), w: 0.3 },
   ];
-  return Q('L1.recap', 1, p_(intro), chooseParts(items, 3, 5));
+  const cc = calc();
+  cc.r(`**Shares repurchased:** $\\frac{D}{P} = \\frac{${tn(D)}}{${tn(Pr)}} = ${tn(n, 4)}$ million shares.`, 'nrep', n);
+  cc.s(`**Firm value:** $V = ${tn(Nsh)} \\times ${tn(Pr)} = ${tn(V)}$ (€ million), unchanged by the recapitalization (MM Proposition I).`);
+  cc.r(`**Equity value after:** $E = V - D = ${tn(V)} - ${tn(D)} = ${tn(E1)}$ (€ million).`, 'E1', E1);
+  cc.r(`**Share price after:** $P = \\frac{E}{N - n} = \\frac{${tn(E1)}}{${tn(Nsh)} - ${tn(n, 4)}} = \\frac{${tn(E1)}}{${tn(Nsh - n, 4)}} = ${tn(E1 / (Nsh - n), 4)}$ (€), unchanged.`, 'price', Pr);
+  cc.r(`**Debt-equity ratio:** $\\frac{D}{E} = \\frac{${tn(D)}}{${tn(E1)}} = ${tn(D / E1, 6)}$.`, 'de', D / E1);
+  cc.r(`**New equity cost of capital:** $r_E = r_U + \\frac{D}{E}(r_U - r_D) = ${tn(rU, 4)} + ${tn(D / E1, 6)} \\times (${tn(rU, 4)} - ${tn(rD, 4)}) = ${tn(rU, 4)} + ${tn(D / E1, 6)} \\times ${tn(rU - rD, 4)} = ${tn(rE1, 6)}$, i.e. $${tp(rE1)}$.`, 'rE1', rE1 * 100);
+  cc.r(`**WACC after:** $\\frac{E \\, r_E + D \\, r_D}{E + D} = \\frac{${tn(E1)} \\times ${tn(rE1, 6)} + ${tn(D)} \\times ${tn(rD, 4)}}{${tn(V)}} = \\frac{${tn(E1 * rE1, 4)} + ${tn(D * rD, 4)}}{${tn(V)}} = ${tn(rU, 6)}$, i.e. $${tp(rU)}$, unchanged.`, 'wacc', rU * 100);
+  return withCalc(Q('L1.recap', 1, p_(intro), chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L1_eps(): Question {
@@ -135,14 +176,24 @@ export function L1_eps(): Question {
     `${name} is currently an all-equity firm. It expects to generate earnings before interest and taxes (EBIT) of ${M(EBIT)} over the next year and every year thereafter. ${name} has ${fmtNum(Nsh)} million shares outstanding, and its stock trades for ${eur(Pr)} per share. The firm is considering changing its capital structure by borrowing ${M(D)} at an interest rate of ${P(rD)} and using the proceeds to repurchase shares at ${eur(Pr)} per share. There are no taxes, EBIT is not expected to grow, and all earnings are paid out as dividends. ${PERF()}`,
     `${name} has no debt and ${fmtNum(Nsh)} million shares outstanding at a price of ${eur(Pr)}. Its EBIT is expected to remain constant at ${M(EBIT)} per year forever, and it pays out all earnings as dividends. The CFO proposes a recapitalization: borrow ${M(D)} at ${P(rD)} per year and buy back shares at the current price. Assume there are no taxes and perfect capital markets otherwise.`);
   const items: Item[] = [
-    { part: N(v('What is the firm’s unlevered cost of capital implied by the current share price?', 'What is the equity cost of capital of the all-equity firm?'), rU * 100, 'pct'), w: 0.5 },
-    { part: N('What is the expected EPS without leverage?', EPS0, 'eur'), w: 0.45 },
-    { part: N(v('What is the expected EPS after the recapitalization?', 'What will expected earnings per share be with leverage?'), EPS1, 'eur'), must: true },
-    { part: N('What is the equity cost of capital after the recapitalization?', rE1 * 100, 'pct'), w: 0.7 },
-    { part: N('What is the share price after the recapitalization?', Pr, 'eur'), w: 0.5 },
-    { part: N(`Suppose EBIT instead turns out to be only ${M(EBITlow)} in a given year. What is EPS in that year with leverage?`, (EBITlow - rD * D) / (Nsh - n), 'eur'), w: 0.3 },
+    { part: N(v('What is the firm’s unlevered cost of capital implied by the current share price?', 'What is the equity cost of capital of the all-equity firm?'), rU * 100, 'pct', { key: 'rU' }), w: 0.5 },
+    { part: N('What is the expected EPS without leverage?', EPS0, 'eur', { key: 'eps0' }), w: 0.45 },
+    { part: N(v('What is the expected EPS after the recapitalization?', 'What will expected earnings per share be with leverage?'), EPS1, 'eur', { key: 'eps1' }), must: true },
+    { part: N('What is the equity cost of capital after the recapitalization?', rE1 * 100, 'pct', { key: 'rE1' }), w: 0.7 },
+    { part: N('What is the share price after the recapitalization?', Pr, 'eur', { key: 'price' }), w: 0.5 },
+    { part: N(`Suppose EBIT instead turns out to be only ${M(EBITlow)} in a given year. What is EPS in that year with leverage?`, (EBITlow - rD * D) / (Nsh - n), 'eur', { key: 'epsLow' }), w: 0.3 },
   ];
-  return Q('L1.eps', 1, p_(intro), chooseParts(items, 3, 5));
+  const cc = calc(), Eq1 = Nsh * Pr - D, intr = rD * D, intrL = rD * D;
+  cc.r(`**Unlevered cost of capital:** with constant EBIT paid out forever, $r_U = \\frac{EBIT}{N \\cdot P} = \\frac{${tn(EBIT)}}{${tn(Nsh)} \\times ${tn(Pr)}} = \\frac{${tn(EBIT)}}{${tn(Nsh * Pr)}} = ${tn(rU, 6)}$, i.e. $${tp(rU)}$.`, 'rU', rU * 100);
+  cc.r(`**EPS without leverage:** $\\frac{EBIT}{N} = \\frac{${tn(EBIT)}}{${tn(Nsh)}} = ${tn(EPS0, 4)}$ (€).`, 'eps0', EPS0);
+  cc.s(`**Shares repurchased:** $\\frac{D}{P} = \\frac{${tn(D)}}{${tn(Pr)}} = ${tn(n, 4)}$ million, leaving $${tn(Nsh)} - ${tn(n, 4)} = ${tn(Nsh - n, 4)}$ million shares.`);
+  cc.s(`**Interest:** $r_D \\times D = ${tn(rD, 4)} \\times ${tn(D)} = ${tn(intr, 4)}$ (€ million).`);
+  cc.r(`**EPS with leverage:** $\\frac{EBIT - \\text{interest}}{N - n} = \\frac{${tn(EBIT)} - ${tn(intr, 4)}}{${tn(Nsh - n, 4)}} = \\frac{${tn(EBIT - intr, 4)}}{${tn(Nsh - n, 4)}} = ${tn(EPS1, 4)}$ (€).`, 'eps1', EPS1);
+  cc.s(`**Equity value after:** $E = N \\cdot P - D = ${tn(Nsh)} \\times ${tn(Pr)} - ${tn(D)} = ${tn(Eq1)}$ (€ million).`);
+  cc.r(`**Share price after:** $\\frac{E}{N - n} = \\frac{${tn(Eq1)}}{${tn(Nsh - n, 4)}} = ${tn(Eq1 / (Nsh - n), 4)}$ (€), unchanged.`, 'price', Pr);
+  cc.r(`**New equity cost of capital:** $r_E = r_U + \\frac{D}{E}(r_U - r_D) = ${tn(rU, 6)} + \\frac{${tn(D)}}{${tn(Eq1)}} \\times (${tn(rU, 6)} - ${tn(rD, 4)}) = ${tn(rU, 6)} + ${tn(D / Eq1, 6)} \\times ${tn(rU - rD, 6)} = ${tn(rE1, 6)}$, i.e. $${tp(rE1)}$.`, 'rE1', rE1 * 100);
+  cc.r(`**EPS with lower EBIT:** $\\frac{EBIT - \\text{interest}}{N - n} = \\frac{${tn(EBITlow)} - ${tn(intrL, 4)}}{${tn(Nsh - n, 4)}} = \\frac{${tn(EBITlow - intrL, 4)}}{${tn(Nsh - n, 4)}} = ${tn((EBITlow - rD * D) / (Nsh - n), 4)}$ (€).`, 'epsLow', (EBITlow - rD * D) / (Nsh - n));
+  return withCalc(Q('L1.eps', 1, p_(intro), chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L1_beta(): Question {
@@ -157,13 +208,21 @@ export function L1_beta(): Question {
   const intro = `${poss(name)} equity has a beta of ${fmtNum(bE)} and its debt has a beta of ${fmtNum(bD)}. The firm has a market debt-equity ratio of ${fmtNum(DE0)}. The risk-free rate is ${P(rf)}, and ${mkt}. ${PERF()}`;
   const plan = v(`${name} plans to change its debt-equity ratio to ${fmtNum(DE1)}, keeping the beta of its debt unchanged.`, `Suppose ${name} recapitalizes to a debt-equity ratio of ${fmtNum(DE1)}; the debt beta stays at ${fmtNum(bD1)}.`);
   const items: Item[] = [
-    { part: N(v(`What is ${poss(name)} unlevered beta?`, 'What is the beta of the firm’s assets?'), bU, 'x'), must: true },
-    { part: N('What is the firm’s unlevered cost of capital?', (rf + bU * mrp) * 100, 'pct'), w: 0.45 },
-    { part: N('What will the equity beta be after the recapitalization?', bE1, 'x'), must: true },
-    { part: N('What will the equity cost of capital be after the recapitalization?', (rf + bE1 * mrp) * 100, 'pct'), w: 0.6 },
-    { part: N('What is the WACC after the recapitalization?', (rf + bU * mrp) * 100, 'pct'), w: 0.25 },
+    { part: N(v(`What is ${poss(name)} unlevered beta?`, 'What is the beta of the firm’s assets?'), bU, 'x', { key: 'bU' }), must: true },
+    { part: N('What is the firm’s unlevered cost of capital?', (rf + bU * mrp) * 100, 'pct', { key: 'rU' }), w: 0.45 },
+    { part: N('What will the equity beta be after the recapitalization?', bE1, 'x', { key: 'bE1' }), must: true },
+    { part: N('What will the equity cost of capital be after the recapitalization?', (rf + bE1 * mrp) * 100, 'pct', { key: 'rE1' }), w: 0.6 },
+    { part: N('What is the WACC after the recapitalization?', (rf + bU * mrp) * 100, 'pct', { key: 'wacc' }), w: 0.25 },
   ];
-  return Q('L1.beta', 1, p_(intro) + p_(plan), chooseParts(items, 3, 4));
+  const cc = calc(), rDb = rf + bD * mrp, rUb = rf + bU * mrp;
+  if (!useMrp) cc.s(`**Market risk premium:** $E[R_m] - r_f = ${tn(rf + mrp, 4)} - ${tn(rf, 4)} = ${tn(mrp, 4)}$.`);
+  cc.r(`**Unlevered beta:** $\\beta_U = \\frac{\\beta_E + (D/E)\\,\\beta_D}{1 + D/E} = \\frac{${tn(bE, 4)} + ${tn(DE0, 2)} \\times ${tn(bD, 4)}}{1 + ${tn(DE0, 2)}} = \\frac{${tn(bE + DE0 * bD, 6)}}{${tn(1 + DE0, 2)}} = ${tn(bU, 6)}$.`, 'bU', bU);
+  cc.r(`**Unlevered cost of capital (CAPM):** $r_U = r_f + \\beta_U \\times MRP = ${tn(rf, 4)} + ${tn(bU, 6)} \\times ${tn(mrp, 4)} = ${tn(rUb, 6)}$, i.e. $${tp(rUb)}$.`, 'rU', rUb * 100);
+  cc.r(`**New equity beta:** $\\beta_E = \\beta_U + \\frac{D}{E}(\\beta_U - \\beta_D) = ${tn(bU, 6)} + ${tn(DE1, 2)} \\times (${tn(bU, 6)} - ${tn(bD1, 4)}) = ${tn(bU, 6)} + ${tn(DE1, 2)} \\times ${tn(bU - bD1, 6)} = ${tn(bE1, 6)}$.`, 'bE1', bE1);
+  cc.r(`**New equity cost of capital:** $r_E = r_f + \\beta_E \\times MRP = ${tn(rf, 4)} + ${tn(bE1, 6)} \\times ${tn(mrp, 4)} = ${tn(rf + bE1 * mrp, 6)}$, i.e. $${tp(rf + bE1 * mrp)}$.`, 'rE1', (rf + bE1 * mrp) * 100);
+  cc.s(`**Debt cost of capital:** $r_D = r_f + \\beta_D \\times MRP = ${tn(rf, 4)} + ${tn(bD, 4)} \\times ${tn(mrp, 4)} = ${tn(rDb, 6)}$.`);
+  cc.r(`**WACC after:** $\\frac{r_E + (D/E)\\, r_D}{1 + D/E} = \\frac{${tn(rf + bE1 * mrp, 6)} + ${tn(DE1, 2)} \\times ${tn(rDb, 6)}}{1 + ${tn(DE1, 2)}} = \\frac{${tn(rf + bE1 * mrp + DE1 * rDb, 6)}}{${tn(1 + DE1, 2)}} = ${tn(rUb, 6)}$, i.e. $${tp(rUb)}$, equal to the unlevered cost of capital.`, 'wacc', rUb * 100);
+  return withCalc(Q('L1.beta', 1, p_(intro) + p_(plan), chooseParts(items, 3, 4)), cc.steps);
 }
 
 export function L1_homemade(): Question {
@@ -179,21 +238,34 @@ export function L1_homemade(): Question {
   if (chance(0.5)) {
     const intro = intro0 + ' ' + `${name} is all-equity financed with a total market value of ${M(V)}. An investor would prefer ${name} to have borrowed ${M(D)} at the risk-free rate, and wants to hold ${P(alpha, 1)} of the levered equity that would exist in that case. The investor can borrow at the risk-free rate as well.`;
     const items = [
-      { part: N(v('How much must the investor borrow to replicate this position (homemade leverage)?', 'What amount of personal borrowing replicates the desired position?'), alpha * D * 1e6, 'eur'), must: true },
-      { part: N('How much of the investor’s own money is required?', alpha * E * 1e6, 'eur'), w: 0.7 },
-      { part: N(`What is the investor’s net payoff next year in the ${st}?`, alpha * (L - D * (1 + rf)) * 1e6, 'eur'), w: 0.7 },
-      { part: N(`What is the investor’s net payoff next year in the ${stg}?`, alpha * (H - D * (1 + rf)) * 1e6, 'eur'), w: 0.5 },
+      { part: N(v('How much must the investor borrow to replicate this position (homemade leverage)?', 'What amount of personal borrowing replicates the desired position?'), alpha * D * 1e6, 'eur', { key: 'borrow' }), must: true },
+      { part: N('How much of the investor’s own money is required?', alpha * E * 1e6, 'eur', { key: 'own' }), w: 0.7 },
+      { part: N(`What is the investor’s net payoff next year in the ${st}?`, alpha * (L - D * (1 + rf)) * 1e6, 'eur', { key: 'payLo' }), w: 0.7 },
+      { part: N(`What is the investor’s net payoff next year in the ${stg}?`, alpha * (H - D * (1 + rf)) * 1e6, 'eur', { key: 'payHi' }), w: 0.5 },
     ];
-    return Q('L1.homemade', 1, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc(), rep3 = D * (1 + rf);
+  cc.r(`**Borrowing needed:** the investor takes the share of the debt, $\\alpha D = ${tn(alpha, 3)} \\times ${tn(D)} = ${tn(alpha * D, 4)}$ (€ million), i.e. €${tn(alpha * D * 1e6, 0)}.`, 'borrow', alpha * D * 1e6);
+  cc.s(`**Levered equity value:** $E = V - D = ${tn(V)} - ${tn(D)} = ${tn(E)}$ (€ million).`);
+  cc.r(`**Own money required:** $\\alpha E = ${tn(alpha, 3)} \\times ${tn(E)} = ${tn(alpha * E, 4)}$ (€ million), i.e. €${tn(alpha * E * 1e6, 0)}.`, 'own', alpha * E * 1e6);
+  cc.s(`**Loan repayment per unit of debt:** $D (1 + r_f) = ${tn(D)} \\times ${tn(1 + rf, 4)} = ${tn(rep3, 4)}$ (€ million).`);
+  cc.r(`**Payoff in the ${st}:** $\\alpha (L - D(1 + r_f)) = ${tn(alpha, 3)} \\times (${tn(L)} - ${tn(rep3, 4)}) = ${tn(alpha, 3)} \\times ${tn(L - rep3, 4)} = ${tn(alpha * (L - rep3), 6)}$ (€ million), i.e. €${tn(alpha * (L - rep3) * 1e6, 0)}.`, 'payLo', alpha * (L - rep3) * 1e6);
+  cc.r(`**Payoff in the ${stg}:** $\\alpha (H - D(1 + r_f)) = ${tn(alpha, 3)} \\times (${tn(H)} - ${tn(rep3, 4)}) = ${tn(alpha, 3)} \\times ${tn(H - rep3, 4)} = ${tn(alpha * (H - rep3), 6)}$ (€ million), i.e. €${tn(alpha * (H - rep3) * 1e6, 0)}.`, 'payHi', alpha * (H - rep3) * 1e6);
+    return withCalc(Q('L1.homemade', 1, p_(intro), chooseParts(items, 3, 4)), cc.steps);
   } else {
     const intro = intro0 + ' ' + `${name} has risk-free debt outstanding with a market value of ${M(D)}, and the total market value of the firm is ${M(V)}. An investor would prefer to hold unlevered equity and wants exposure equal to ${P(alpha, 1)} of the firm’s total cash flows.`;
     const items = [
-      { part: N('How much must the investor invest in the firm’s equity?', alpha * E * 1e6, 'eur'), must: true },
-      { part: N('How much must the investor invest in the firm’s debt?', alpha * D * 1e6, 'eur'), must: true },
-      { part: N(`What is the investor’s total payoff next year in the ${st}?`, alpha * L * 1e6, 'eur'), w: 0.7 },
-      { part: N('What is the total cost of this position?', alpha * V * 1e6, 'eur'), w: 0.5 },
+      { part: N('How much must the investor invest in the firm’s equity?', alpha * E * 1e6, 'eur', { key: 'inE' }), must: true },
+      { part: N('How much must the investor invest in the firm’s debt?', alpha * D * 1e6, 'eur', { key: 'inD' }), must: true },
+      { part: N(`What is the investor’s total payoff next year in the ${st}?`, alpha * L * 1e6, 'eur', { key: 'pay' }), w: 0.7 },
+      { part: N('What is the total cost of this position?', alpha * V * 1e6, 'eur', { key: 'cost' }), w: 0.5 },
     ];
-    return Q('L1.homemade', 1, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.s(`**Equity value:** $E = V - D = ${tn(V)} - ${tn(D)} = ${tn(E)}$ (€ million).`);
+  cc.r(`**Investment in equity:** $\\alpha E = ${tn(alpha, 3)} \\times ${tn(E)} = ${tn(alpha * E, 4)}$ (€ million), i.e. €${tn(alpha * E * 1e6, 0)}.`, 'inE', alpha * E * 1e6);
+  cc.r(`**Investment in debt:** $\\alpha D = ${tn(alpha, 3)} \\times ${tn(D)} = ${tn(alpha * D, 4)}$ (€ million), i.e. €${tn(alpha * D * 1e6, 0)}.`, 'inD', alpha * D * 1e6);
+  cc.r(`**Payoff in the ${st}:** equity plus debt pay the whole cash flow, so the investor receives $\\alpha L = ${tn(alpha, 3)} \\times ${tn(L)} = ${tn(alpha * L, 4)}$ (€ million), i.e. €${tn(alpha * L * 1e6, 0)}.`, 'pay', alpha * L * 1e6);
+  cc.r(`**Total cost:** $\\alpha E + \\alpha D = ${tn(alpha * E, 4)} + ${tn(alpha * D, 4)} = ${tn(alpha * V, 4)}$ (€ million), i.e. $\\alpha V$ = €${tn(alpha * V * 1e6, 0)}.`, 'cost', alpha * V * 1e6);
+    return withCalc(Q('L1.homemade', 1, p_(intro), chooseParts(items, 3, 4)), cc.steps);
   }
 }
 
@@ -201,6 +273,7 @@ export function L1_homemade(): Question {
 // LECTURE 2 — Debt and taxes
 // =====================================================================
 const annuity = (Cf: number, r: number, n: number) => Cf / r * (1 - 1 / Math.pow(1 + r, n));
+const annMd = (TS: number, r: number, n: number, d = 4) => `$PV = \\frac{${tn(TS, d)}}{${tn(r, 4)}}\\left(1 - \\frac{1}{(1 + ${tn(r, 4)})^{${n}}}\\right) = ${tn(TS / r, d)} \\times \\left(1 - \\frac{1}{${tn(Math.pow(1 + r, n), 6)}}\\right) = ${tn(TS / r, d)} \\times ${tn(1 - 1 / Math.pow(1 + r, n), 6)} = ${tn(annuity(TS, r, n), d)}$`;
 const TAXR = [0.15, 0.2, 0.21, 0.25, 0.25, 0.3, 0.3, 0.35, 0.39, 0.4, 0.28, 0.32];
 
 export function L2_itsFinite(): Question {
@@ -213,20 +286,32 @@ export function L2_itsFinite(): Question {
     const intro = useC ? `${name} issues bonds with a face value of ${M(B)} and an annual coupon rate of ${P(c)}. It will pay the coupons each year for the next ${Nn} years and repay the principal in year ${Nn}. These payments are risk-free, ${poss(name)} marginal corporate tax rate will remain ${P(tc, 0)} throughout this period, and the risk-free interest rate is ${P(rf)}.`
       : `Suppose ${name} plans to pay ${M(I)} in interest each year for the next ${Nn} years and then repay the principal of ${M(B)} in year ${Nn}. These payments are risk-free, and ${poss(name)} marginal tax rate will remain ${P(tc, 0)} throughout this period. The risk-free interest rate is ${P(rf)}.`;
     const items = [
-      { part: N('What is the annual interest tax shield?', tc * I, 'm'), w: 0.5 },
-      { part: N(v('By how much does the interest tax shield increase the value of the firm?', 'What is the present value of the interest tax shield?'), annuity(tc * I, rf, Nn), 'm'), must: true },
-      { part: N(`Suppose instead that ${name} keeps the debt outstanding permanently, paying the same interest every year. What would the present value of the interest tax shield be?`, tc * I / rf, 'm'), w: 0.35 },
+      { part: N('What is the annual interest tax shield?', tc * I, 'm', { key: 'its' }), w: 0.5 },
+      { part: N(v('By how much does the interest tax shield increase the value of the firm?', 'What is the present value of the interest tax shield?'), annuity(tc * I, rf, Nn), 'm', { key: 'pvIts' }), must: true },
+      { part: N(`Suppose instead that ${name} keeps the debt outstanding permanently, paying the same interest every year. What would the present value of the interest tax shield be?`, tc * I / rf, 'm', { key: 'pvPerp' }), w: 0.35 },
     ];
-    return Q('L2.itsFinite', 2, p_(intro), chooseParts(items, 2, 3));
+  const cc = calc();
+  if (useC) cc.s(`**Annual interest:** $I = c \\times B = ${tn(c, 4)} \\times ${tn(B)} = ${tn(I)}$ (€ million).`);
+  cc.r(`**Annual interest tax shield:** $\\tau_c \\times I = ${tn(tc, 2)} \\times ${tn(I)} = ${tn(tc * I)}$ (€ million).`, 'its', tc * I);
+  cc.r(`**Present value of the shields** (an ordinary annuity over ${Nn} years): ${annMd(tc * I, rf, Nn)} (€ million).`, 'pvIts', annuity(tc * I, rf, Nn));
+  cc.r(`**Permanent debt:** $PV = \\frac{\\tau_c I}{r_f} = \\frac{${tn(tc * I)}}{${tn(rf, 4)}} = ${tn(tc * I / rf)}$ (€ million).`, 'pvPerp', tc * I / rf);
+    return withCalc(Q('L2.itsFinite', 2, p_(intro), chooseParts(items, 2, 3)), cc.steps);
   } else if (vr < 0.7) {
     const I1 = rstep(10, 120, 5), n1 = rint(3, 6), I2 = roundTo(I1 * rstep(0.4, 1.6, 0.1), 1), n2 = rint(3, 8);
     const pv1 = annuity(tc * I1, rf, n1), pv2 = annuity(tc * I2, rf, n2) / Math.pow(1 + rf, n1);
     const intro = `${name} has arranged its debt so that it will pay interest of ${M(I1)} per year for the next ${n1} years. After refinancing in year ${n1}, it will pay ${M(I2)} per year for the following ${n2} years, after which all debt is repaid. All payments are risk-free, the corporate tax rate is ${P(tc, 0)} throughout, and the risk-free rate is ${P(rf)}.`;
     const parts = [
-      N(`What is the present value of the interest tax shields over the first ${n1} years?`, pv1, 'm'),
-      N('What is the total present value of the interest tax shield?', pv1 + pv2, 'm'),
+      N(`What is the present value of the interest tax shields over the first ${n1} years?`, pv1, 'm', { key: 'pv1' }),
+      N('What is the total present value of the interest tax shield?', pv1 + pv2, 'm', { key: 'pvTot' }),
     ];
-    return Q('L2.itsFinite', 2, p_(intro), chance(0.5) ? parts : [parts[1]]);
+  const cc = calc(), ts1 = tc * I1, ts2 = tc * I2;
+  cc.s(`**Shield in years 1–${n1}:** $\\tau_c I_1 = ${tn(tc, 2)} \\times ${tn(I1)} = ${tn(ts1)}$ (€ million).`);
+  cc.r(`**PV of the first ${n1} years:** ${annMd(ts1, rf, n1)} (€ million).`, 'pv1', pv1);
+  cc.s(`**Shield in the following ${n2} years:** $\\tau_c I_2 = ${tn(tc, 2)} \\times ${tn(I2)} = ${tn(ts2)}$ (€ million).`);
+  cc.s(`**Value of that annuity at year ${n1}:** ${annMd(ts2, rf, n2)} (€ million).`);
+  cc.s(`**Discount to today:** $\\frac{${tn(annuity(ts2, rf, n2))}}{(1 + ${tn(rf, 4)})^{${n1}}} = \\frac{${tn(annuity(ts2, rf, n2))}}{${tn(Math.pow(1 + rf, n1), 6)}} = ${tn(pv2)}$ (€ million).`);
+  cc.r(`**Total present value:** $${tn(pv1)} + ${tn(pv2)} = ${tn(pv1 + pv2)}$ (€ million).`, 'pvTot', pv1 + pv2);
+    return withCalc(Q('L2.itsFinite', 2, p_(intro), chance(0.5) ? parts : [parts[1]]), cc.steps);
   } else {
     const yrs = rint(4, 5), y0 = rint(2026, 2030), ints = []; let x = rstep(20, 120, 5);
     for (let i = 0; i < yrs; i++) { ints.push(x); x = roundTo(x * rstep(0.9, 1.4, 0.05), 5); }
@@ -237,12 +322,18 @@ export function L2_itsFinite(): Question {
     const pv = ints.reduce((a, b, i) => a + tc * b / Math.pow(1 + rf, i + 1), 0);
     const intro = `Shown below is part of the pro-forma income statement of ${name}. Its marginal corporate tax rate is ${P(tc, 0)}, interest payments are risk-free, and the risk-free rate is ${P(rf)}. Assume that the first year shown ends one year from today.`;
     const items = [
-      { part: N(`What is the interest tax shield in ${y0 + 1}?`, tc * ints[1], 'm'), w: 0.4 },
-      { part: N('By how much does the interest tax shield increase the total amount the firm can pay to its investors over the period shown?', tot, 'm'), w: 0.7 },
-      { part: N('What is the present value today of the interest tax shields over the period shown?', pv, 'm'), w: 0.8 },
-      { part: N(`What is net income in ${y0 + yrs - 1}?`, (ebit[yrs - 1] - ints[yrs - 1]) * (1 - tc), 'm'), w: 0.3 },
+      { part: N(`What is the interest tax shield in ${y0 + 1}?`, tc * ints[1], 'm', { key: 'its2' }), w: 0.4 },
+      { part: N('By how much does the interest tax shield increase the total amount the firm can pay to its investors over the period shown?', tot, 'm', { key: 'tot' }), w: 0.7 },
+      { part: N('What is the present value today of the interest tax shields over the period shown?', pv, 'm', { key: 'pv' }), w: 0.8 },
+      { part: N(`What is net income in ${y0 + yrs - 1}?`, (ebit[yrs - 1] - ints[yrs - 1]) * (1 - tc), 'm', { key: 'ni' }), w: 0.3 },
     ];
-    return Q('L2.itsFinite', 2, p_(intro) + table(head, rows), chooseParts(items, 2, 3));
+  const cc = calc(), sumI = ints.reduce((a, b) => a + b, 0);
+  cc.r(`**Tax shield in ${y0 + 1}:** $\\tau_c \\times \\text{interest} = ${tn(tc, 2)} \\times ${tn(ints[1])} = ${tn(tc * ints[1])}$ (€ million).`, 'its2', tc * ints[1]);
+  cc.r(`**Total tax shield:** $\\tau_c \\times \\sum \\text{interest} = ${tn(tc, 2)} \\times (${ints.map(x => tn(x)).join(' + ')}) = ${tn(tc, 2)} \\times ${tn(sumI)} = ${tn(tot)}$ (€ million).`, 'tot', tot);
+  ints.forEach((b, i) => cc.s(`**Year ${y0 + i}** (year ${i + 1} from today)**:** shield $${tn(tc, 2)} \\times ${tn(b)} = ${tn(tc * b, 4)}$, discounted $\\frac{${tn(tc * b, 4)}}{(1 + ${tn(rf, 4)})^{${i + 1}}} = \\frac{${tn(tc * b, 4)}}{${tn(Math.pow(1 + rf, i + 1), 6)}} = ${tn(tc * b / Math.pow(1 + rf, i + 1), 4)}$.`));
+  cc.r(`**Present value of the shields:** $${ints.map((b, i) => tn(tc * b / Math.pow(1 + rf, i + 1), 4)).join(' + ')} = ${tn(pv, 4)}$ (€ million).`, 'pv', pv);
+  cc.r(`**Net income in ${y0 + yrs - 1}:** $(EBIT - \\text{interest})(1 - \\tau_c) = (${tn(ebit[yrs - 1])} - ${tn(ints[yrs - 1])}) \\times ${tn(1 - tc, 2)} = ${tn(ebit[yrs - 1] - ints[yrs - 1])} \\times ${tn(1 - tc, 2)} = ${tn((ebit[yrs - 1] - ints[yrs - 1]) * (1 - tc))}$ (€ million).`, 'ni', (ebit[yrs - 1] - ints[yrs - 1]) * (1 - tc));
+    return withCalc(Q('L2.itsFinite', 2, p_(intro) + table(head, rows), chooseParts(items, 2, 3)), cc.steps);
   }
 }
 
@@ -254,25 +345,36 @@ export function L2_income(): Question {
     const NIL = (EBIT - Int) * (1 - tc), NIU = EBIT * (1 - tc);
     const intro = `${name} expects earnings before interest and taxes of ${M(EBIT)} this year and has interest expenses of ${M(Int)}. Its marginal corporate tax rate is ${P(tc, 0)}.`;
     const items = [
-      { part: N('What is net income with leverage?', NIL, 'm'), w: 0.6 },
-      { part: N('What would net income be without leverage?', NIU, 'm'), w: 0.4 },
-      { part: N('What is the total amount available to all investors (debt and equity holders) with leverage?', NIL + Int, 'm'), must: true },
-      { part: N(v('By how much does leverage increase the total amount paid to investors?', 'What is the interest tax shield this year?'), tc * Int, 'm'), w: 0.6 },
+      { part: N('What is net income with leverage?', NIL, 'm', { key: 'niL' }), w: 0.6 },
+      { part: N('What would net income be without leverage?', NIU, 'm', { key: 'niU' }), w: 0.4 },
+      { part: N('What is the total amount available to all investors (debt and equity holders) with leverage?', NIL + Int, 'm', { key: 'total' }), must: true },
+      { part: N(v('By how much does leverage increase the total amount paid to investors?', 'What is the interest tax shield this year?'), tc * Int, 'm', { key: 'its' }), w: 0.6 },
     ];
-    return Q('L2.income', 2, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.r(`**Net income with leverage:** $(EBIT - \\text{interest})(1 - \\tau_c) = (${tn(EBIT)} - ${tn(Int)}) \\times ${tn(1 - tc, 2)} = ${tn(EBIT - Int)} \\times ${tn(1 - tc, 2)} = ${tn(NIL)}$ (€ million).`, 'niL', NIL);
+  cc.r(`**Net income without leverage:** $EBIT (1 - \\tau_c) = ${tn(EBIT)} \\times ${tn(1 - tc, 2)} = ${tn(NIU)}$ (€ million).`, 'niU', NIU);
+  cc.r(`**Total to all investors with leverage:** net income plus interest, $${tn(NIL)} + ${tn(Int)} = ${tn(NIL + Int)}$ (€ million).`, 'total', NIL + Int);
+  cc.r(`**Interest tax shield:** $\\tau_c \\times \\text{interest} = ${tn(tc, 2)} \\times ${tn(Int)} = ${tn(tc * Int)}$ (€ million); equivalently $${tn(NIL + Int)} - ${tn(NIU)} = ${tn(NIL + Int - NIU)}$.`, 'its', tc * Int);
+    return withCalc(Q('L2.income', 2, p_(intro), chooseParts(items, 3, 4)), cc.steps);
   } else {
     const lim = pick([0.3, 0.3, 0.25, 0.3]), cap = lim * EBIT;
     const Int = roundTo(cap * rstep(0.5, 1.9, 0.05), 5);
     const ded = Math.min(Int, cap), tax = (EBIT - ded) * tc, NI = EBIT - Int - tax;
     const intro = `${name} has EBIT of ${M(EBIT)} and interest expense of ${M(Int)}. The corporate tax rate is ${P(tc, 0)}. The interest deduction is limited to ${P(lim, 0)} of EBIT; interest above this limit cannot be deducted in the current year.`;
     const items = [
-      { part: N('What is the allowed interest deduction?', ded, 'm'), w: 0.5 },
-      { part: N('What are the firm’s taxes?', tax, 'm'), w: 0.6 },
-      { part: N('What is net income?', NI, 'm'), w: 0.6 },
-      { part: N('What are the tax savings from leverage compared with an all-equity firm?', ded * tc, 'm'), must: true },
-      { part: N('What is the maximum interest expense that would still be fully tax-deductible this year?', cap, 'm'), w: 0.35 },
+      { part: N('What is the allowed interest deduction?', ded, 'm', { key: 'ded' }), w: 0.5 },
+      { part: N('What are the firm’s taxes?', tax, 'm', { key: 'tax' }), w: 0.6 },
+      { part: N('What is net income?', NI, 'm', { key: 'ni' }), w: 0.6 },
+      { part: N('What are the tax savings from leverage compared with an all-equity firm?', ded * tc, 'm', { key: 'save' }), must: true },
+      { part: N('What is the maximum interest expense that would still be fully tax-deductible this year?', cap, 'm', { key: 'cap' }), w: 0.35 },
     ];
-    return Q('L2.income', 2, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.r(`**Deduction cap:** $${tn(lim, 2)} \\times EBIT = ${tn(lim, 2)} \\times ${tn(EBIT)} = ${tn(cap)}$ (€ million).`, 'cap', cap);
+  cc.r(`**Allowed deduction:** $\\min(\\text{interest}, \\text{cap}) = \\min(${tn(Int)}, ${tn(cap)}) = ${tn(ded)}$ (€ million).`, 'ded', ded);
+  cc.r(`**Taxes:** $(EBIT - \\text{deduction}) \\times \\tau_c = (${tn(EBIT)} - ${tn(ded)}) \\times ${tn(tc, 2)} = ${tn(EBIT - ded)} \\times ${tn(tc, 2)} = ${tn(tax)}$ (€ million).`, 'tax', tax);
+  cc.r(`**Net income:** $EBIT - \\text{interest} - \\text{taxes} = ${tn(EBIT)} - ${tn(Int)} - ${tn(tax)} = ${tn(NI)}$ (€ million).`, 'ni', NI);
+  cc.r(`**Tax savings from leverage:** $\\tau_c \\times \\text{allowed deduction} = ${tn(tc, 2)} \\times ${tn(ded)} = ${tn(ded * tc)}$ (€ million).`, 'save', ded * tc);
+    return withCalc(Q('L2.income', 2, p_(intro), chooseParts(items, 3, 4)), cc.steps);
   }
 }
 
@@ -285,9 +387,14 @@ export function L2_recapTax(): Question {
   if (chance(0.2)) {
     // reverse: infer tax rate from announcement price
     const intro = `${name} has ${fmtNum(Nsh)} million shares outstanding at ${eur(Pr)} per share and no debt. It announces that it will borrow ${M(D)} on a permanent basis and use the proceeds to repurchase shares. On the announcement, the share price rises to ${eur(P1)}. ${TAXONLY()}`;
-    const parts = [N('What marginal corporate tax rate is the market assuming?', tc * 100, 'pct'),
-    N('How many shares will the firm repurchase?', n, 'msh'), N('What is the market value of equity after the repurchase?', E, 'm')];
-    return Q('L2.recapTax', 2, p_(intro), chance(0.5) ? parts : parts.slice(0, 2));
+    const parts = [N('What marginal corporate tax rate is the market assuming?', tc * 100, 'pct', { key: 'tc' }),
+    N('How many shares will the firm repurchase?', n, 'msh', { key: 'n' }), N('What is the market value of equity after the repurchase?', E, 'm', { key: 'E' })];
+  const cc = calc(), P1r = Nsh * P1;
+  cc.s(`**Value created:** the price rises from €${tn(Pr)} to €${tn(P1, 4)} on ${tn(Nsh)} million shares, $(${tn(P1, 4)} - ${tn(Pr)}) \\times ${tn(Nsh)} = ${tn(ITS, 4)}$ (€ million). This is the present value of the tax shield $\\tau_c D$.`);
+  cc.r(`**Tax rate:** $\\tau_c = \\frac{\\tau_c D}{D} = \\frac{${tn(ITS, 4)}}{${tn(D)}} = ${tn(tc, 4)}$, i.e. $${tp(tc)}$.`, 'tc', tc * 100);
+  cc.r(`**Shares repurchased:** $\\frac{D}{P_1} = \\frac{${tn(D)}}{${tn(P1, 4)}} = ${tn(n, 4)}$ million.`, 'n', n);
+  cc.r(`**Equity value after the repurchase:** $(N - n) \\times P_1 = (${tn(Nsh)} - ${tn(n, 4)}) \\times ${tn(P1, 4)} = ${tn(Nsh - n, 4)} \\times ${tn(P1, 4)} = ${tn(E, 4)}$ (€ million); equivalently $N P_1 - D = ${tn(P1r, 4)} - ${tn(D)}$.`, 'E', E);
+    return withCalc(Q('L2.recapTax', 2, p_(intro), chance(0.5) ? parts : parts.slice(0, 2)), cc.steps);
   }
   const intro = v(
     `Assume a company that currently has ${fmtNum(Nsh)} million shares outstanding with a market price of ${eur(Pr)} per share. The company is all-equity financed, has consistently stable earnings, and pays a corporate tax rate of ${P(tc, 0)}. Management considers the following transaction: borrow ${M(D)} on a permanent basis at the risk-free interest rate of ${P(rf)} and use all the borrowed funds to repurchase outstanding shares. ${TAXONLY()}`,
@@ -297,16 +404,27 @@ export function L2_recapTax(): Question {
   const tstar = 1 - (1 - tc) * (1 - tauE) / (1 - tauI);
   const Pfd = roundTo(Pr + (P1 - Pr) * rstep(0.2, 0.8, 0.05), 0.01);
   const items: Item[] = [
-    { part: N('What is the present value of the interest tax shield?', ITS, 'm'), w: 0.4 },
-    { part: N(v('What is the firm value after the transaction?', 'What is the value of the levered firm?'), VL, 'm'), w: 0.55 },
-    { part: N('What is the equity value after the transaction?', E, 'm'), w: 0.55 },
-    { part: N(v('What is the share price after the announcement?', 'At what price will the shares be repurchased?'), P1, 'eur'), must: true },
-    { part: N('How many shares will be repurchased?', n, 'msh'), w: 0.6 },
-    { part: N('Suppose that, in addition to the corporate tax, investors pay personal taxes: ' + `${P(tauI, 0)} on interest income and ${P(tauE, 0)} on equity income. What is the present value of the interest tax shield under these assumptions?`, tstar * D, 'm'), w: 0.35 },
-    { part: N(`Suppose instead that corporate taxes and financial distress costs are the only imperfections, and the share price rises only to ${eur(Pfd)} on the announcement. What is the present value of the financial distress costs implied by this price?`, (P1 - Pfd) * Nsh, 'm'), w: 0.25 },
+    { part: N('What is the present value of the interest tax shield?', ITS, 'm', { key: 'its' }), w: 0.4 },
+    { part: N(v('What is the firm value after the transaction?', 'What is the value of the levered firm?'), VL, 'm', { key: 'VL' }), w: 0.55 },
+    { part: N('What is the equity value after the transaction?', E, 'm', { key: 'E' }), w: 0.55 },
+    { part: N(v('What is the share price after the announcement?', 'At what price will the shares be repurchased?'), P1, 'eur', { key: 'P1' }), must: true },
+    { part: N('How many shares will be repurchased?', n, 'msh', { key: 'n' }), w: 0.6 },
+    { part: N('Suppose that, in addition to the corporate tax, investors pay personal taxes: ' + `${P(tauI, 0)} on interest income and ${P(tauE, 0)} on equity income. What is the present value of the interest tax shield under these assumptions?`, tstar * D, 'm', { key: 'tstarPV' }), w: 0.35 },
+    { part: N(`Suppose instead that corporate taxes and financial distress costs are the only imperfections, and the share price rises only to ${eur(Pfd)} on the announcement. What is the present value of the financial distress costs implied by this price?`, (P1 - Pfd) * Nsh, 'm', { key: 'fdc' }), w: 0.25 },
   ];
   let parts = chooseParts(items, 3, 5);
-  return Q('L2.recapTax', 2, p_(intro), parts);
+  const cc = calc(), PVd = (P1 - Pfd) * Nsh;
+  cc.s(`**Unlevered value:** $V^U = N \\times P = ${tn(Nsh)} \\times ${tn(Pr)} = ${tn(VU)}$ (€ million).`);
+  cc.r(`**PV of the interest tax shield:** permanent debt, $\\tau_c D = ${tn(tc, 2)} \\times ${tn(D)} = ${tn(ITS)}$ (€ million).`, 'its', ITS);
+  cc.r(`**Firm value after the transaction:** $V^L = V^U + \\tau_c D = ${tn(VU)} + ${tn(ITS)} = ${tn(VL)}$ (€ million).`, 'VL', VL);
+  cc.r(`**Equity value:** $E = V^L - D = ${tn(VL)} - ${tn(D)} = ${tn(E)}$ (€ million).`, 'E', E);
+  cc.r(`**Share price after the announcement:** the tax shield accrues to the existing shareholders, $P_1 = \\frac{V^L}{N} = \\frac{${tn(VL)}}{${tn(Nsh)}} = ${tn(P1, 4)}$ (€).`, 'P1', P1);
+  cc.r(`**Shares repurchased:** $\\frac{D}{P_1} = \\frac{${tn(D)}}{${tn(P1, 4)}} = ${tn(n, 4)}$ million.`, 'n', n);
+  cc.s(`**Personal tax advantage factors:** $1 - \\tau_c = ${tn(1 - tc, 2)}$, $1 - \\tau_e = ${tn(1 - tauE, 2)}$, $1 - \\tau_i = ${tn(1 - tauI, 2)}$.`);
+  cc.s(`**Effective tax advantage:** $\\tau^* = 1 - \\frac{(1 - \\tau_c)(1 - \\tau_e)}{1 - \\tau_i} = 1 - \\frac{${tn(1 - tc, 2)} \\times ${tn(1 - tauE, 2)}}{${tn(1 - tauI, 2)}} = 1 - \\frac{${tn((1 - tc) * (1 - tauE), 4)}}{${tn(1 - tauI, 2)}} = ${tn(tstar, 6)}$.`);
+  cc.r(`**PV of the interest tax shield with personal taxes:** $\\tau^* D = ${tn(tstar, 6)} \\times ${tn(D)} = ${tn(tstar * D, 4)}$ (€ million).`, 'tstarPV', tstar * D);
+  cc.r(`**Financial distress costs:** the price rises only to €${tn(Pfd)} instead of €${tn(P1, 4)}, so the lost value is $(P_1 - P) \\times N = (${tn(P1, 4)} - ${tn(Pfd)}) \\times ${tn(Nsh)} = ${tn(P1 - Pfd, 4)} \\times ${tn(Nsh)} = ${tn(PVd, 4)}$ (€ million).`, 'fdc', PVd);
+  return withCalc(Q('L2.recapTax', 2, p_(intro), parts), cc.steps);
 }
 
 export function L2_target(): Question {
@@ -327,36 +445,51 @@ export function L2_target(): Question {
     `${name} expects to have free cash flow in the coming year of ${M(FCF)}. Its free cash flow is expected to grow at a rate of ${P(g, 1)} per year thereafter. ${name} has an equity cost of capital of ${P(rE, 1)}, a debt cost of capital of ${P(rD, 1)}, and it pays a corporate tax rate of ${P(tc, 0)}. ${name} ${lev}. ${TAXONLY()}`,
     `Next year, ${name} will generate free cash flow of ${M(FCF)}, growing at ${P(g, 1)} per year forever. The firm ${lev} at all times. Its equity holders require ${P(rE, 1)} and its lenders ${P(rD, 1)}; the corporate tax rate is ${P(tc, 0)}. ${TAXONLY()}`);
   const items: Item[] = [
-    { part: N('What is the pretax WACC?', wpre * 100, 'pct'), w: 0.35 },
-    { part: N('What is the unlevered value of the firm?', VU, 'm', { alts: [VUr] }), w: 0.35 },
-    { part: N('What is the (after-tax) WACC?', w * 100, 'pct'), w: 0.35 },
-    { part: N('What is the value of the levered firm?', VL, 'm', { alts: [VLr] }), w: 0.35 },
-    { part: N(v('What is the present value of the interest tax shield?', 'What is the value of the interest tax shield?'), ITS, 'm', { alts: [VLr - VUr] }), must: true },
-    { part: N('What is the market value of the firm’s debt?', VL * DE / (1 + DE), 'm', { alts: [VLr * DE / (1 + DE)] }), w: 0.2 },
+    { part: N('What is the pretax WACC?', wpre * 100, 'pct', { key: 'wpre' }), w: 0.35 },
+    { part: N('What is the unlevered value of the firm?', VU, 'm', { alts: [VUr], key: 'VU' }), w: 0.35 },
+    { part: N('What is the (after-tax) WACC?', w * 100, 'pct', { key: 'w' }), w: 0.35 },
+    { part: N('What is the value of the levered firm?', VL, 'm', { alts: [VLr], key: 'VL' }), w: 0.35 },
+    { part: N(v('What is the present value of the interest tax shield?', 'What is the value of the interest tax shield?'), ITS, 'm', { alts: [VLr - VUr], key: 'ITS' }), must: true },
+    { part: N('What is the market value of the firm’s debt?', VL * DE / (1 + DE), 'm', { alts: [VLr * DE / (1 + DE)], key: 'D' }), w: 0.2 },
   ];
-  return Q('L2.target', 2, p_(intro), chooseParts(items, 1, 4));
+  const cc = calc(), dvT = DE / (1 + DE), wd = rD * (1 - tc), sumW = rE + DE * wd;
+  if (useDV) cc.s(`**Debt-equity ratio:** $\\frac{D}{E} = \\frac{D/V}{1 - D/V} = \\frac{${tn(dvT, 4)}}{1 - ${tn(dvT, 4)}} = ${tn(DE, 2)}$ (the percentage in the text is rounded).`);
+  cc.r(`**Pretax WACC:** $\\frac{r_E + (D/E)\\, r_D}{1 + D/E} = \\frac{${tn(rE, 4)} + ${tn(DE, 2)} \\times ${tn(rD, 4)}}{1 + ${tn(DE, 2)}} = \\frac{${tn(rE + DE * rD, 6)}}{${tn(1 + DE, 2)}} = ${tn(wpre, 6)}$, i.e. $${tp(wpre)}$.`, 'wpre', wpre * 100);
+  cc.r(`**Unlevered value:** growing perpetuity, $V^U = \\frac{FCF}{r_{pretax} - g} = \\frac{${tn(FCF)}}{${tn(wpre, 6)} - ${tn(g, 4)}} = \\frac{${tn(FCF)}}{${tn(wpre - g, 6)}} = ${tn(VU, 4)}$ (€ million).`, 'VU', VU);
+  cc.r(`**After-tax WACC:** $\\frac{r_E + (D/E)\\, r_D (1 - \\tau_c)}{1 + D/E} = \\frac{${tn(rE, 4)} + ${tn(DE, 2)} \\times ${tn(rD, 4)} \\times ${tn(1 - tc, 2)}}{1 + ${tn(DE, 2)}} = \\frac{${tn(rE, 4)} + ${tn(DE * wd, 6)}}{${tn(1 + DE, 2)}} = \\frac{${tn(sumW, 6)}}{${tn(1 + DE, 2)}} = ${tn(w, 6)}$, i.e. $${tp(w)}$.`, 'w', w * 100);
+  cc.r(`**Levered value:** $V^L = \\frac{FCF}{r_{WACC} - g} = \\frac{${tn(FCF)}}{${tn(w, 6)} - ${tn(g, 4)}} = \\frac{${tn(FCF)}}{${tn(w - g, 6)}} = ${tn(VL, 4)}$ (€ million).`, 'VL', VL);
+  cc.r(`**Interest tax shield:** $V^L - V^U = ${tn(VL, 4)} - ${tn(VU, 4)} = ${tn(ITS, 4)}$ (€ million).`, 'ITS', ITS);
+  cc.r(`**Market value of debt:** $V^L \\times \\frac{D/E}{1 + D/E} = ${tn(VL, 4)} \\times \\frac{${tn(DE, 2)}}{${tn(1 + DE, 2)}} = ${tn(VL, 4)} \\times ${tn(DE / (1 + DE), 6)} = ${tn(VL * DE / (1 + DE), 4)}$ (€ million).`, 'D', VL * DE / (1 + DE));
+  return withCalc(Q('L2.target', 2, p_(intro), chooseParts(items, 1, 4)), cc.steps);
 }
 
 export function L2_personal(): Question {
   const name = co(), M = mk();
   const tc = pick(TAXR), ti = pick([0.15, 0.2, 0.25, 0.3, 0.34, 0.35, 0.37, 0.4, 0.45]);
-  let te, eqText;
+  let te, eqText, mix: { td: number; tg: number; po: number } | null = null;
   if (chance(0.3)) {
     const td = pick([0.15, 0.2, 0.25, 0.3]), tg = pick([0.1, 0.15, 0.2, 0.25]), po = pick([0.4, 0.5, 0.6, 0.7]);
-    te = po * td + (1 - po) * tg;
+    te = po * td + (1 - po) * tg; mix = { td, tg, po };
     eqText = `dividends are taxed at ${P(td, 0)} and capital gains at ${P(tg, 0)}. The firm pays out ${P(po, 0)} of its equity income as dividends; the remainder is realized as capital gains each year, so the average tax rate on equity income is the payout-weighted average of the two rates`;
   } else { te = pick([0.1, 0.15, 0.2, 0.25, 0.28, 0.3, 0.35]); eqText = `the personal tax rate on equity income is ${P(te, 0)}`; }
   const tstar = 1 - (1 - tc) * (1 - te) / (1 - ti);
   const VU = rstep(200, 3000, 50), D = roundTo(VU * rstep(0.1, 0.5, 0.05), 10);
   const intro = `${name} pays a corporate tax rate of ${P(tc, 0)}. Its investors pay a personal tax rate of ${P(ti, 0)} on interest income, and ${eqText}.`;
   const items: Item[] = [
-    { part: N('How much does a debt holder receive after all taxes from €1 of EBIT paid out as interest?', 1 - ti, 'eur'), w: 0.35 },
-    { part: N('How much does an equity holder receive after all taxes from €1 of EBIT paid out to equity?', (1 - tc) * (1 - te), 'eur'), w: 0.35 },
-    { part: N(v('What is the effective tax advantage of debt?', 'What is τ*, the effective tax advantage of debt?'), tstar * 100, 'pct'), must: true },
-    { part: N(`The unlevered value of ${name} is ${M(VU)}. If it adds ${M(D)} of permanent debt, what is its value with leverage?`, VU + tstar * D, 'm'), w: 0.5 },
-    { part: N('Holding the other tax rates fixed, at what personal tax rate on interest income would debt have no tax advantage at all?', (1 - (1 - tc) * (1 - te)) * 100, 'pct'), w: 0.3 },
+    { part: N('How much does a debt holder receive after all taxes from €1 of EBIT paid out as interest?', 1 - ti, 'eur', { key: 'debtNet' }), w: 0.35 },
+    { part: N('How much does an equity holder receive after all taxes from €1 of EBIT paid out to equity?', (1 - tc) * (1 - te), 'eur', { key: 'eqNet' }), w: 0.35 },
+    { part: N(v('What is the effective tax advantage of debt?', 'What is τ*, the effective tax advantage of debt?'), tstar * 100, 'pct', { key: 'tstar' }), must: true },
+    { part: N(`The unlevered value of ${name} is ${M(VU)}. If it adds ${M(D)} of permanent debt, what is its value with leverage?`, VU + tstar * D, 'm', { key: 'VL' }), w: 0.5 },
+    { part: N('Holding the other tax rates fixed, at what personal tax rate on interest income would debt have no tax advantage at all?', (1 - (1 - tc) * (1 - te)) * 100, 'pct', { key: 'tbe' }), w: 0.3 },
   ];
-  return Q('L2.personal', 2, p_(intro), chooseParts(items, 2, 4));
+  const cc = calc(), eqNet = (1 - tc) * (1 - te);
+  if (mix) cc.s(`**Average tax rate on equity income:** $\\tau_e = \\text{payout} \\times \\tau_d + (1 - \\text{payout}) \\times \\tau_g = ${tn(mix.po, 2)} \\times ${tn(mix.td, 2)} + ${tn(1 - mix.po, 2)} \\times ${tn(mix.tg, 2)} = ${tn(te, 4)}$.`);
+  cc.r(`**Debt holder after all taxes:** interest is deductible at the firm level and taxed at $\\tau_i$, so €1 becomes $1 - \\tau_i = 1 - ${tn(ti, 2)} = ${tn(1 - ti, 2)}$ (€).`, 'debtNet', 1 - ti);
+  cc.r(`**Equity holder after all taxes:** $(1 - \\tau_c)(1 - \\tau_e) = ${tn(1 - tc, 2)} \\times ${tn(1 - te, 4)} = ${tn(eqNet, 6)}$ (€).`, 'eqNet', eqNet);
+  cc.r(`**Effective tax advantage of debt:** $\\tau^* = 1 - \\frac{(1 - \\tau_c)(1 - \\tau_e)}{1 - \\tau_i} = 1 - \\frac{${tn(eqNet, 6)}}{${tn(1 - ti, 2)}} = 1 - ${tn(eqNet / (1 - ti), 6)} = ${tn(tstar, 6)}$, i.e. $${tp(tstar)}$.`, 'tstar', tstar * 100);
+  cc.r(`**Levered value:** $V^L = V^U + \\tau^* D = ${tn(VU)} + ${tn(tstar, 6)} \\times ${tn(D)} = ${tn(VU)} + ${tn(tstar * D, 4)} = ${tn(VU + tstar * D, 4)}$ (€ million).`, 'VL', VU + tstar * D);
+  cc.r(`**Break-even personal tax rate on interest:** debt has no advantage when $\\tau^* = 0$, i.e. $1 - \\tau_i = (1 - \\tau_c)(1 - \\tau_e)$, so $\\tau_i = 1 - ${tn(eqNet, 6)} = ${tn(1 - eqNet, 6)}$, i.e. $${tp(1 - eqNet)}$.`, 'tbe', (1 - eqNet) * 100);
+  return withCalc(Q('L2.personal', 2, p_(intro), chooseParts(items, 2, 4)), cc.steps);
 }
 
 export function L2_hamada(): Question {
@@ -371,12 +504,19 @@ export function L2_hamada(): Question {
   const wacc = (rE + DE * rD * (1 - tc)) / (1 + DE);
   const intro = `${name} is a private firm planning a new division. A comparable listed firm, ${comp}, has an equity beta of ${fmtNum(bLc)} and a debt-equity ratio of ${fmtNum(DEc)}. ${name} will finance the division ${useDV ? `with ${P(DVt, 0)} debt (as a fraction of total value)` : `at a debt-equity ratio of ${fmtNum(DEt)}`}. Both firms face a corporate tax rate of ${P(tc, 0)}. The risk-free rate is ${P(rf)}, ${useM ? `the market risk premium is ${P(mrp)}` : `the expected market return is ${P(rf + mrp)}`}, and ${name} can borrow at ${P(rD)}. Use the levered beta formula from the formula sheet.`;
   const items: Item[] = [
-    { part: N(`What is the unlevered beta of ${comp}?`, bU, 'x'), must: true },
-    { part: N('What is the levered equity beta of the division?', bLt, 'x'), w: 0.8 },
-    { part: N('What is the equity cost of capital of the division?', rE * 100, 'pct'), w: 0.7 },
-    { part: N('What is the WACC of the division?', wacc * 100, 'pct'), w: 0.7 },
+    { part: N(`What is the unlevered beta of ${comp}?`, bU, 'x', { key: 'bU' }), must: true },
+    { part: N('What is the levered equity beta of the division?', bLt, 'x', { key: 'bL' }), w: 0.8 },
+    { part: N('What is the equity cost of capital of the division?', rE * 100, 'pct', { key: 'rE' }), w: 0.7 },
+    { part: N('What is the WACC of the division?', wacc * 100, 'pct', { key: 'wacc' }), w: 0.7 },
   ];
-  return Q('L2.hamada', 2, p_(intro), chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.r(`**Unlevered beta of ${comp}:** $\\beta_U = \\frac{\\beta_L}{1 + (1 - \\tau_c) D/E} = \\frac{${tn(bLc, 4)}}{1 + ${tn(1 - tc, 2)} \\times ${tn(DEc, 2)}} = \\frac{${tn(bLc, 4)}}{${tn(1 + (1 - tc) * DEc, 6)}} = ${tn(bU, 6)}$.`, 'bU', bU);
+  if (useDV) cc.s(`**Debt-equity ratio of the division:** $\\frac{D}{E} = \\frac{D/V}{1 - D/V} = \\frac{${tn(DVt, 2)}}{1 - ${tn(DVt, 2)}} = ${tn(DE, 6)}$.`);
+  cc.r(`**Levered beta of the division:** $\\beta_L = \\beta_U (1 + (1 - \\tau_c) D/E) = ${tn(bU, 6)} \\times (1 + ${tn(1 - tc, 2)} \\times ${tn(DE, 4)}) = ${tn(bU, 6)} \\times ${tn(1 + (1 - tc) * DE, 6)} = ${tn(bLt, 6)}$.`, 'bL', bLt);
+  if (!useM) cc.s(`**Market risk premium:** $E[R_m] - r_f = ${tn(rf + mrp, 4)} - ${tn(rf, 4)} = ${tn(mrp, 4)}$.`);
+  cc.r(`**Equity cost of capital (CAPM):** $r_E = r_f + \\beta_L \\times MRP = ${tn(rf, 4)} + ${tn(bLt, 6)} \\times ${tn(mrp, 4)} = ${tn(rE, 6)}$, i.e. $${tp(rE)}$.`, 'rE', rE * 100);
+  cc.r(`**WACC of the division:** $\\frac{r_E + (D/E)\\, r_D (1 - \\tau_c)}{1 + D/E} = \\frac{${tn(rE, 6)} + ${tn(DE, 4)} \\times ${tn(rD, 4)} \\times ${tn(1 - tc, 2)}}{1 + ${tn(DE, 4)}} = \\frac{${tn(rE, 6)} + ${tn(DE * rD * (1 - tc), 6)}}{${tn(1 + DE, 4)}} = \\frac{${tn(rE + DE * rD * (1 - tc), 6)}}{${tn(1 + DE, 4)}} = ${tn(wacc, 6)}$, i.e. $${tp(wacc)}$.`, 'wacc', wacc * 100);
+  return withCalc(Q('L2.hamada', 2, p_(intro), chooseParts(items, 3, 4)), cc.steps);
 }
 
 // =====================================================================
@@ -408,19 +548,30 @@ export function L3_twoState(): Question {
     body = p_(`${name} is launching a new product. If it is a hit, ${name} will be worth ${M(Vs)} at the end of the year; if it fails, it will be worth only ${M(Vf)}. The product is ${probT}, and the risk is fully diversifiable, so the appropriate discount rate is the risk-free rate of ${P(rf, 1)}. ${name} currently has ${fmtNum(Nsh)} million shares outstanding and no debt.`) +
       p_(`${name} announces plans to issue zero-coupon debt with a face value of ${M(F)}, due at the end of the year, and to use the proceeds to repurchase shares. ${costT} Ignore taxes.`);
   }
-  const who = C('Who ultimately bears the present value of the financial distress costs?', shuffle(['The original shareholders', 'The debt holders', 'Debt and equity holders equally', 'Nobody; they are diversifiable']), 0);
+  const who = C('Who ultimately bears the present value of the financial distress costs?', shuffle(['The original shareholders', 'The debt holders', 'Debt and equity holders equally', 'Nobody; they are diversifiable']), 0, 'who');
   who.correct = who.options.indexOf('The original shareholders');
   const items: Item[] = [
-    { part: N(v('What is the value of the firm at the beginning of the year if it is unlevered?', 'What is the initial value of the unlevered equity?'), VU, 'm'), w: 0.5 },
-    { part: N('What is the initial value of the levered equity?', E, 'm'), w: 0.6 },
-    { part: N('What is the initial value of the debt?', D, 'm'), must: true },
-    { part: N('What is the present value of the financial distress costs?', PVF, 'm'), w: 0.55 },
-    { part: N('What is the share price after the debt issue and repurchase?', PL, 'eur'), w: 0.45 },
-    { part: N('How many shares will be repurchased?', D / PL, 'msh'), w: 0.3 },
-    { part: N('What is the yield to maturity of the debt?', (F / D - 1) * 100, 'pct'), w: 0.35 },
+    { part: N(v('What is the value of the firm at the beginning of the year if it is unlevered?', 'What is the initial value of the unlevered equity?'), VU, 'm', { key: 'VU' }), w: 0.5 },
+    { part: N('What is the initial value of the levered equity?', E, 'm', { key: 'E' }), w: 0.6 },
+    { part: N('What is the initial value of the debt?', D, 'm', { key: 'D' }), must: true },
+    { part: N('What is the present value of the financial distress costs?', PVF, 'm', { key: 'PVF' }), w: 0.55 },
+    { part: N('What is the share price after the debt issue and repurchase?', PL, 'eur', { key: 'PL' }), w: 0.45 },
+    { part: N('How many shares will be repurchased?', D / PL, 'msh', { key: 'nrep' }), w: 0.3 },
+    { part: N('What is the yield to maturity of the debt?', (F / D - 1) * 100, 'pct', { key: 'ytm' }), w: 0.35 },
     { part: who, w: 0.2 },
   ];
-  return Q('L3.twoState', 3, body, chooseParts(items, 4, 5));
+  const cc = calc(), d1 = 1 + rf, eT = p * (Vs - F), dT = p * F + (1 - p) * (Vf - cost), uT = p * Vs + (1 - p) * Vf;
+  if (pctCost) cc.s(`**Distress cost:** $${tn(cp, 2)} \\times V_f = ${tn(cp, 2)} \\times ${tn(Vf)} = ${tn(cost, 4)}$ (€ million).`);
+  cc.r(`**Unlevered value:** $V^U = \\frac{p V_s + (1 - p) V_f}{1 + r_f} = \\frac{${tn(p, 2)} \\times ${tn(Vs)} + ${tn(1 - p, 2)} \\times ${tn(Vf)}}{${tn(d1, 4)}} = \\frac{${tn(uT, 4)}}{${tn(d1, 4)}} = ${tn(VU, 4)}$ (€ million).`, 'VU', VU);
+  cc.r(`**Levered equity:** equity is paid $V_s - F$ in success and nothing in failure, $E = \\frac{p (V_s - F)}{1 + r_f} = \\frac{${tn(p, 2)} \\times (${tn(Vs)} - ${tn(F)})}{${tn(d1, 4)}} = \\frac{${tn(eT, 4)}}{${tn(d1, 4)}} = ${tn(E, 4)}$ (€ million).`, 'E', E);
+  cc.r(`**Debt:** paid $F$ in success and $V_f - \\text{cost}$ in failure, $D = \\frac{p F + (1 - p)(V_f - \\text{cost})}{1 + r_f} = \\frac{${tn(p, 2)} \\times ${tn(F)} + ${tn(1 - p, 2)} \\times (${tn(Vf)} - ${tn(cost, 4)})}{${tn(d1, 4)}} = \\frac{${tn(dT, 4)}}{${tn(d1, 4)}} = ${tn(D, 4)}$ (€ million).`, 'D', D);
+  cc.s(`**Levered firm value:** $V^L = E + D = ${tn(E, 4)} + ${tn(D, 4)} = ${tn(VL, 4)}$ (€ million).`);
+  cc.r(`**PV of the distress costs:** $\\frac{(1 - p)\\,\\text{cost}}{1 + r_f} = \\frac{${tn(1 - p, 2)} \\times ${tn(cost, 4)}}{${tn(d1, 4)}} = ${tn(PVF, 4)}$ (€ million).`, 'PVF', PVF);
+  cc.r(`**Who bears the costs:** $V^L = V^U - PV(\\text{distress}) = ${tn(VU, 4)} - ${tn(PVF, 4)} = ${tn(VU - PVF, 4)}$, matching $E + D$. Debt holders pay a fair price for the debt, so the loss falls on the original shareholders.`, 'who');
+  cc.r(`**Share price after the issue:** the shares are worth the whole levered firm value, $\\frac{V^L}{N} = \\frac{${tn(VL, 4)}}{${tn(Nsh)}} = ${tn(PL, 4)}$ (€).`, 'PL', PL);
+  cc.r(`**Shares repurchased:** the proceeds $D$ buy back shares at this price, $\\frac{D}{P} = \\frac{${tn(D, 4)}}{${tn(PL, 4)}} = ${tn(D / PL, 4)}$ million.`, 'nrep', D / PL);
+  cc.r(`**Yield to maturity of the debt:** $\\frac{F}{D} - 1 = \\frac{${tn(F)}}{${tn(D, 4)}} - 1 = ${tn(F / D, 6)} - 1 = ${tn(F / D - 1, 6)}$, i.e. $${tp(F / D - 1)}$.`, 'ytm', (F / D - 1) * 100);
+  return withCalc(Q('L3.twoState', 3, body, chooseParts(items, 4, 5)), cc.steps);
 }
 
 export function L3_multiState(): Question {
@@ -442,16 +593,30 @@ export function L3_multiState(): Question {
   const body = p_(`${name} is about to launch a new product. Depending on its success, ${name} will have one of ${k} values next year: ${valT}. These outcomes are all equally likely, the risk is diversifiable, and ${name} will not make any payouts to investors during the year. The risk-free interest rate is ${P(rf, 1)}. ${name} has ${fmtNum(Nsh)} million shares outstanding.`) +
     p_(`Suppose ${name} issues zero-coupon debt with a face value of ${M(F)} due next year and uses the proceeds to repurchase shares. In the event of default, ${P(b, 0)} of the value of ${poss(name)} assets will be lost to bankruptcy costs. Ignore all other market imperfections.`);
   const items: Item[] = [
-    { part: N('What is the initial value of the equity without leverage?', VU, 'm'), w: 0.35 },
-    { part: N('What is the initial value of the debt?', Db, 'm'), must: true },
-    { part: N('What is the yield to maturity of the debt?', (F / Db - 1) * 100, 'pct'), w: 0.55 },
-    { part: N('What is the expected return of the debt?', rf * 100, 'pct'), w: 0.35 },
-    { part: N('What is the initial value of the levered equity?', E, 'm'), w: 0.5 },
-    { part: N('What is the total value of the firm with leverage?', E + Db, 'm'), w: 0.45 },
-    { part: N('What will the share price be after the debt issue and repurchase?', (E + Db) / Nsh, 'eur'), w: 0.5 },
-    { part: N('Without bankruptcy costs, what would the debt be worth initially?', Dn, 'm'), w: 0.2 },
+    { part: N('What is the initial value of the equity without leverage?', VU, 'm', { key: 'VU' }), w: 0.35 },
+    { part: N('What is the initial value of the debt?', Db, 'm', { key: 'Db' }), must: true },
+    { part: N('What is the yield to maturity of the debt?', (F / Db - 1) * 100, 'pct', { key: 'ytm' }), w: 0.55 },
+    { part: N('What is the expected return of the debt?', rf * 100, 'pct', { key: 'rD' }), w: 0.35 },
+    { part: N('What is the initial value of the levered equity?', E, 'm', { key: 'E' }), w: 0.5 },
+    { part: N('What is the total value of the firm with leverage?', E + Db, 'm', { key: 'VL' }), w: 0.45 },
+    { part: N('What will the share price be after the debt issue and repurchase?', (E + Db) / Nsh, 'eur', { key: 'PL' }), w: 0.5 },
+    { part: N('Without bankruptcy costs, what would the debt be worth initially?', Dn, 'm', { key: 'Dn' }), w: 0.2 },
   ];
-  return Q('L3.multiState', 3, body, chooseParts(items, 3, 5));
+  const cc = calc(), sv = vals.reduce((a, x) => a + x, 0), pays = vals.map(x => (x >= F ? F : x * (1 - b))), sp = pays.reduce((a, x) => a + x, 0);
+  const eqs = vals.map(x => Math.max(0, x - F)), se = eqs.reduce((a, x) => a + x, 0), pn = vals.map(x => Math.min(F, x)), sn = pn.reduce((a, x) => a + x, 0);
+  cc.s(`**Probabilities and discounting:** each outcome has probability $\\frac{1}{${k}}$; discount factor $1 + r_f = ${tn(disc, 4)}$.`);
+  cc.r(`**Unlevered equity:** $V^U = \\frac{\\frac{1}{${k}}(${vals.map(x => tn(x)).join(' + ')})}{1 + r_f} = \\frac{${tn(sv / k, 4)}}{${tn(disc, 4)}} = ${tn(VU, 4)}$ (€ million).`, 'VU', VU);
+  vals.forEach((x, i) => cc.s(x >= F
+    ? `**Outcome ${tn(x)}:** at least the face value ${tn(F)}, so debt is repaid in full and receives ${tn(F)}.`
+    : `**Outcome ${tn(x)}:** below the face value ${tn(F)}, so default: debt receives the assets less bankruptcy costs, $${tn(x)} \\times (1 - ${tn(b, 2)}) = ${tn(x * (1 - b), 4)}$.`));
+  cc.r(`**Debt value:** $D = \\frac{\\frac{1}{${k}} \\times \\text{sum of payoffs}}{1 + r_f} = \\frac{\\frac{1}{${k}}(${pays.map(x => tn(x, 4)).join(' + ')})}{${tn(disc, 4)}} = \\frac{${tn(sp / k, 4)}}{${tn(disc, 4)}} = ${tn(Db, 4)}$ (€ million).`, 'Db', Db);
+  cc.r(`**Yield to maturity:** $\\frac{F}{D} - 1 = \\frac{${tn(F)}}{${tn(Db, 4)}} - 1 = ${tn(F / Db, 6)} - 1 = ${tn(F / Db - 1, 6)}$, i.e. $${tp(F / Db - 1)}$.`, 'ytm', (F / Db - 1) * 100);
+  cc.r(`**Expected return of the debt:** the risk is diversifiable, so the expected return equals the risk-free rate. Check: $\\frac{E[\\text{payoff}]}{D} - 1 = \\frac{${tn(sp / k, 4)}}{${tn(Db, 4)}} - 1 = ${tn(sp / k / Db - 1, 6)}$, i.e. $${tp(rf)}$.`, 'rD', rf * 100);
+  cc.r(`**Levered equity:** payoff $\\max(0, V - F)$ in each outcome, $E = \\frac{\\frac{1}{${k}}(${eqs.map(x => tn(x)).join(' + ')})}{1 + r_f} = \\frac{${tn(se / k, 4)}}{${tn(disc, 4)}} = ${tn(E, 4)}$ (€ million).`, 'E', E);
+  cc.r(`**Total value with leverage:** $E + D = ${tn(E, 4)} + ${tn(Db, 4)} = ${tn(E + Db, 4)}$ (€ million).`, 'VL', E + Db);
+  cc.r(`**Share price after the issue:** $\\frac{E + D}{N} = \\frac{${tn(E + Db, 4)}}{${tn(Nsh)}} = ${tn((E + Db) / Nsh, 4)}$ (€).`, 'PL', (E + Db) / Nsh);
+  cc.r(`**Debt value without bankruptcy costs:** $\\frac{\\frac{1}{${k}}(${pn.map(x => tn(x)).join(' + ')})}{1 + r_f} = \\frac{${tn(sn / k, 4)}}{${tn(disc, 4)}} = ${tn(Dn, 4)}$ (€ million).`, 'Dn', Dn);
+  return withCalc(Q('L3.multiState', 3, body, chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L3_tradeoff(): Question {
@@ -481,12 +646,22 @@ export function L3_tradeoff(): Question {
     const net2 = lv.map((d, i) => tc2 * d - fdc[i]);
     const b2 = net2.indexOf(Math.max(...net2)); const s2 = [...net2].sort((x, y) => y - x);
     const items = [
-      { part: N(v('What is the optimal debt choice?', 'Which debt level maximizes firm value?'), lv[best], 'm'), must: true },
-      { part: N('What is the net benefit of leverage at the optimal debt level?', net[best], 'm'), w: 0.6 },
-      { part: N(`The value of ${name} without leverage is ${M(VU)}. What is the value of the firm at the optimal debt level?`, VU + net[best], 'm'), w: 0.4 },
+      { part: N(v('What is the optimal debt choice?', 'Which debt level maximizes firm value?'), lv[best], 'm', { key: 'opt' }), must: true },
+      { part: N('What is the net benefit of leverage at the optimal debt level?', net[best], 'm', { key: 'net' }), w: 0.6 },
+      { part: N(`The value of ${name} without leverage is ${M(VU)}. What is the value of the firm at the optimal debt level?`, VU + net[best], 'm', { key: 'VLopt' }), w: 0.4 },
     ];
-    if (s2[0] - s2[1] >= 0.1) items.push({ part: N(`Suppose the corporate tax rate were ${P(tc2, 0)} instead. What would the optimal debt level be?`, lv[b2], 'm'), w: 0.3 });
-    return Q('L3.tradeoff', 3, body, chooseParts(items, 2, 3));
+    if (s2[0] - s2[1] >= 0.1) items.push({ part: N(`Suppose the corporate tax rate were ${P(tc2, 0)} instead. What would the optimal debt level be?`, lv[b2], 'm', { key: 'opt2' }), w: 0.3 });
+  const cc = calc();
+  cc.s(`**Tax shield at each debt level:** $\\tau_c \\times D$ with $\\tau_c = ${tn(tc, 2)}$: ${lv.map((d, i) => `$${tn(tc, 2)} \\times ${tn(d)} = ${tn(its[i])}$`).join('; ')} (€ million).`);
+  cc.s(`**Net benefit of leverage = PV(tax shield) − PV(distress costs):** ${lv.map((d, i) => `D = ${tn(d)}: $${tn(its[i])} - ${tn(fdc[i])} = ${tn(net[i])}$`).join('; ')} (€ million).`);
+  cc.r(`**Optimal debt:** the net benefit is largest, ${tn(net[best])}, at a debt level of ${tn(lv[best])} (€ million).`, 'opt', lv[best]);
+  cc.r(`**Net benefit at the optimum:** $${tn(its[best])} - ${tn(fdc[best])} = ${tn(its[best] - fdc[best])}$ (€ million).`, 'net', net[best]);
+  cc.r(`**Firm value at the optimum:** $V^L = V^U + \\text{net benefit} = ${tn(VU)} + ${tn(net[best])} = ${tn(VU + net[best])}$ (€ million).`, 'VLopt', VU + net[best]);
+  if (s2[0] - s2[1] >= 0.1) {
+    cc.s(`**Net benefit with $\\tau_c = ${tn(tc2, 2)}$:** ${lv.map((d, i) => `D = ${tn(d)}: $${tn(tc2, 2)} \\times ${tn(d)} - ${tn(fdc[i])} = ${tn(net2[i])}$`).join('; ')} (€ million).`);
+    cc.r(`**Optimal debt with the new tax rate:** the largest net benefit, ${tn(net2[b2])}, is at a debt level of ${tn(lv[b2])} (€ million).`, 'opt2', lv[b2]);
+  }
+    return withCalc(Q('L3.tradeoff', 3, body, chooseParts(items, 2, 3)), cc.steps);
   }
   return L3_twoState();
 }
@@ -505,15 +680,22 @@ export function L4_assetSub(): Question {
     const st = [[pb, A + big], [pm, A + mid], [p0, A]];
     const EV = st.reduce((s, [p, x]) => s + p * x, 0), ED = st.reduce((s, [p, x]) => s + p * Math.min(F, x), 0), EE = st.reduce((s, [p, x]) => s + p * Math.max(0, x - F), 0);
     const body = p_(`${name} is currently operating two active fields, each with a market value of ${M(A)}. If the company does not change its strategy, the market values will be the same at the end of the year. Unfortunately, ${name} has ${M(F)} in debt coming due at the end of the year. Another company has offered ${name} a highly speculative, but potentially very valuable, lease in exchange for one of its active fields. If ${name} accepts, there is a ${P(pb, 0)} chance that the lease will be worth ${M(big)}, a ${P(pm, 0)} chance that it will be worth ${M(mid)}, and a ${P(p0, 0)} chance that it will be worthless (all values at the end of the year). In your answers, include the value of the remaining active field. Ignore discounting.`);
-    const acc = C('Based on total firm value, should the deal be accepted?', ['Yes', 'No'], EV > 2 * A ? 0 : 1);
+    const acc = C('Based on total firm value, should the deal be accepted?', ['Yes', 'No'], EV > 2 * A ? 0 : 1, 'acc');
     const items = [
-      { part: N('What is the expected value of the firm at the end of the year if it accepts the deal?', EV, 'm'), w: 0.7 },
-      { part: N('What is the expected value for debt holders at the end of the year if the deal is accepted?', ED, 'm'), must: true },
-      { part: N('What is the expected value for equity holders at the end of the year if the deal is accepted?', EE, 'm'), must: true },
-      { part: N('By how much does the deal change the expected value of the firm? (Enter a decrease as a negative number.)', EV - 2 * A, 'm'), w: 0.5 },
+      { part: N('What is the expected value of the firm at the end of the year if it accepts the deal?', EV, 'm', { key: 'EV' }), w: 0.7 },
+      { part: N('What is the expected value for debt holders at the end of the year if the deal is accepted?', ED, 'm', { key: 'ED' }), must: true },
+      { part: N('What is the expected value for equity holders at the end of the year if the deal is accepted?', EE, 'm', { key: 'EE' }), must: true },
+      { part: N('By how much does the deal change the expected value of the firm? (Enter a decrease as a negative number.)', EV - 2 * A, 'm', { key: 'dEV' }), w: 0.5 },
       { part: acc, w: 0.3 },
     ];
-    return Q('L4.assetSub', 4, body, chooseParts(items, 3, 5));
+  const cc = calc(), vals1 = st.map(([, x]) => x);
+  cc.s(`**Firm value in each outcome** (lease plus the remaining active field worth ${tn(A)}): ${st.map(([q, x], i) => `${tn(x)} with probability ${tn(q, 2)}`).join('; ')} (€ million).`);
+  cc.r(`**Expected value of the firm:** $E[V] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(x)}`).join(' + ')} = ${tn(EV)}$ (€ million).`, 'EV', EV);
+  cc.r(`**Change in expected firm value:** accepting gives $${tn(EV)}$, keeping both fields gives $2 \\times ${tn(A)} = ${tn(2 * A)}$, so the change is $${tn(EV)} - ${tn(2 * A)} = ${tn(EV - 2 * A)}$ (€ million).`, 'dEV', EV - 2 * A);
+  cc.r(`**Debt holders:** payoff $\\min(F, V)$ with $F = ${tn(F)}$, $E[D] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(Math.min(F, x))}`).join(' + ')} = ${tn(ED)}$ (€ million).`, 'ED', ED);
+  cc.r(`**Equity holders:** payoff $\\max(0, V - F)$, $E[E] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(Math.max(0, x - F))}`).join(' + ')} = ${tn(EE)}$ (€ million).`, 'EE', EE);
+  cc.r(`**Total firm value:** $E[V] = ${tn(EV)}$ versus ${tn(2 * A)} without the deal, a change of ${tn(EV - 2 * A)}, so the deal should be ${EV > 2 * A ? 'accepted' : 'rejected'} (${tn(ED + EE)} = debt ${tn(ED)} + equity ${tn(EE)}).`, 'acc');
+    return withCalc(Q('L4.assetSub', 4, body, chooseParts(items, 3, 5)), cc.steps);
   }
   const name = co();
   const k = chance(0.5) ? 1000 : 1; // values in € thousand (shown as full euros) or € million
@@ -528,16 +710,25 @@ export function L4_assetSub(): Question {
   const E0 = Math.max(0, V0 - F), D0 = Math.min(F, V0);
   const ans = (x: number) => k === 1000 ? x * 1000 : x;
   const body = p_(`${name} has a loan of ${fx(F)} due at the end of the year. Without a change in its strategy, the market value of its assets will be ${fx(V0)} at that time. ${name} is considering a new strategy that requires no upfront investment. It has a ${P(p, 0)} chance of success, in which case the value of the firm’s assets will increase to ${fx(Vh)}; if it fails, the value of the firm’s assets will fall to ${fx(Vl)}. Assume risk-neutral investors, and ignore discounting and taxes.`);
-  const pref = C('Will equity holders be in favor of the new strategy?', ['Yes', 'No'], EE > E0 ? 0 : 1);
+  const pref = C('Will equity holders be in favor of the new strategy?', ['Yes', 'No'], EE > E0 ? 0 : 1, 'pref');
   const items: Item[] = [
-    { part: N('What is the expected value of the firm’s assets under the new strategy?', ans(EV), unit), w: 0.5 },
-    { part: N('What is the expected payoff to equity holders under the new strategy?', ans(EE), unit), must: true },
-    { part: N('What is the expected payoff to debt holders under the new strategy?', ans(ED), unit), w: 0.6 },
-    { part: N('What is the payoff to equity holders if the firm keeps its current strategy?', ans(E0), unit), w: 0.35 },
-    { part: N('By how much does the new strategy change the expected payoff to debt holders? (Enter a loss as a negative number.)', ans(ED - D0), unit), w: 0.4 },
+    { part: N('What is the expected value of the firm’s assets under the new strategy?', ans(EV), unit, { key: 'EV' }), w: 0.5 },
+    { part: N('What is the expected payoff to equity holders under the new strategy?', ans(EE), unit, { key: 'EE' }), must: true },
+    { part: N('What is the expected payoff to debt holders under the new strategy?', ans(ED), unit, { key: 'ED' }), w: 0.6 },
+    { part: N('What is the payoff to equity holders if the firm keeps its current strategy?', ans(E0), unit, { key: 'E0' }), w: 0.35 },
+    { part: N('By how much does the new strategy change the expected payoff to debt holders? (Enter a loss as a negative number.)', ans(ED - D0), unit, { key: 'dED' }), w: 0.4 },
     { part: pref, w: 0.55 },
   ];
-  return Q('L4.assetSub', 4, body, chooseParts(items, 3, 5));
+  const cc = calc(), us = k === 1000 ? '€' : '€ million', ux = (x: number) => tn(x * k);
+  cc.s(`**Expected asset value, new strategy:** $E[V] = p V_h + (1 - p) V_l = ${tn(p, 2)} \\times ${ux(Vh)} + ${tn(1 - p, 2)} \\times ${ux(Vl)} = ${ux(EV)}$ (${us}).`);
+  cc.s(`**Current strategy:** the assets are worth ${ux(V0)}, so equity gets $\\max(0, V_0 - F) = \\max(0, ${ux(V0)} - ${ux(F)}) = ${ux(E0)}$ and debt gets $\\min(F, V_0) = ${ux(D0)}$ (${us}).`);
+  cc.r(`**Equity payoff, current strategy:** $\\max(0, ${ux(V0)} - ${ux(F)}) = ${ux(E0)}$ (${us}).`, 'E0', ans(E0));
+  cc.r(`**Equity payoff, new strategy:** $p \\max(0, V_h - F) + (1 - p)\\max(0, V_l - F) = ${tn(p, 2)} \\times ${ux(Math.max(0, Vh - F))} + ${tn(1 - p, 2)} \\times ${ux(Math.max(0, Vl - F))} = ${ux(EE)}$ (${us}).`, 'EE', ans(EE));
+  cc.r(`**Debt payoff, new strategy:** $p \\min(F, V_h) + (1 - p)\\min(F, V_l) = ${tn(p, 2)} \\times ${ux(Math.min(F, Vh))} + ${tn(1 - p, 2)} \\times ${ux(Math.min(F, Vl))} = ${ux(ED)}$ (${us}).`, 'ED', ans(ED));
+  cc.r(`**Change for debt holders:** $${ux(ED)} - ${ux(D0)} = ${ux(ED - D0)}$ (${us}).`, 'dED', ans(ED - D0));
+  cc.r(`**Expected asset value:** $E[V] = ${ux(EV)}$ (${us}).`, 'EV', ans(EV));
+  cc.r(`**Equity holders' preference:** new strategy ${ux(EE)} ${EE > E0 ? '>' : '≤'} current strategy ${ux(E0)}, so equity holders are ${EE > E0 ? 'in favor' : 'against it'}.`, 'pref');
+  return withCalc(Q('L4.assetSub', 4, body, chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L4_overhang(): Question {
@@ -561,18 +752,29 @@ export function L4_overhang(): Question {
   const d = 1 + rf;
   const Eno = Math.max(0, A - F) / d, Dno = Math.min(A, F) / d, Ein = Math.max(0, B - F) / d, Din = Math.min(B, F) / d;
   const npv = -I + (B - A) / d, gain = Ein - I - Eno;
-  const inv = C('Will equity holders be willing to provide the funds?', ['Yes', 'No'], gain > 0 ? 0 : 1);
+  const inv = C('Will equity holders be willing to provide the funds?', ['Yes', 'No'], gain > 0 ? 0 : 1, 'inv');
   const items: Item[] = [
-    { part: N('If the firm does nothing, what is the value of the debt today?', Dno, 'm'), w: 0.5 },
-    { part: N('If the firm does nothing, what is the value of the equity today?', Eno, 'm'), w: 0.25 },
-    { part: N(v('What is the NPV of the investment?', 'What is the net present value of the new strategy?'), npv, 'm'), must: true },
-    { part: N('If the firm undertakes the investment, what is the value of the equity today (excluding the funds contributed)?', Ein, 'm'), w: 0.45 },
-    { part: N('If the firm undertakes the investment, what is the value of the debt today?', Din, 'm'), w: 0.35 },
-    { part: N('What is the net gain (or loss) to equity holders from funding the investment? (Enter a loss as a negative number.)', gain, 'm'), w: 0.45 },
+    { part: N('If the firm does nothing, what is the value of the debt today?', Dno, 'm', { key: 'Dno' }), w: 0.5 },
+    { part: N('If the firm does nothing, what is the value of the equity today?', Eno, 'm', { key: 'Eno' }), w: 0.25 },
+    { part: N(v('What is the NPV of the investment?', 'What is the net present value of the new strategy?'), npv, 'm', { key: 'npv' }), must: true },
+    { part: N('If the firm undertakes the investment, what is the value of the equity today (excluding the funds contributed)?', Ein, 'm', { key: 'Ein' }), w: 0.45 },
+    { part: N('If the firm undertakes the investment, what is the value of the debt today?', Din, 'm', { key: 'Din' }), w: 0.35 },
+    { part: N('What is the net gain (or loss) to equity holders from funding the investment? (Enter a loss as a negative number.)', gain, 'm', { key: 'gain' }), w: 0.45 },
     { part: inv, w: 0.6 },
-    { part: N('Up to what face value of the debt would the equity holders still be willing to fund the investment?', Math.max(A, B - I * d), 'm'), w: 0.25 },
+    { part: N('Up to what face value of the debt would the equity holders still be willing to fund the investment?', Math.max(A, B - I * d), 'm', { key: 'Fmax' }), w: 0.25 },
   ];
-  return Q('L4.overhang', 4, p_(body), chooseParts(items, 3, 5));
+  const cc = calc();
+  cc.s(`**Discount factor:** $1 + r_f = ${tn(d, 4)}$.`);
+  cc.r(`**Debt without the investment:** the debt is paid $\\min(A, F) = \\min(${tn(A)}, ${tn(F)}) = ${tn(Math.min(A, F))}$ in a year, so $D = \\frac{${tn(Math.min(A, F))}}{${tn(d, 4)}} = ${tn(Dno, 4)}$ (€ million).`, 'Dno', Dno);
+  cc.r(`**Equity without the investment:** $\\frac{\\max(0, A - F)}{1 + r_f} = \\frac{\\max(0, ${tn(A)} - ${tn(F)})}{${tn(d, 4)}} = \\frac{${tn(Math.max(0, A - F))}}{${tn(d, 4)}} = ${tn(Eno, 4)}$ (€ million).`, 'Eno', Eno);
+  cc.r(`**NPV of the investment:** $-I + \\frac{B - A}{1 + r_f} = -${tn(I)} + \\frac{${tn(B)} - ${tn(A)}}{${tn(d, 4)}} = -${tn(I)} + ${tn((B - A) / d, 4)} = ${tn(npv, 4)}$ (€ million).`, 'npv', npv);
+  cc.r(`**Equity with the investment:** $\\frac{\\max(0, B - F)}{1 + r_f} = \\frac{\\max(0, ${tn(B)} - ${tn(F)})}{${tn(d, 4)}} = \\frac{${tn(Math.max(0, B - F))}}{${tn(d, 4)}} = ${tn(Ein, 4)}$ (€ million).`, 'Ein', Ein);
+  cc.r(`**Debt with the investment:** $\\frac{\\min(B, F)}{1 + r_f} = \\frac{\\min(${tn(B)}, ${tn(F)})}{${tn(d, 4)}} = \\frac{${tn(Math.min(B, F))}}{${tn(d, 4)}} = ${tn(Din, 4)}$ (€ million).`, 'Din', Din);
+  cc.s(`**Net gain to equity holders:** $E_{new} - I - E_{old} = ${tn(Ein, 4)} - ${tn(I)} - ${tn(Eno, 4)} = ${tn(gain, 4)}$ (€ million).`);
+  cc.r(`**Net gain to equity holders:** $${tn(Ein, 4)} - ${tn(I)} - ${tn(Eno, 4)} = ${tn(gain, 4)}$ (€ million).`, 'gain', gain);
+  cc.r(`**Decision:** the net gain is ${tn(gain, 4)} ${gain > 0 ? '> 0' : '≤ 0'}, so equity holders ${gain > 0 ? 'are willing' : 'are not willing'} to provide the funds.`, 'inv');
+  cc.r(`**Break-even face value:** equity holders fund the project while $\\frac{B - F}{1 + r_f} - I \\ge 0$, i.e. $F \\le B - I(1 + r_f) = ${tn(B)} - ${tn(I)} \\times ${tn(d, 4)} = ${tn(B - I * d, 4)}$; for $F \\le A$ the debt is risk-free and there is no overhang. The limit is $\\max(A, B - I(1 + r_f)) = \\max(${tn(A)}, ${tn(B - I * d, 4)}) = ${tn(Math.max(A, B - I * d), 4)}$ (€ million).`, 'Fmax', Math.max(A, B - I * d));
+  return withCalc(Q('L4.overhang', 4, p_(body), chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L4_cashout(): Question {
@@ -584,15 +786,24 @@ export function L4_cashout(): Question {
   const loss = roundTo(V * rstep(0.08, 0.2, 0.01), 5), V1 = V - loss, X = roundTo(loss * rstep(0.2, 0.6, 0.05), 1);
   const E0 = Math.max(0, V - F) / d, E1 = X + Math.max(0, V1 - F) / d, D0 = Math.min(F, V) / d, D1 = Math.min(F, V1) / d;
   const body = p_(`${name} has debt with a face value of ${M(F)} due at the end of the year. Without any changes, its assets will be worth ${M(V)} at that time. ${name} has equipment that it can sell today for ${M(X)} and pay out immediately as a cash dividend. Without the equipment, ${name} would have to shut down some operations, and the firm would be worth only ${M(V1)} at the end of the year. All values are certain; the risk-free rate is ${P(rf, 0)}. Ignore taxes.`);
-  const fav = C('Will equity holders be in favor of selling the equipment and paying the dividend?', ['Yes', 'No'], E1 > E0 ? 0 : 1);
+  const fav = C('Will equity holders be in favor of selling the equipment and paying the dividend?', ['Yes', 'No'], E1 > E0 ? 0 : 1, 'fav');
   const items: Item[] = [
-    { part: N('What is the value of equity today if the firm does not sell the equipment?', E0, 'm'), w: 0.5 },
-    { part: N('What is the total value to equity holders today (including the dividend) if the firm sells the equipment?', E1, 'm'), must: true },
-    { part: N('By how much does the value of the debt today fall if the firm sells the equipment?', D0 - D1, 'm'), w: 0.5 },
-    { part: N('By how much does the total value of the firm today fall as a result of the sale?', (V - V1) / d - X, 'm'), w: 0.4 },
+    { part: N('What is the value of equity today if the firm does not sell the equipment?', E0, 'm', { key: 'E0' }), w: 0.5 },
+    { part: N('What is the total value to equity holders today (including the dividend) if the firm sells the equipment?', E1, 'm', { key: 'E1' }), must: true },
+    { part: N('By how much does the value of the debt today fall if the firm sells the equipment?', D0 - D1, 'm', { key: 'dD' }), w: 0.5 },
+    { part: N('By how much does the total value of the firm today fall as a result of the sale?', (V - V1) / d - X, 'm', { key: 'dV' }), w: 0.4 },
     { part: fav, must: true },
   ];
-  return Q('L4.cashout', 4, body, chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.s(`**Discount factor:** $1 + r_f = ${tn(d, 4)}$.`);
+  cc.r(`**Equity without the sale:** $\\frac{\\max(0, V - F)}{1 + r_f} = \\frac{\\max(0, ${tn(V)} - ${tn(F)})}{${tn(d, 4)}} = \\frac{${tn(Math.max(0, V - F))}}{${tn(d, 4)}} = ${tn(E0, 4)}$ (€ million).`, 'E0', E0);
+  cc.r(`**Equity with the sale:** the dividend $X$ plus the discounted equity, $${tn(X)} + \\frac{\\max(0, ${tn(V1)} - ${tn(F)})}{${tn(d, 4)}} = ${tn(X)} + \\frac{${tn(Math.max(0, V1 - F))}}{${tn(d, 4)}} = ${tn(E1, 4)}$ (€ million).`, 'E1', E1);
+  cc.s(`**Debt value without the sale:** $\\frac{\\min(F, V)}{1 + r_f} = \\frac{${tn(Math.min(F, V))}}{${tn(d, 4)}} = ${tn(D0, 4)}$ (€ million).`);
+  cc.s(`**Debt value with the sale:** $\\frac{\\min(F, V_1)}{1 + r_f} = \\frac{${tn(Math.min(F, V1))}}{${tn(d, 4)}} = ${tn(D1, 4)}$ (€ million).`);
+  cc.r(`**Fall in the value of debt:** $${tn(D0, 4)} - ${tn(D1, 4)} = ${tn(D0 - D1, 4)}$ (€ million).`, 'dD', D0 - D1);
+  cc.r(`**Fall in total firm value:** $\\frac{V - V_1}{1 + r_f} - X = \\frac{${tn(V)} - ${tn(V1)}}{${tn(d, 4)}} - ${tn(X)} = ${tn((V - V1) / d, 4)} - ${tn(X)} = ${tn((V - V1) / d - X, 4)}$ (€ million).`, 'dV', (V - V1) / d - X);
+  cc.r(`**Decision:** equity is worth ${tn(E1, 4)} with the sale versus ${tn(E0, 4)} without it, so equity holders are ${E1 > E0 ? 'in favor' : 'against it'}.`, 'fav');
+  return withCalc(Q('L4.cashout', 4, body, chooseParts(items, 3, 4)), cc.steps);
 }
 
 export function L4_petron(): Question {
@@ -616,15 +827,25 @@ export function L4_petron(): Question {
       table(['', ...L.map(x => 'Strategy ' + x)], [['Probability of success', ...pr.map(x => P(x, 0))], ['Firm value if successful (€ million)', ...vs.map(x => fmtNum(x))]]);
     const firm2 = ev[c2.i], debt2 = firm2 - c2.eq;
     const items = [
-      { part: C('Which strategy has the highest expected payoff for the firm as a whole?', L, 0), w: 0.3 },
-      { part: C(`Which strategy will management choose if ${name} has debt with a face value of ${M(c1.F)}?`, L, c1.i), w: 0.6 },
-      { part: C(`Which strategy will management choose if ${name} has debt with a face value of ${M(c2.F)}?`, L, c2.i), must: true },
-      { part: N(`With debt of ${M(c2.F)}, what is the expected value of equity?`, c2.eq, 'm'), w: 0.6 },
-      { part: N(`With debt of ${M(c2.F)}, what is the expected value of the firm?`, firm2, 'm'), w: 0.5 },
-      { part: N(`With debt of ${M(c2.F)}, what is the expected value of the debt?`, debt2, 'm'), w: 0.35 },
-      { part: N(`What are the agency costs of debt with a face value of ${M(c2.F)}, measured as the loss in expected firm value?`, ev[0] - firm2, 'm'), w: 0.35 },
+      { part: C('Which strategy has the highest expected payoff for the firm as a whole?', L, 0, 'bestFirm'), w: 0.3 },
+      { part: C(`Which strategy will management choose if ${name} has debt with a face value of ${M(c1.F)}?`, L, c1.i, 'choose1'), w: 0.6 },
+      { part: C(`Which strategy will management choose if ${name} has debt with a face value of ${M(c2.F)}?`, L, c2.i, 'choose2'), must: true },
+      { part: N(`With debt of ${M(c2.F)}, what is the expected value of equity?`, c2.eq, 'm', { key: 'eq2' }), w: 0.6 },
+      { part: N(`With debt of ${M(c2.F)}, what is the expected value of the firm?`, firm2, 'm', { key: 'firm2' }), w: 0.5 },
+      { part: N(`With debt of ${M(c2.F)}, what is the expected value of the debt?`, debt2, 'm', { key: 'debt2' }), w: 0.35 },
+      { part: N(`What are the agency costs of debt with a face value of ${M(c2.F)}, measured as the loss in expected firm value?`, ev[0] - firm2, 'm', { key: 'agency' }), w: 0.35 },
     ];
-    return Q('L4.petron', 4, body, chooseParts(items, 3, 5));
+  const cc = calc(), eqsOf = (F: number) => vs.map((x, i) => pr[i] * Math.max(0, x - F)), eq1 = eqsOf(c1.F), eq2 = eqsOf(c2.F);
+  cc.s(`**Expected firm value of each strategy:** $p \\times V$: ${vs.map((x, i) => `${L[i]}: $${tn(pr[i], 2)} \\times ${tn(x)} = ${tn(ev[i])}$`).join('; ')} (€ million).`);
+  cc.r(`**Highest expected firm value:** strategy A with ${tn(ev[0])}, ahead of ${tn(ev[1])}, ${tn(ev[2])} and ${tn(ev[3])}.`, 'bestFirm');
+  cc.r(`**Management's choice with debt ${tn(c1.F)}:** equity value $p \\max(0, V - F)$: ${vs.map((x, i) => `${L[i]}: $${tn(pr[i], 2)} \\times \\max(0, ${tn(x)} - ${tn(c1.F)}) = ${tn(eq1[i], 4)}$`).join('; ')}. The highest is strategy ${L[c1.i]}.`, 'choose1');
+  cc.s(`**Equity value of each strategy with debt ${tn(c2.F)}:** ${vs.map((x, i) => `${L[i]}: $${tn(pr[i], 2)} \\times \\max(0, ${tn(x)} - ${tn(c2.F)}) = ${tn(eq2[i], 4)}$`).join('; ')}.`);
+  cc.r(`**Management's choice with debt ${tn(c2.F)}:** the highest equity value is ${tn(c2.eq, 4)}, strategy ${L[c2.i]}.`, 'choose2');
+  cc.r(`**Expected value of equity:** ${tn(c2.eq, 4)} (€ million), from strategy ${L[c2.i]}.`, 'eq2', c2.eq);
+  cc.r(`**Expected value of the firm:** $p \\times V$ for strategy ${L[c2.i]} $= ${tn(pr[c2.i], 2)} \\times ${tn(vs[c2.i])} = ${tn(firm2, 4)}$ (€ million).`, 'firm2', firm2);
+  cc.r(`**Expected value of the debt:** $\\text{firm} - \\text{equity} = ${tn(firm2, 4)} - ${tn(c2.eq, 4)} = ${tn(debt2, 4)}$ (€ million).`, 'debt2', debt2);
+  cc.r(`**Agency cost of debt:** loss in expected firm value, $${tn(ev[0])} - ${tn(firm2, 4)} = ${tn(ev[0] - firm2, 4)}$ (€ million).`, 'agency', ev[0] - firm2);
+    return withCalc(Q('L4.petron', 4, body, chooseParts(items, 3, 5)), cc.steps);
   }
   return L4_overhang();
 }
@@ -639,12 +860,19 @@ export function L4_empire(): Question {
     : p_(`${name} expects EBIT of €${fmtNum(EBIT)} thousand in the coming year. It has no debt and pays a corporate tax rate of ${P(tc, 0)}.`)) +
     p_(`Unfortunately, ${poss(name)} managers are expected to waste ${P(w, 0)} of its net income on needless perks, pet projects, and other expenditures that do not contribute to the firm. All remaining income will be returned to shareholders through dividends and share repurchases.`);
   const items: Item[] = [
-    { part: N('By how much would each €1 of interest expense reduce dividends and share repurchases?', (1 - tc) * (1 - w), 'eur'), must: true },
-    { part: N('What is the increase in the total funds paid to investors for each €1 of interest expense?', 1 - (1 - tc) * (1 - w), 'eur'), w: 0.75 },
-    { part: N('Without debt, how much will be paid out to shareholders?', NI * (1 - w), 'k'), w: 0.35 },
-    { part: N(`If ${name} takes on debt with interest expense of €${fmtNum(Int)} thousand per year, what are the total funds paid to all investors?`, Int + (EBIT - Int) * (1 - tc) * (1 - w), 'k'), w: 0.45 },
+    { part: N('By how much would each €1 of interest expense reduce dividends and share repurchases?', (1 - tc) * (1 - w), 'eur', { key: 'perEur' }), must: true },
+    { part: N('What is the increase in the total funds paid to investors for each €1 of interest expense?', 1 - (1 - tc) * (1 - w), 'eur', { key: 'invEur' }), w: 0.75 },
+    { part: N('Without debt, how much will be paid out to shareholders?', NI * (1 - w), 'k', { key: 'payout' }), w: 0.35 },
+    { part: N(`If ${name} takes on debt with interest expense of €${fmtNum(Int)} thousand per year, what are the total funds paid to all investors?`, Int + (EBIT - Int) * (1 - tc) * (1 - w), 'k', { key: 'totInv' }), w: 0.45 },
   ];
-  return Q('L4.empire', 4, body, chooseParts(items, 2, 3));
+  const cc = calc();
+  cc.s(`**Net income without debt:** $EBIT (1 - \\tau_c) = ${tn(EBIT)} \\times ${tn(1 - tc, 2)} = ${tn(NI)}$ (€ thousand).`);
+  cc.r(`**Effect of €1 of interest on payouts:** it lowers pretax income by €1, taxes by $\\tau_c$, and the wasted share by $w$, so payouts fall by $(1 - \\tau_c)(1 - w) = ${tn(1 - tc, 2)} \\times ${tn(1 - w, 2)} = ${tn((1 - tc) * (1 - w), 6)}$ (€).`, 'perEur', (1 - tc) * (1 - w));
+  cc.r(`**Increase in total funds to investors per €1 of interest:** the investors receive the interest itself plus the lower payout, $1 - (1 - \\tau_c)(1 - w) = 1 - ${tn((1 - tc) * (1 - w), 6)} = ${tn(1 - (1 - tc) * (1 - w), 6)}$ (€).`, 'invEur', 1 - (1 - tc) * (1 - w));
+  cc.r(`**Payout without debt:** $NI (1 - w) = ${tn(NI)} \\times ${tn(1 - w, 2)} = ${tn(NI * (1 - w))}$ (€ thousand).`, 'payout', NI * (1 - w));
+  cc.s(`**With debt:** income before tax $EBIT - \\text{interest} = ${tn(EBIT)} - ${tn(Int)} = ${tn(EBIT - Int)}$ (€ thousand); payout to shareholders $(EBIT - \\text{interest})(1 - \\tau_c)(1 - w) = ${tn(EBIT - Int)} \\times ${tn(1 - tc, 2)} \\times ${tn(1 - w, 2)} = ${tn((EBIT - Int) * (1 - tc) * (1 - w))}$.`);
+  cc.r(`**Total funds paid to all investors:** interest plus shareholder payout, $${tn(Int)} + ${tn((EBIT - Int) * (1 - tc) * (1 - w))} = ${tn(Int + (EBIT - Int) * (1 - tc) * (1 - w))}$ (€ thousand).`, 'totInv', Int + (EBIT - Int) * (1 - tc) * (1 - w));
+  return withCalc(Q('L4.empire', 4, body, chooseParts(items, 2, 3)), cc.steps);
 }
 
 // =====================================================================
@@ -661,13 +889,19 @@ export function L5_financing(): Question {
     `${name} needs to raise ${M(A)} for a new investment project. If the firm issues one-year debt, it may have to pay an interest rate of ${P(rc)}, although ${poss(name)} managers believe that ${P(fair)} would be a fair rate given the level of risk. However, if the firm issues equity, they believe the equity may be underpriced by ${P(u, 1)}.`,
     `To fund a ${M(A)} project, ${name} can use retained earnings, issue one-year debt, or issue new equity. Lenders would charge ${P(rc)}, whereas management considers ${P(fair)} the fair rate for the firm’s risk. Management also believes that the market underprices ${poss(name)} shares by ${P(u, 1)}.`));
   const items: Item[] = [
-    { part: N('What is the cost to current shareholders of financing the project out of retained earnings?', A, 'm'), w: 0.3 },
-    { part: N('What is the cost to current shareholders of financing the project with debt?', cD, 'm'), must: true },
-    { part: N('What is the cost to current shareholders of financing the project with equity?', cE, 'm'), must: true },
-    { part: C('Rank the sources from cheapest to most expensive for current shareholders.', ranking, corr), w: 0.4 },
-    { part: N('Up to what level of underpricing would issuing equity be cheaper than issuing debt?', (1 - A / cD) * 100, 'pct'), w: 0.3 },
+    { part: N('What is the cost to current shareholders of financing the project out of retained earnings?', A, 'm', { key: 'costRE' }), w: 0.3 },
+    { part: N('What is the cost to current shareholders of financing the project with debt?', cD, 'm', { key: 'costD' }), must: true },
+    { part: N('What is the cost to current shareholders of financing the project with equity?', cE, 'm', { key: 'costE' }), must: true },
+    { part: C('Rank the sources from cheapest to most expensive for current shareholders.', ranking, corr, 'rank'), w: 0.4 },
+    { part: N('Up to what level of underpricing would issuing equity be cheaper than issuing debt?', (1 - A / cD) * 100, 'pct', { key: 'underp' }), w: 0.3 },
   ];
-  return Q('L5.financing', 5, body, chooseParts(items, 3, 4));
+  const cc = calc();
+  cc.r(`**Retained earnings:** no external financing cost, the cost to current shareholders is the amount itself, ${tn(A)} (€ million).`, 'costRE', A);
+  cc.r(`**Debt:** repay $A (1 + r_c) = ${tn(A)} \\times ${tn(1 + rc, 4)} = ${tn(A * (1 + rc), 4)}$; its fair present value at the fair rate is $\\frac{${tn(A * (1 + rc), 4)}}{1 + ${tn(fair, 4)}} = \\frac{${tn(A * (1 + rc), 4)}}{${tn(1 + fair, 4)}} = ${tn(cD, 4)}$ (€ million).`, 'costD', cD);
+  cc.r(`**Equity:** shares worth $A$ would be sold for only $A (1 - u)$ in value terms, so $\\frac{A}{1 - u} = \\frac{${tn(A)}}{1 - ${tn(u, 4)}} = \\frac{${tn(A)}}{${tn(1 - u, 4)}} = ${tn(cE, 4)}$ (€ million).`, 'costE', cE);
+  cc.r(`**Ranking:** retained earnings ${tn(A, 4)}, debt ${tn(cD, 4)}, equity ${tn(cE, 4)} (€ million), so the order from cheapest to most expensive is: ${ranking[corr].toLowerCase()}.`, 'rank');
+  cc.r(`**Break-even underpricing:** equity is cheaper than debt while $\\frac{A}{1 - u} < c_D$, i.e. $u < 1 - \\frac{A}{c_D} = 1 - \\frac{${tn(A)}}{${tn(cD, 4)}} = 1 - ${tn(A / cD, 6)} = ${tn(1 - A / cD, 6)}$, i.e. $${tp(1 - A / cD)}$.`, 'underp', (1 - A / cD) * 100);
+  return withCalc(Q('L5.financing', 5, body, chooseParts(items, 3, 4)), cc.steps);
 }
 
 export function L5_lemons(): Question {
@@ -687,11 +921,23 @@ export function L5_lemons(): Question {
   const options = optsSet.map(optText);
   const ci = optsSet.findIndex(s => s.length === sellers.length);
   const items: Item[] = [
-    { part: N('At what price will the CEO ultimately be able to sell his shares?', final, 'eur'), must: true },
-    { part: C('For which true values of the stock will the CEO sell?', options, ci), must: true },
+    { part: N('At what price will the CEO ultimately be able to sell his shares?', final, 'eur', { key: 'final' }), must: true },
+    { part: C('For which true values of the stock will the CEO sell?', options, ci, 'sellers'), must: true },
   ];
-  if (prices.length > 1) items.splice(0, 0, { part: N(`If investors conclude that the CEO would not sell if the true value were ${eur(vals[0])}, to what price should the stock fall?`, prices[1], 'eur'), w: 0.5 });
-  return Q('L5.lemons', 5, body, chooseParts(items, 2, 3));
+  if (prices.length > 1) items.splice(0, 0, { part: N(`If investors conclude that the CEO would not sell if the true value were ${eur(vals[0])}, to what price should the stock fall?`, prices[1], 'eur', { key: 'p2' }), w: 0.5 });
+  const cc = calc();
+  let S2 = vals.slice();
+  prices.forEach((pr, j) => {
+    const top = S2[0], avg = `$\\frac{${S2.map(x => tn(x)).join(' + ')}}{${S2.length}} = ${tn(pr, 4)}$`;
+    const last = j === prices.length - 1;
+    const test = `The CEO holding value ${tn(top)} sells only if $(1 - d) \\times ${tn(top)} = ${tn(1 - d, 2)} \\times ${tn(top)} = ${tn((1 - d) * top, 4)}$ is at most the price ${tn(pr, 4)}: ${last ? 'it is, so he sells (and so do all lower values)' : 'it is not, so he does not sell'}.`;
+    if (j === 1) cc.r(`**Price after the first round:** investors drop the value ${tn(vals[0])}, so the price is the average of the remaining values, ${avg} (€). ${test}`, 'p2', pr);
+    else cc.s(`**Price ${j + 1}:** the average of the values still on offer, ${avg} (€). ${test}`);
+    S2 = S2.slice(1);
+  });
+  cc.r(`**Final price:** the price settles at ${tn(final, 4)} (€), where no further type drops out.`, 'final', final);
+  cc.r(`**Sellers:** $(1 - d) \\times \\text{value} \\le ${tn(final, 4)}$: ${vals.map(x => `${tn(x)}: $${tn(1 - d, 2)} \\times ${tn(x)} = ${tn((1 - d) * x, 4)}$ ${(1 - d) * x <= final + 1e-9 ? '≤' : '>'} ${tn(final, 4)}`).join('; ')}. So the CEO sells ${options[ci].charAt(0).toLowerCase() + options[ci].slice(1)}.`, 'sellers');
+  return withCalc(Q('L5.lemons', 5, body, chooseParts(items, 2, 3)), cc.steps);
 }
 
 export function L5_signal(): Question {
@@ -700,12 +946,17 @@ export function L5_signal(): Question {
   const D1 = roundTo(L * rstep(0.3, 0.9, 0.1), 5), D2 = roundTo(L + (H - L) * rstep(0.1, 0.8, 0.1), 5);
   const order = chance(0.5);
   const body = p_(`${name} currently uses all-equity financing. Its market value in one year’s time will be either ${M(H)} or ${M(L)}, depending on the success of a new strategy. Investors currently view the outcomes as equally likely, but the CEO has information that success is virtually certain. The CEO considers taking on debt (due in one year) to signal this information. Financial distress is costly.`);
-  const a = C(`Would debt with a face value of ${M(order ? D1 : D2)} make the CEO’s claim credible?`, ['Yes', 'No'], order ? 1 : 0);
-  const b = C(`Would debt with a face value of ${M(order ? D2 : D1)} make the CEO’s claim credible?`, ['Yes', 'No'], order ? 0 : 1);
+  const a = C(`Would debt with a face value of ${M(order ? D1 : D2)} make the CEO’s claim credible?`, ['Yes', 'No'], order ? 1 : 0, 'a');
+  const b = C(`Would debt with a face value of ${M(order ? D2 : D1)} make the CEO’s claim credible?`, ['Yes', 'No'], order ? 0 : 1, 'b');
   const parts: Part[] = [a, b];
-  if (chance(0.6)) parts.push(N('Above what face value of debt does the leverage become a credible signal?', L, 'm'));
-  if (chance(0.4)) parts.push(N(`If the firm issues debt with a face value of ${M(D2)} and the strategy fails, how much will equity holders receive in one year?`, 0, 'm'));
-  return Q('L5.signal', 5, body, parts);
+  if (chance(0.6)) parts.push(N('Above what face value of debt does the leverage become a credible signal?', L, 'm', { key: 'faceMin' }));
+  if (chance(0.4)) parts.push(N(`If the firm issues debt with a face value of ${M(D2)} and the strategy fails, how much will equity holders receive in one year?`, 0, 'm', { key: 'eqFail' }));
+  const cc = calc(), fa = order ? D1 : D2, fb = order ? D2 : D1;
+  cc.r(`**Credibility threshold:** a firm worth only ${tn(L)} in the bad outcome cannot repay more than ${tn(L)}; debt is a credible signal only if its face value is above ${tn(L)} (€ million).`, 'faceMin', L);
+  cc.r(`**Face value ${tn(fa)}:** ${fa > L ? `${tn(fa)} > ${tn(L)}, so a weak firm would default and could not imitate: credible, Yes.` : `${tn(fa)} ≤ ${tn(L)}, so a weak firm could repay it as well and imitate: not credible, No.`}`, 'a');
+  cc.r(`**Face value ${tn(fb)}:** ${fb > L ? `${tn(fb)} > ${tn(L)}, so a weak firm would default and could not imitate: credible, Yes.` : `${tn(fb)} ≤ ${tn(L)}, so a weak firm could repay it as well and imitate: not credible, No.`}`, 'b');
+  cc.r(`**Equity if the strategy fails:** the firm is worth ${tn(L)} but owes ${tn(D2)}, so equity gets $\\max(0, ${tn(L)} - ${tn(D2)}) = 0$ (€ million).`, 'eqFail', 0);
+  return withCalc(Q('L5.signal', 5, body, parts), cc.steps);
 }
 
 // =====================================================================
@@ -721,52 +972,80 @@ export function L6_vc(): Question {
     `Last year you started ${name}, investing ${eur(inv0)} in exchange for ${sh(N0)} shares.${Na ? ` Afterwards, angel investors bought ${sh(Na)} newly issued shares.` : ''}`);
   const vr = rint(0, 3);
   let body, items;
+  const cc = calc(), mi = (x: number) => tn(x / 1e6, 4);
+  cc.s(`**Shares before the round:** you hold $${tn(N0, 0)}$ shares${Na ? ` and the angels $${tn(Na, 0)}$, so $${tn(N0, 0)} + ${tn(Na, 0)} = ${tn(old, 0)}$ shares are outstanding` : `, so $${tn(old, 0)}$ shares are outstanding`}.`);
   if (vr === 0) {
     const s = rstep(0.2, 0.6, 0.01), I = rstep(0.5, 15, 0.25) * 1e6;
     const tot = old / (1 - s), nv = tot - old, pr = I / nv;
     body = founder + ` You now need to raise a new round of capital, and a venture capitalist is willing to invest ${eur(I)} if she owns ${P(s, 0)} of the company after the investment is completed.`;
+    cc.s(`**Total shares after the round:** the venture capitalist owns the share $s$, so the old shares are $1 - s$ of the total, $\\frac{${tn(old, 0)}}{1 - ${tn(s, 2)}} = ${tn(tot, 4)}$.`);
+    cc.r(`**New shares for the venture capitalist:** $${tn(tot, 4)} - ${tn(old, 0)} = ${tn(nv, 4)}$, i.e. $${tn(nv / 1e6, 6)}$ million.`, 'nv', nv / 1e6);
+    cc.r(`**Price per share:** $\\frac{I}{\\text{new shares}} = \\frac{${tn(I, 0)}}{${tn(nv, 4)}} = ${tn(pr, 4)}$ (€).`, 'price', pr);
+    cc.r(`**Pre-money valuation:** old shares times the price, $${tn(old, 0)} \\times ${tn(pr, 4)} = ${tn(old * pr, 2)}$ (€), i.e. $${mi(old * pr)}$ (€ million).`, 'pre', old * pr / 1e6);
+    cc.r(`**Post-money valuation:** all shares times the price, $${tn(tot, 4)} \\times ${tn(pr, 4)} = ${tn(tot * pr, 2)}$ (€), i.e. $${mi(tot * pr)}$ (€ million).`, 'post', tot * pr / 1e6);
+    cc.r(`**Your ownership:** $\\frac{${tn(N0, 0)}}{${tn(tot, 4)}} = ${tn(N0 / tot, 6)}$, i.e. $${tp(N0 / tot)}$.`, 'ownPct', N0 / tot * 100);
     items = [
-      { part: N('How many shares must the venture capitalist receive?', nv / 1e6, 'msh'), must: true },
-      { part: N('What is the implied price per share of this funding round?', pr, 'eur', { abs: 0.006 }), w: 0.8 },
-      { part: N('What is the pre-money valuation?', old * pr / 1e6, 'm'), w: 0.7 },
-      { part: N('What is the post-money valuation?', tot * pr / 1e6, 'm'), w: 0.7 },
-      { part: N('What percentage of the firm will you own after the round?', N0 / tot * 100, 'pct'), w: Na ? 0.5 : 0.2 },
+      { part: N('How many shares must the venture capitalist receive?', nv / 1e6, 'msh', { key: 'nv' }), must: true },
+      { part: N('What is the implied price per share of this funding round?', pr, 'eur', { abs: 0.006, key: 'price' }), w: 0.8 },
+      { part: N('What is the pre-money valuation?', old * pr / 1e6, 'm', { key: 'pre' }), w: 0.7 },
+      { part: N('What is the post-money valuation?', tot * pr / 1e6, 'm', { key: 'post' }), w: 0.7 },
+      { part: N('What percentage of the firm will you own after the round?', N0 / tot * 100, 'pct', { key: 'ownPct' }), w: Na ? 0.5 : 0.2 },
     ];
   } else if (vr === 1) {
     const I = rstep(1, 15, 0.5) * 1e6, post = roundTo(I / rstep(0.2, 0.65, 0.01), 100000);
     const pre = post - I, pr = pre / old, nv = I / pr, tot = old + nv;
     body = founder + ` You are now raising capital from a venture capitalist, who has agreed to invest ${eur(I)} at a post-money valuation of ${eur(post)}. This is the venture capitalist’s first investment in the company.`;
+    cc.r(`**Venture capitalist's stake:** $\\frac{I}{\\text{post-money}} = \\frac{${tn(I, 0)}}{${tn(post, 0)}} = ${tn(I / post, 6)}$, i.e. $${tp(I / post)}$.`, 'vcPct', I / post * 100);
+    cc.s(`**Pre-money valuation:** $${tn(post, 0)} - ${tn(I, 0)} = ${tn(pre, 0)}$ (€).`);
+    cc.r(`**Price per share:** pre-money valuation divided by the old shares, $\\frac{${tn(pre, 0)}}{${tn(old, 0)}} = ${tn(pr, 4)}$ (€).`, 'price', pr);
+    cc.r(`**New shares:** $\\frac{I}{\\text{price}} = \\frac{${tn(I, 0)}}{${tn(pr, 4)}} = ${tn(nv, 4)}$, i.e. $${tn(nv / 1e6, 6)}$ million.`, 'nv', nv / 1e6);
+    cc.s(`**Total shares after the round:** $${tn(old, 0)} + ${tn(nv, 4)} = ${tn(tot, 4)}$.`);
+    cc.r(`**Your ownership:** $\\frac{${tn(N0, 0)}}{${tn(tot, 4)}} = ${tn(N0 / tot, 6)}$, i.e. $${tp(N0 / tot)}$.`, 'ownPct', N0 / tot * 100);
+    cc.r(`**Value of your shares:** $${tn(N0, 0)} \\times ${tn(pr, 4)} = ${tn(N0 * pr, 2)}$ (€), i.e. $${mi(N0 * pr)}$ (€ million).`, 'myVal', N0 * pr / 1e6);
     items = [
-      { part: N('What percentage of the firm will the venture capitalist own?', I / post * 100, 'pct'), w: 0.6 },
-      { part: N('What is the price per share in this round?', pr, 'eur', { abs: 0.006 }), w: 0.5 },
-      { part: N('How many new shares will the venture capitalist receive?', nv / 1e6, 'msh'), w: 0.4 },
-      { part: N('What percentage of the firm will you own?', N0 / tot * 100, 'pct'), must: true },
-      { part: N('What is the value of your shares after the round?', N0 * pr / 1e6, 'm'), must: true },
+      { part: N('What percentage of the firm will the venture capitalist own?', I / post * 100, 'pct', { key: 'vcPct' }), w: 0.6 },
+      { part: N('What is the price per share in this round?', pr, 'eur', { abs: 0.006, key: 'price' }), w: 0.5 },
+      { part: N('How many new shares will the venture capitalist receive?', nv / 1e6, 'msh', { key: 'nv' }), w: 0.4 },
+      { part: N('What percentage of the firm will you own?', N0 / tot * 100, 'pct', { key: 'ownPct' }), must: true },
+      { part: N('What is the value of your shares after the round?', N0 * pr / 1e6, 'm', { key: 'myVal' }), must: true },
     ];
   } else if (vr === 2) {
     const nv = roundTo(old * rstep(0.4, 2, 0.05), 50000); const pr = rstep(0.4, 6, 0.05); const I = nv * pr;
     body = founder + ` You now want to raise more capital from a venture capitalist, who invests ${eur(I)} and receives ${sh(nv)} newly issued shares.`;
     const tot = old + nv;
+    cc.s(`**Price per share:** $\\frac{I}{\\text{new shares}} = \\frac{${tn(I, 2)}}{${tn(nv, 0)}} = ${tn(pr, 4)}$ (€).`);
+    cc.s(`**Total shares after the round:** $${tn(old, 0)} + ${tn(nv, 0)} = ${tn(tot, 0)}$.`);
+    cc.r(`**Post-money valuation:** $${tn(tot, 0)} \\times ${tn(pr, 4)} = ${tn(tot * pr, 2)}$ (€), i.e. $${mi(tot * pr)}$ (€ million).`, 'post', tot * pr / 1e6);
+    cc.r(`**Pre-money valuation:** $${tn(old, 0)} \\times ${tn(pr, 4)} = ${tn(old * pr, 2)}$ (€), i.e. $${mi(old * pr)}$ (€ million).`, 'pre', old * pr / 1e6);
+    cc.r(`**Your ownership:** $\\frac{${tn(N0, 0)}}{${tn(tot, 0)}} = ${tn(N0 / tot, 6)}$, i.e. $${tp(N0 / tot)}$.`, 'ownPct', N0 / tot * 100);
+    cc.r(`**Venture capitalist's ownership:** $\\frac{${tn(nv, 0)}}{${tn(tot, 0)}} = ${tn(nv / tot, 6)}$, i.e. $${tp(nv / tot)}$.`, 'vcPct', nv / tot * 100);
+    cc.r(`**Value of your shares:** $${tn(N0, 0)} \\times ${tn(pr, 4)} = ${tn(N0 * pr, 2)}$ (€), i.e. $${mi(N0 * pr)}$ (€ million).`, 'myVal', N0 * pr / 1e6);
     items = [
-      { part: N('What is the post-money valuation after this funding round?', tot * pr / 1e6, 'm'), must: true },
-      { part: N('What is the pre-money valuation?', old * pr / 1e6, 'm'), w: 0.4 },
-      { part: N('What percentage of the firm will you own?', N0 / tot * 100, 'pct'), w: 0.7 },
-      { part: N('What percentage of the firm will the venture capitalist own?', nv / tot * 100, 'pct'), w: 0.6 },
-      { part: N('What will be the value of your shares?', N0 * pr / 1e6, 'm'), w: 0.7 },
+      { part: N('What is the post-money valuation after this funding round?', tot * pr / 1e6, 'm', { key: 'post' }), must: true },
+      { part: N('What is the pre-money valuation?', old * pr / 1e6, 'm', { key: 'pre' }), w: 0.4 },
+      { part: N('What percentage of the firm will you own?', N0 / tot * 100, 'pct', { key: 'ownPct' }), w: 0.7 },
+      { part: N('What percentage of the firm will the venture capitalist own?', nv / tot * 100, 'pct', { key: 'vcPct' }), w: 0.6 },
+      { part: N('What will be the value of your shares?', N0 * pr / 1e6, 'm', { key: 'myVal' }), w: 0.7 },
     ];
   } else {
     const pre = roundTo(old * rstep(0.5, 6, 0.05), 100000), I = rstep(0.5, 10, 0.25) * 1e6;
     const pr = pre / old, nv = I / pr, tot = old + nv;
     body = founder + ` A venture capitalist offers to invest ${eur(I)} at a pre-money valuation of ${eur(pre)}.`;
+    cc.r(`**Price per share:** pre-money valuation divided by the old shares, $\\frac{${tn(pre, 0)}}{${tn(old, 0)}} = ${tn(pr, 4)}$ (€).`, 'price', pr);
+    cc.r(`**New shares:** $\\frac{I}{\\text{price}} = \\frac{${tn(I, 0)}}{${tn(pr, 4)}} = ${tn(nv, 4)}$, i.e. $${tn(nv / 1e6, 6)}$ million.`, 'nv', nv / 1e6);
+    cc.r(`**Post-money valuation:** $${tn(pre, 0)} + ${tn(I, 0)} = ${tn(pre + I, 0)}$ (€), i.e. $${mi(pre + I)}$ (€ million).`, 'post', (pre + I) / 1e6);
+    cc.s(`**Total shares after the round:** $${tn(old, 0)} + ${tn(nv, 4)} = ${tn(tot, 4)}$.`);
+    cc.r(`**Your ownership:** $\\frac{${tn(N0, 0)}}{${tn(tot, 4)}} = ${tn(N0 / tot, 6)}$, i.e. $${tp(N0 / tot)}$.`, 'ownPct', N0 / tot * 100);
+    cc.r(`**Multiple on your investment:** $\\frac{N_0 \\times \\text{price}}{\\text{initial investment}} = \\frac{${tn(N0, 0)} \\times ${tn(pr, 4)}}{${tn(inv0, 0)}} = \\frac{${tn(N0 * pr, 2)}}{${tn(inv0, 0)}} = ${tn(N0 * pr / inv0, 4)}$.`, 'multiple', N0 * pr / inv0);
     items = [
-      { part: N('What is the price per share in this round?', pr, 'eur', { abs: 0.006 }), must: true },
-      { part: N('How many shares will the venture capitalist receive?', nv / 1e6, 'msh'), w: 0.6 },
-      { part: N('What is the post-money valuation?', (pre + I) / 1e6, 'm'), w: 0.5 },
-      { part: N('What percentage of the firm will you own after the round?', N0 / tot * 100, 'pct'), w: 0.7 },
-      { part: N('By what multiple has the value of your shares increased relative to your initial investment?', N0 * pr / inv0, 'x'), w: 0.3 },
+      { part: N('What is the price per share in this round?', pr, 'eur', { abs: 0.006, key: 'price' }), must: true },
+      { part: N('How many shares will the venture capitalist receive?', nv / 1e6, 'msh', { key: 'nv' }), w: 0.6 },
+      { part: N('What is the post-money valuation?', (pre + I) / 1e6, 'm', { key: 'post' }), w: 0.5 },
+      { part: N('What percentage of the firm will you own after the round?', N0 / tot * 100, 'pct', { key: 'ownPct' }), w: 0.7 },
+      { part: N('By what multiple has the value of your shares increased relative to your initial investment?', N0 * pr / inv0, 'x', { key: 'multiple' }), w: 0.3 },
     ];
   }
-  return Q('L6.vc', 6, p_(body), chooseParts(items, 3, 5));
+  return withCalc(Q('L6.vc', 6, p_(body), chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L6_rounds(): Question {
@@ -776,14 +1055,23 @@ export function L6_rounds(): Question {
   const NC = roundTo((NA + NB) * rstep(0.1, 0.35, 0.01), 1000), pC = r2(pB * rstep(1.5, 4, 0.1));
   const body = p_(`${name} was founded by a single entrepreneur, whose initial investment of ${eur(NA * pA, 0)} represented ${sh(NA)} shares of Series A preferred stock (a purchase price of about ${eur(pA)} per share). To raise additional capital, ${name} sold ${sh(NB)} shares of Series B preferred stock to an angel investor at ${eur(pB)} per share. A year later, venture capital firms bought ${sh(NC)} shares of Series C preferred stock at ${eur(pC)} per share. Treat all preferred shares as equivalent to common shares.`);
   const items: Item[] = [
-    { part: N('What is the pre-money valuation of the Series B round?', NA * pB / 1e6, 'm'), w: 0.6 },
-    { part: N('What is the post-money valuation of the Series B round?', (NA + NB) * pB / 1e6, 'm'), w: 0.6 },
-    { part: N('What fraction of the firm does the founder own after the Series B round?', NA / (NA + NB) * 100, 'pct'), w: 0.5 },
-    { part: N('What is the post-money valuation of the Series C round?', (NA + NB + NC) * pC / 1e6, 'm'), must: true },
-    { part: N('What fraction of the firm does the founder own after the Series C round?', NA / (NA + NB + NC) * 100, 'pct'), w: 0.6 },
-    { part: N('What is the value of the angel investor’s stake after the Series C round?', NB * pC / 1e6, 'm'), w: 0.4 },
+    { part: N('What is the pre-money valuation of the Series B round?', NA * pB / 1e6, 'm', { key: 'preB' }), w: 0.6 },
+    { part: N('What is the post-money valuation of the Series B round?', (NA + NB) * pB / 1e6, 'm', { key: 'postB' }), w: 0.6 },
+    { part: N('What fraction of the firm does the founder own after the Series B round?', NA / (NA + NB) * 100, 'pct', { key: 'ownB' }), w: 0.5 },
+    { part: N('What is the post-money valuation of the Series C round?', (NA + NB + NC) * pC / 1e6, 'm', { key: 'postC' }), must: true },
+    { part: N('What fraction of the firm does the founder own after the Series C round?', NA / (NA + NB + NC) * 100, 'pct', { key: 'ownC' }), w: 0.6 },
+    { part: N('What is the value of the angel investor’s stake after the Series C round?', NB * pC / 1e6, 'm', { key: 'angel' }), w: 0.4 },
   ];
-  return Q('L6.rounds', 6, body, chooseParts(items, 3, 5));
+  const cc = calc();
+  cc.r(`**Pre-money valuation, Series B:** shares before the round times the Series B price, $${tn(NA, 0)} \\times ${tn(pB, 2)} = ${tn(NA * pB, 2)}$ (€), i.e. $${tn(NA * pB / 1e6, 4)}$ (€ million).`, 'preB', NA * pB / 1e6);
+  cc.s(`**Shares after Series B:** $${tn(NA, 0)} + ${tn(NB, 0)} = ${tn(NA + NB, 0)}$.`);
+  cc.r(`**Post-money valuation, Series B:** $${tn(NA + NB, 0)} \\times ${tn(pB, 2)} = ${tn((NA + NB) * pB, 2)}$ (€), i.e. $${tn((NA + NB) * pB / 1e6, 4)}$ (€ million).`, 'postB', (NA + NB) * pB / 1e6);
+  cc.r(`**Founder's stake after Series B:** $\\frac{${tn(NA, 0)}}{${tn(NA + NB, 0)}} = ${tn(NA / (NA + NB), 6)}$, i.e. $${tp(NA / (NA + NB))}$.`, 'ownB', NA / (NA + NB) * 100);
+  cc.s(`**Shares after Series C:** $${tn(NA + NB, 0)} + ${tn(NC, 0)} = ${tn(NA + NB + NC, 0)}$.`);
+  cc.r(`**Post-money valuation, Series C:** $${tn(NA + NB + NC, 0)} \\times ${tn(pC, 2)} = ${tn((NA + NB + NC) * pC, 2)}$ (€), i.e. $${tn((NA + NB + NC) * pC / 1e6, 4)}$ (€ million).`, 'postC', (NA + NB + NC) * pC / 1e6);
+  cc.r(`**Founder's stake after Series C:** $\\frac{${tn(NA, 0)}}{${tn(NA + NB + NC, 0)}} = ${tn(NA / (NA + NB + NC), 6)}$, i.e. $${tp(NA / (NA + NB + NC))}$.`, 'ownC', NA / (NA + NB + NC) * 100);
+  cc.r(`**Angel investor's stake after Series C:** the ${tn(NB, 0)} shares are valued at the Series C price, $${tn(NB, 0)} \\times ${tn(pC, 2)} = ${tn(NB * pC, 2)}$ (€), i.e. $${tn(NB * pC / 1e6, 4)}$ (€ million).`, 'angel', NB * pC / 1e6);
+  return withCalc(Q('L6.rounds', 6, body, chooseParts(items, 3, 5)), cc.steps);
 }
 
 export function L6_spac(): Question {
@@ -804,16 +1092,31 @@ export function L6_spac(): Question {
   const body = p_(`${name} announces that it will go public in a merger with a SPAC, ${spac}. The SPAC raised ${eur(10 * U, 0)} million in its IPO by issuing ${fmtNum(U)} million units at €10 per unit. Each unit consisted of one share of common stock and ${wT} with a strike price of €11.50 per share. The sponsor received ${fmtNum(Ws)} million warrants in addition to the standard 20% promote (20% of SPAC ownership, conditional on completing a deal). The SPAC has also arranged to raise ${eur(PIPE)} million from PIPE investors at ${eur(pPipe)} per share.`) +
     p_(`Under the terms of the merger, ${poss(name)} current shareholders receive ${fmtNum(T)} million shares. Fees associated with the merger are expected to be ${eur(fee)} million.${red ? ` Before the merger closes, holders of ${P(red, 0)} of the SPAC’s public shares redeem them for €10 per share.` : ' Assume no SPAC shares are redeemed.'} Shortly after the deal closes, all warrants are exercised on a cashless basis at a share price of ${eur(Pw)}.`);
   const items: Item[] = [
-    { part: N('How many shares does the sponsor receive as its promote?', prom, 'msh'), w: 0.4 },
-    { part: N('How many SPAC shares are outstanding just prior to the merger (after any redemptions)?', S0, 'msh'), w: 0.45 },
-    { part: N('How many warrants are outstanding in total?', W, 'msh_w'), w: 0.4 },
-    { part: N('How much cash is available at the close of the deal, net of fees?', cash - fee, 'm'), w: 0.5 },
-    { part: N('How many new shares are issued in the cashless warrant exercise?', wsh, 'msh'), w: 0.5 },
-    { part: N(`What is the effective price per share at which ${name} issued shares in its “IPO” (gross cash raised divided by shares issued to non-target shareholders)?`, eff, 'eur'), must: true },
-    { part: N('What is the implied post-deal equity value?', eff * tot / 1000, 'bn'), w: 0.4 },
-    { part: N('What are the direct fees as a percentage of the gross cash raised?', fee / cash * 100, 'pct'), w: 0.3 },
-    { part: N(`On the first day of trading after the close, ${poss(name)} shares trade at ${eur(first)}. What is the implied underpricing?`, (first / eff - 1) * 100, 'pct'), w: 0.3 },
+    { part: N('How many shares does the sponsor receive as its promote?', prom, 'msh', { key: 'prom' }), w: 0.4 },
+    { part: N('How many SPAC shares are outstanding just prior to the merger (after any redemptions)?', S0, 'msh', { key: 'S0' }), w: 0.45 },
+    { part: N('How many warrants are outstanding in total?', W, 'msh_w', { key: 'W' }), w: 0.4 },
+    { part: N('How much cash is available at the close of the deal, net of fees?', cash - fee, 'm', { key: 'cashNet' }), w: 0.5 },
+    { part: N('How many new shares are issued in the cashless warrant exercise?', wsh, 'msh', { key: 'wsh' }), w: 0.5 },
+    { part: N(`What is the effective price per share at which ${name} issued shares in its “IPO” (gross cash raised divided by shares issued to non-target shareholders)?`, eff, 'eur', { key: 'eff' }), must: true },
+    { part: N('What is the implied post-deal equity value?', eff * tot / 1000, 'bn', { key: 'equity' }), w: 0.4 },
+    { part: N('What are the direct fees as a percentage of the gross cash raised?', fee / cash * 100, 'pct', { key: 'feePct' }), w: 0.3 },
+    { part: N(`On the first day of trading after the close, ${poss(name)} shares trade at ${eur(first)}. What is the implied underpricing?`, (first / eff - 1) * 100, 'pct', { key: 'under' }), w: 0.3 },
   ];
-  return Q('L6.spac', 6, body, chooseParts(items, 4, 5));
+  const cc = calc(), wf = w === 1 / 3 ? '\\frac{1}{3}' : tn(w, 2), Wpub = w * U, nwB = Pw - K;
+  cc.r(`**Sponsor promote:** 20% of the post-IPO SPAC shares, $\\frac{0.20}{1 - 0.20} \\times U = 0.25 \\times ${tn(U)} = ${tn(prom, 4)}$ million shares.`, 'prom', prom);
+  if (red) cc.s(`**Public shares after redemptions:** $U (1 - ${tn(red, 2)}) = ${tn(U)} \\times ${tn(1 - red, 2)} = ${tn(Upub, 4)}$ million.`);
+  cc.s(`**PIPE shares:** $\\frac{${tn(PIPE, 4)}}{${tn(pPipe, 2)}} = ${tn(pipeN, 4)}$ million shares (€ million raised divided by the price).`);
+  cc.r(`**Shares outstanding before the merger:** public shares + promote + PIPE $= ${tn(Upub, 4)} + ${tn(prom, 4)} + ${tn(pipeN, 4)} = ${tn(S0, 4)}$ million.`, 'S0', S0);
+  cc.r(`**Total warrants:** $w \\times U + W_s = ${wf} \\times ${tn(U)} + ${tn(Ws, 2)} = ${tn(Wpub, 4)} + ${tn(Ws, 2)} = ${tn(W, 4)}$ million.`, 'W', W);
+  cc.s(`**Gross cash:** $10 \\times ${tn(Upub, 4)} + ${tn(PIPE, 4)} = ${tn(cash, 4)}$ (€ million).`);
+  cc.r(`**Cash net of fees:** $${tn(cash, 4)} - ${tn(fee)} = ${tn(cash - fee, 4)}$ (€ million).`, 'cashNet', cash - fee);
+  cc.r(`**New shares from the cashless exercise:** $W \\times \\frac{P - K}{P} = ${tn(W, 4)} \\times \\frac{${tn(Pw, 2)} - ${tn(K, 2)}}{${tn(Pw, 2)}} = ${tn(W, 4)} \\times \\frac{${tn(nwB, 2)}}{${tn(Pw, 2)}} = ${tn(W, 4)} \\times ${tn(nwB / Pw, 6)} = ${tn(wsh, 4)}$ million.`, 'wsh', wsh);
+  cc.s(`**Shares issued to non-target holders:** $${tn(S0, 4)} + ${tn(wsh, 4)} = ${tn(issued, 4)}$ million.`);
+  cc.r(`**Effective issue price:** $\\frac{\\text{gross cash}}{\\text{shares issued}} = \\frac{${tn(cash, 4)}}{${tn(issued, 4)}} = ${tn(eff, 4)}$ (€ per share).`, 'eff', eff);
+  cc.s(`**Total shares after the deal:** $${tn(S0, 4)} + ${tn(T)} + ${tn(wsh, 4)} = ${tn(tot, 4)}$ million.`);
+  cc.r(`**Post-deal equity value:** $${tn(eff, 4)} \\times ${tn(tot, 4)} = ${tn(eff * tot, 4)}$ (€ million), i.e. $${tn(eff * tot / 1000, 4)}$ (€ billion).`, 'equity', eff * tot / 1000);
+  cc.r(`**Fees as a share of gross cash:** $\\frac{${tn(fee)}}{${tn(cash, 4)}} = ${tn(fee / cash, 6)}$, i.e. $${tp(fee / cash)}$.`, 'feePct', fee / cash * 100);
+  cc.r(`**Underpricing:** $\\frac{P_{first}}{P_{eff}} - 1 = \\frac{${tn(first)}}{${tn(eff, 4)}} - 1 = ${tn(first / eff, 6)} - 1 = ${tn(first / eff - 1, 6)}$, i.e. $${tp(first / eff - 1)}$.`, 'under', (first / eff - 1) * 100);
+  return withCalc(Q('L6.spac', 6, body, chooseParts(items, 4, 5)), cc.steps);
 }
 

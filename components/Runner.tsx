@@ -9,7 +9,6 @@ import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, rev
 import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Answers, Graded, TypeDef } from '@/lib/engine/types';
-import ExplainButton from './Explain';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
 
@@ -252,7 +251,6 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
   const newest = cur.pos === cur.items.length - 1;
   // The cycle counts its round; when looking back, the header counts the questions kept in memory instead.
   const progress = cycleInfo && newest ? { pos: cycleInfo.pos, size: cycleInfo.size } : { pos: cur.pos + 1, size: cur.items.length };
-  const wrong = graded && graded.c < graded.a;
   const nav = cur.items.map((it, i) => {
     if (!isSeen(cur, i)) return 'unseen';
     if (!it.checked) return 'open';
@@ -280,10 +278,6 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
           ))}
         </nav>
         <QuestionView q={item.q} answers={answers} onChange={setAnswers} graded={graded} onSubmit={check} autoFocus />
-        <div className="theorylink" style={{ visibility: wrong ? 'visible' : 'hidden' }}>
-          <ExplainButton typeKey={type.key} hidden={!wrong} />
-          {theory ? <span>Revisit the lecture: <Link href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link></span> : ' '}
-        </div>
         <div className="actions">
           <div className="actl">
             <button type="button" className="linkbtn" style={{ visibility: cur.pos > 0 ? 'visible' : 'hidden' }} onClick={() => jump(cur.pos - 1)}>← Previous</button>

@@ -1,7 +1,7 @@
 // Investment and Financing Decisions: practice in the format of the Moodle quizzes and the practice exercises.
 // Cases with several steps keep numeric entry, single questions are multiple choice A–E with wrong options from
 // typical mistakes. Each set also covers content of the lecture and its additional material that the quizzes leave out.
-import { C, N, P, Q, chance, chooseParts, fmtNum, p_, pick, rint, roundTo, rstep, shuffle } from '@/lib/engine/gen-helpers';
+import { C, N, P, Q, calc, chance, chooseParts, fmtNum, p_, pick, rint, roundTo, rstep, shuffle, tn, tp, tq, withCalc } from '@/lib/engine/gen-helpers';
 import { CANNOT, mcNum, mcText, shortAnswer } from '@/lib/engine/mc';
 import type { Part, Question } from '@/lib/engine/types';
 import { BANK } from './concepts';
@@ -20,21 +20,30 @@ const one = (s: string) => (x: number) => (x < 0 ? '−' : '') + s + fmtNum(Math
 export function PS1_ipoMc(): Question {
   const d = G.ipoDraw(), { c } = d;
   const html = p_(`${d.name} has ${d.n0} million shares outstanding and issues ${d.nNew} million new shares in an IPO at ${c.one(d.P0, 0)} per share, with an underwriting spread of ${P(d.s, 0)}. The share price rises to ${c.one(d.P1, 0)} on the first day of trading.`);
+  const k = calc();
   if (chance(0.5)) {
+    k.r(`**Proceeds:** the firm gets the offer price minus the spread. $${d.nNew} \\times ${tn(d.P0, 0)} \\times (1 - ${tn(d.s, 2)}) = ${tn(d.nNew * d.P0, 2)} \\times ${tn(1 - d.s, 2)} = ${tn(d.raised, 4)}$ (${c.um}).`, 'ans', d.raised);
     return mcNum('PS1.ipoMc', '1', html + p_('How much money does the firm receive from the IPO?'), d.raised,
       [d.nNew * d.P0, d.nNew * d.P1 * (1 - d.s), d.nNew * d.P1, d.nNew * d.P0 * d.s, (d.n0 + d.nNew) * d.P0 * (1 - d.s)], mil(c.s),
-      { sol: p_(`The firm receives the offer price net of the spread: ${d.nNew}m × ${c.one(d.P0, 0)} × (1 − ${P(d.s, 0)}) = ${c.mil(d.raised)}. The first-day price goes to the investors who bought the shares.`) });
+      { calc: k.steps, sol: p_(`The firm receives the offer price net of the spread: ${d.nNew}m × ${c.one(d.P0, 0)} × (1 − ${P(d.s, 0)}) = ${c.mil(d.raised)}. The first-day price goes to the investors who bought the shares.`) });
   }
+  k.s(`**Underpricing:** the new shares were sold at ${c.u1}${tn(d.P0, 0)} but are worth ${c.u1}${tn(d.P1, 0)}. $${d.nNew} \\times (${tn(d.P1, 0)} - ${tn(d.P0, 0)}) = ${tn(d.under, 4)}$ (${c.um}).`);
+  k.s(`**Underwriting spread:** $${d.nNew} \\times ${tn(d.P0, 0)} \\times ${tn(d.s, 2)} = ${tn(d.direct, 4)}$ (${c.um}).`);
+  k.r(`**Total cost:** underpricing plus spread, $${tn(d.under, 4)} + ${tn(d.direct, 4)} = ${tn(d.total, 4)}$ (${c.um}).`, 'ans', d.total);
   return mcNum('PS1.ipoMc', '1', html + p_('What is the total cost to the original shareholders due to market imperfections?'), d.total,
     [d.under, d.direct, d.n0 * (d.P1 - d.P0), (d.n0 + d.nNew) * (d.P1 - d.P0), d.mv - d.raised], mil(c.s),
-    { sol: p_(`Underpricing ${d.nNew}m × (${c.one(d.P1, 0)} − ${c.one(d.P0, 0)}) = ${c.mil(d.under)} plus the spread ${d.nNew}m × ${c.one(d.P0, 0)} × ${P(d.s, 0)} = ${c.mil(d.direct)}: ${c.mil(d.total)}. Equivalently, in a perfect market the old shares would be worth ${c.mil(d.mv)} − ${c.mil(d.raised)} = ${c.mil(d.pre)}, against ${c.mil(d.n0 * d.P1)} now.`) });
+    { calc: k.steps, sol: p_(`Underpricing ${d.nNew}m × (${c.one(d.P1, 0)} − ${c.one(d.P0, 0)}) = ${c.mil(d.under)} plus the spread ${d.nNew}m × ${c.one(d.P0, 0)} × ${P(d.s, 0)} = ${c.mil(d.direct)}: ${c.mil(d.total)}. Equivalently, in a perfect market the old shares would be worth ${c.mil(d.mv)} − ${c.mil(d.raised)} = ${c.mil(d.pre)}, against ${c.mil(d.n0 * d.P1)} now.`) });
 }
 
 export function PS1_rightsMc(): Question {
   const d = G.rightsDraw(), { c } = d;
   const html = p_(`${d.name} has ${d.n} million shares outstanding at ${c.one(d.P0, 0)}. In a rights issue each shareholder receives one right per share, and ${d.k} rights buy one new share at ${c.one(d.X, 0)}. All rights are exercised. What is the share price after the rights issue?`);
   const sol = p_(`New shares ${d.n}m / ${d.k} = ${f2(d.n / d.k)}m raise ${c.mil(d.raised)}. Price = (${d.n}m × ${c.one(d.P0, 0)} + ${c.mil(d.raised)}) / ${f2(d.n + d.n / d.k)}m = ${c.one(d.post)}.`);
-  return mcNum('PS1.rightsMc', '1', html, d.post, [d.P0, d.X, (d.n * d.P0 + d.raised) / d.n, (d.P0 + d.X) / 2, d.P0 - d.X / d.k], one(c.s), { sol });
+  const k = calc(), newSh = d.n / d.k;
+  k.s(`**New shares:** ${d.k} rights buy one share, so $\\frac{${d.n}}{${d.k}} = ${tn(newSh, 4)}$ million new shares.`);
+  k.s(`**Money raised:** $${tn(newSh, 4)} \\times ${tn(d.X, 0)} = ${tn(d.raised, 4)}$ (${c.um}).`);
+  k.r(`**Share price after the issue:** $\\frac{${d.n} \\times ${tn(d.P0, 0)} + ${tn(d.raised, 4)}}{${d.n} + ${tn(newSh, 4)}} = \\frac{${tn(d.n * d.P0 + d.raised, 4)}}{${tn(d.n + newSh, 4)}} = ${tn(d.post, 4)}$ (${c.u1} per share).`, 'ans', d.post);
+  return mcNum('PS1.rightsMc', '1', html, d.post, [d.P0, d.X, (d.n * d.P0 + d.raised) / d.n, (d.P0 + d.X) / 2, d.P0 - d.X / d.k], one(c.s), { sol, calc: k.steps });
 }
 
 const PS1_short = () => shortAnswer('PS1.short', '1', BANK['1'].MC);
@@ -47,20 +56,29 @@ export function PS2_rating(): Question {
   const d = G.ardenDraw(), { c } = d;
   const html = p_(`${d.name} finances a new project costing ${c.mil(d.I, 0)} entirely with one-year zero-coupon bonds. The project pays ${c.mil(d.H, 0)} if demand is high and ${c.mil(d.L, 0)} if it is low; ${d.p === 0.5 ? 'both are equally likely' : `high demand has a probability of ${P(d.p, 0)}`}, and demand is uncorrelated with the market. The risk-free rate is ${pp(d.rf, 0)}; there are no bankruptcy costs.`) + G.ratingTable() + p_('Which credit rating is most consistent with the bonds’ default spread?');
   const sol = p_(`F = [${f2(d.I)} × ${f2(1 + d.rf)} − ${f2(1 - d.p)} × ${f2(d.L)}] / ${f2(d.p)} = ${f2(d.F)}; yield ${f2(d.F)}/${f2(d.I)} − 1 = ${pp(d.y)}; spread ${pp(d.s)}, nearest ${G.RATING_NAMES[G.ratingOf(d.s)]}.`);
-  return { ...Q('PS2.rating', '2', html, [C('Rating', G.RATING_NAMES, G.ratingOf(d.s))]), solution: sol };
+  const k = calc(), ri = G.ratingOf(d.s);
+  G.faceSteps(k, d, 'F');
+  k.s(`**Yield to maturity:** $\\frac{${tn(d.F, 4)}}{${tn(d.I, 2)}} - 1 = ${tn(d.F / d.I, 6)} - 1 = ${tn(d.y, 6)}$, i.e. $${tp(d.y, 2)}$.`);
+  k.s(`**Default spread:** $${tn(d.y, 6)} - ${tn(d.rf, 2)} = ${tn(d.s, 6)}$, i.e. $${tp(d.s, 2)}$.`);
+  k.r(`**Rating:** the spread of ${tn(d.s * 100, 2)}% is closest to the spread of ${G.RATING_NAMES[ri]} (${tn(G.RATINGS[ri][1] * 100, 2)}%) in the table, so the rating is ${G.RATING_NAMES[ri]}.`, 'rating');
+  return { ...withCalc(Q('PS2.rating', '2', html, [C('Rating', G.RATING_NAMES, ri, 'rating')]), k.steps), solution: sol };
 }
 
 export function PS2_faceMc(): Question {
   const d = G.ardenDraw(), { c } = d;
   const html = p_(`${d.name} finances a project costing ${c.mil(d.I, 0)} entirely with one-year zero-coupon bonds. The project pays ${c.mil(d.H, 0)} if demand is high and ${c.mil(d.L, 0)} if it is low; ${d.p === 0.5 ? 'both are equally likely' : `high demand has a probability of ${P(d.p, 0)}`}, and demand is uncorrelated with the market. The risk-free rate is ${pp(d.rf, 0)}; there are no bankruptcy costs and no other assets or liabilities.`);
-  const need = d.I * (1 + d.rf);
-  if (chance(0.55)) {
+  const need = d.I * (1 + d.rf), k = calc();
+  const faceFirst = chance(0.55);
+  if (faceFirst) {
+    G.faceSteps(k, d, 'ans');
     return mcNum('PS2.faceMc', '2', html + p_('What is the total face value of the debt?'), d.F, [need, need / d.p, need - (1 - d.p) * d.L, d.I / d.p, d.p * d.H + (1 - d.p) * d.L - d.L * 0.5], mil(c.s),
-      { sol: p_(`Bondholders get F if demand is high and the whole ${f2(d.L)} if it is low; with zero beta the bonds are priced at r<sub>f</sub>: ${f2(d.I)} = [${f2(d.p)}F + ${f2(1 - d.p)} × ${f2(d.L)}] / ${f2(1 + d.rf)}, so F = ${c.mil(d.F)}.`) });
+      { calc: k.steps, sol: p_(`Bondholders get F if demand is high and the whole ${f2(d.L)} if it is low; with zero beta the bonds are priced at r<sub>f</sub>: ${f2(d.I)} = [${f2(d.p)}F + ${f2(1 - d.p)} × ${f2(d.L)}] / ${f2(1 + d.rf)}, so F = ${c.mil(d.F)}.`) });
   }
+  G.faceSteps(k, d, 'F');
+  G.equitySteps(k, d, 'ans');
   return mcNum('PS2.faceMc', '2', html + p_('What is the market value of the equity immediately after the investment?'), d.E,
     [d.p * (d.H - d.F), (d.H - d.F) / (1 + d.rf), d.p * d.H + (1 - d.p) * d.L - d.I, d.p * (d.H - d.I) / (1 + d.rf)], mil(c.s),
-    { sol: p_(`F = ${f2(d.F)}. Equity gets ${f2(d.H)} − ${f2(d.F)} if demand is high and nothing otherwise: ${f2(d.p)} × ${f2(d.H - d.F)} / ${f2(1 + d.rf)} = ${c.mil(d.E)}, which is also project value minus the debt raised.`), last: CANNOT });
+    { calc: k.steps, sol: p_(`F = ${f2(d.F)}. Equity gets ${f2(d.H)} − ${f2(d.F)} if demand is high and nothing otherwise: ${f2(d.p)} × ${f2(d.H - d.F)} / ${f2(1 + d.rf)} = ${c.mil(d.E)}, which is also project value minus the debt raised.`), last: CANNOT });
 }
 
 export function PS2_bankruptcy(): Question {
@@ -78,10 +96,14 @@ export function PS2_yield(): Question {
   const B = (p * F + (1 - p) * L) / (1 + rf), y = F / B - 1, s = y - rf;
   const html = p_(`A company has a one-year zero-coupon bond with a face value of ${c}${F} million. With probability ${P(p, 0)} its project succeeds and the bond is repaid in full; otherwise the firm defaults and bondholders receive the project’s ${c}${L} million. The project’s cash flows are uncorrelated with the market and the risk-free rate is ${pp(rf, 1)}.`);
   const sol = p_(`B<sub>0</sub> = (${f2(p)} × ${F} + ${f2(1 - p)} × ${L}) / ${fmtNum(1 + rf, 3)} = ${f2(B)}; y = ${F}/${f2(B)} − 1 = ${pp(y)}; default spread ${pp(y)} − ${pp(rf, 1)} = ${pp(s)}.`);
-  const v = pick([0, 1, 2]);
-  if (v === 0) return mcNum('PS2.yield', '2', html + p_('What is the price of the bond today (in millions)?'), B, [F / (1 + rf), p * F + (1 - p) * L, p * F / (1 + rf), (p * F + (1 - p) * L) / (1 + rf + s)], one(c), { sol });
-  if (v === 1) return mcNum('PS2.yield', '2', html + p_('What is the bond’s yield to maturity?'), y, [rf, (F - B) / F, s, (p * F + (1 - p) * L) / B - 1, y + rf], x => pp(x), { sol });
-  return mcNum('PS2.yield', '2', html + p_('What is the bond’s default spread?'), s, [y, rf, (F - B) / F - rf, (1 - p) * (F - L) / F, s * (1 + rf) + rf], x => pp(x), { sol });
+  const v = pick([0, 1, 2]), k = calc(), cu = c === '€' ? '€' : 'USD';
+  const st = (i: number, md: string, val: number) => { if (i === v) k.r(md, 'ans', val); else k.s(md); };
+  st(0, `**Bond price:** the expected payoff discounted at the risk-free rate (zero beta). $\\frac{${tn(p, 2)} \\times ${tn(F, 2)} + ${tn(1 - p, 2)} \\times ${tn(L, 2)}}{1 + ${tn(rf, 3)}} = \\frac{${tn(p * F + (1 - p) * L, 4)}}{${tn(1 + rf, 3)}} = ${tn(B, 4)}$ (${cu} million).`, B);
+  if (v >= 1) st(1, `**Yield to maturity:** $\\frac{${tn(F, 2)}}{${tn(B, 4)}} - 1 = ${tn(F / B, 6)} - 1 = ${tn(y, 6)}$, i.e. $${tp(y, 2)}$.`, y);
+  if (v >= 2) st(2, `**Default spread:** yield minus the risk-free rate. $${tn(y, 6)} - ${tn(rf, 3)} = ${tn(s, 6)}$, i.e. $${tp(s, 2)}$.`, s);
+  if (v === 0) return mcNum('PS2.yield', '2', html + p_('What is the price of the bond today (in millions)?'), B, [F / (1 + rf), p * F + (1 - p) * L, p * F / (1 + rf), (p * F + (1 - p) * L) / (1 + rf + s)], one(c), { sol, calc: k.steps });
+  if (v === 1) return mcNum('PS2.yield', '2', html + p_('What is the bond’s yield to maturity?'), y, [rf, (F - B) / F, s, (p * F + (1 - p) * L) / B - 1, y + rf], x => pp(x), { sol, calc: k.steps });
+  return mcNum('PS2.yield', '2', html + p_('What is the bond’s default spread?'), s, [y, rf, (F - B) / F - rf, (1 - p) * (F - L) / F, s * (1 + rf) + rf], x => pp(x), { sol, calc: k.steps });
 }
 
 const PS2_short = () => shortAnswer('PS2.short', '2', BANK['2'].MC);
@@ -97,7 +119,20 @@ export function PS3_kappaMc(): Question {
     : p_(`She has no money and investors believe she will choose high effort. If she finances the start-up with ${v === 'equity' ? 'outside equity' : 'debt'}, what is the maximum κ for which she still chooses high effort?`));
   const sol = p_(`Own cash: κ ≤ ${f2(d.Eh)} − ${f2(d.El)} = ${f2(own)}. Equity: α = ${f2(d.I)}/${f2(d.Eh)} = ${fmtNum(d.alpha, 4)}, κ ≤ (1 − α) × ${f2(own)} = ${f2(d.kE)}. Debt: F = ${f2(d.F)}, κ ≤ ${f2(d.kD)}.`);
   const ans = v === 'own' ? own : v === 'equity' ? d.kE : d.kD;
-  return mcNum('PS3.kappaMc', '3', html, ans, [own, d.kE, d.kD, d.alpha * own, own - d.kD, d.kD * 2], mil(c.s), { sol, step: 1 });
+  const k = calc(), tms = (p: number[]) => d.V.map((x, i) => `${tn(p[i], 2)} \\times ${tn(x, 2)}`).join(' + ');
+  k.s(`**Expected value with high effort:** $${tms(d.ph)} = ${tn(d.Eh, 4)}$ (${c.um}).`);
+  k.s(`**Expected value with low effort:** $${tms(d.pl)} = ${tn(d.El, 4)}$ (${c.um}).`);
+  if (v === 'own') k.r(`**Own cash:** she gets the whole gain from effort, so high effort is chosen if $\\kappa \\le ${tn(d.Eh, 4)} - ${tn(d.El, 4)} = ${tn(own, 4)}$ (${c.um}).`, 'ans', own);
+  else k.s(`**Own cash:** the gain from effort is $${tn(d.Eh, 4)} - ${tn(d.El, 4)} = ${tn(own, 4)}$ (${c.um}).`);
+  if (v === 'equity') {
+    k.s(`**Equity stake:** investors break even if $\\alpha \\times ${tn(d.Eh, 4)} = ${tn(d.I, 2)}$, so $\\alpha = \\frac{${tn(d.I, 2)}}{${tn(d.Eh, 4)}} = ${tn(d.alpha, 6)}$.`);
+    k.r(`**Maximum κ:** she keeps $1 - \\alpha$ of the gain. $\\kappa \\le (1 - ${tn(d.alpha, 6)}) \\times ${tn(own, 4)} = ${tn(1 - d.alpha, 6)} \\times ${tn(own, 4)} = ${tn(d.kE, 4)}$ (${c.um}).`, 'ans', d.kE);
+  }
+  if (v === 'debt') {
+    k.s(`**Face value:** with high effort investors expect $${tn(d.ph[0], 2)} F + ${tn(d.ph[1], 2)} \\times ${tn(d.V[1], 2)} = ${tn(d.I, 2)}$, so $F = \\frac{${tn(d.I, 2)} - ${tn(d.ph[1] * d.V[1], 4)}}{${tn(d.ph[0], 2)}} = ${tn(d.F, 4)}$ (${c.um}).`);
+    k.r(`**Maximum κ:** she keeps everything above $F$, and only the best state exceeds it. $\\kappa \\le (${tn(d.ph[0], 2)} - ${tn(d.pl[0], 2)}) \\times (${tn(d.V[0], 2)} - ${tn(d.F, 4)}) = ${tn(d.ph[0] - d.pl[0], 2)} \\times ${tn(d.V[0] - d.F, 4)} = ${tn(d.kD, 4)}$ (${c.um}).`, 'ans', d.kD);
+  }
+  return mcNum('PS3.kappaMc', '3', html, ans, [own, d.kE, d.kD, d.alpha * own, own - d.kD, d.kD * 2], mil(c.s), { sol, step: 1, calc: k.steps });
 }
 
 export function PS3_pecking(): Question {
@@ -138,22 +173,42 @@ export function PS3_hotel(): Question {
   const prior = d.q === 0.5 ? 'assign an equal probability to each type' : `believe that the hotel is a “star” with probability ${P(d.q, 0)}`;
   const html = p_(`An entrepreneur builds the first boutique hotel in an emerging neighbourhood of ${city} and funds it entirely with her own equity. Depending on her relations with travel agencies, the hotel is either a rising “star” or a “common” hotel. A star generates ${m(d.H)} with probability ${P(d.pS, 0)} and ${m(d.L)} otherwise; a common hotel generates ${m(d.H)} with probability ${P(d.pC, 0)} and ${m(d.L)} otherwise. The entrepreneur knows her type; outside investors do not and ${prior}. The discount rate is zero and the hotel generates a single cash flow at the end of the period.`) +
     p_(`She can launch an advertising campaign costing ${m(d.K)}, which raises the probability of the high cash flow by ${fmtNum(d.up * 100, 0)} percentage points for either type. ${G.inMillions(c)}`);
-  const ret = (t: string, eq: boolean) => C(`Entrepreneurs of ${t} hotels retain … the full NPV of the campaign${eq ? ' (equity)' : ' (debt)'}.`, RETAIN, eq ? (t === '“star”' ? 0 : 2) : 1);
+  const ret = (t: string, eq: boolean, key: string) => C(`Entrepreneurs of ${t} hotels retain … the full NPV of the campaign${eq ? ' (equity)' : ' (debt)'}.`, RETAIN, eq ? (t === '“star”' ? 0 : 2) : 1, key);
   const parts = chooseParts([
-    { part: N('What is the market value of the hotel’s equity before the campaign?', d.V0, c.m), w: 0.6 },
-    { part: [N('What is its true value if it is a “star” hotel?', d.VS, c.m), N('… and if it is a “common” hotel?', d.VC, c.m)], w: 0.6 },
-    { part: [N('The campaign is financed with outside equity and investors infer nothing from the choice. True value to a “star” entrepreneur?', d.eqS, c.m), N('… and to a “common” entrepreneur?', d.eqC, c.m)], must: true },
-    { part: [ret('“star”', true), ret('“common”', true)], w: 0.6 },
-    { part: [N('Financed with debt instead (investors still infer nothing): true value of a “star” hotel’s equity?', d.dS, c.m), N('… and of a “common” hotel’s equity?', d.dC, c.m)], w: 0.6 },
-    { part: [ret('“star”', false), ret('“common”', false)], w: 0.35 },
-    { part: [C('Investors are sophisticated. Who would be willing to issue equity?', WHO, 1), C('… and who would be willing to issue debt?', WHO, 2)], w: 0.7 },
-    { part: N('What fraction of the equity would you ask from an entrepreneur who issues equity?', d.sep * 100, 'pct'), w: 0.7 },
+    { part: N('What is the market value of the hotel’s equity before the campaign?', d.V0, c.m, { key: 'V0' }), w: 0.6 },
+    { part: [N('What is its true value if it is a “star” hotel?', d.VS, c.m, { key: 'VS' }), N('… and if it is a “common” hotel?', d.VC, c.m, { key: 'VC' })], w: 0.6 },
+    { part: [N('The campaign is financed with outside equity and investors infer nothing from the choice. True value to a “star” entrepreneur?', d.eqS, c.m, { key: 'eqS' }), N('… and to a “common” entrepreneur?', d.eqC, c.m, { key: 'eqC' })], must: true },
+    { part: [ret('“star”', true, 'retSe'), ret('“common”', true, 'retCe')], w: 0.6 },
+    { part: [N('Financed with debt instead (investors still infer nothing): true value of a “star” hotel’s equity?', d.dS, c.m, { key: 'dS' }), N('… and of a “common” hotel’s equity?', d.dC, c.m, { key: 'dC' })], w: 0.6 },
+    { part: [ret('“star”', false, 'retSd'), ret('“common”', false, 'retCd')], w: 0.35 },
+    { part: [C('Investors are sophisticated. Who would be willing to issue equity?', WHO, 1, 'whoE'), C('… and who would be willing to issue debt?', WHO, 2, 'whoD')], w: 0.7 },
+    { part: N('What fraction of the equity would you ask from an entrepreneur who issues equity?', d.sep * 100, 'pct', { key: 'sep' }), w: 0.7 },
   ], 4, 7);
+  const k = calc(), spread = d.H - d.L, gain = d.up * spread, t2 = (x: number) => tn(x, 2);
+  k.r(`**True value of a star hotel:** $${t2(d.L)} + ${t2(d.pS)} \\times (${t2(d.H)} - ${t2(d.L)}) = ${t2(d.L)} + ${t2(d.pS)} \\times ${t2(spread)} = ${tn(d.VS, 4)}$ (${c.um}).`, 'VS', d.VS);
+  k.r(`**True value of a common hotel:** $${t2(d.L)} + ${t2(d.pC)} \\times ${t2(spread)} = ${tn(d.VC, 4)}$ (${c.um}).`, 'VC', d.VC);
+  k.r(`**Market value before the campaign:** investors use the average of the two types. $${t2(d.q)} \\times ${tn(d.VS, 4)} + ${t2(1 - d.q)} \\times ${tn(d.VC, 4)} = ${tn(d.V0, 4)}$ (${c.um}).`, 'V0', d.V0);
+  k.s(`**Value of the campaign:** it raises the probability of the high cash flow by ${t2(d.up)}, so it adds $${t2(d.up)} \\times ${t2(spread)} = ${tn(gain, 4)}$ at a cost of ${t2(d.K)}. NPV $${tn(gain, 4)} - ${t2(d.K)} = ${tn(d.npv, 4)}$ (${c.um}), for either type.`);
+  k.s(`**Values after the campaign:** star $${t2(d.L)} + (${t2(d.pS)} + ${t2(d.up)}) \\times ${t2(spread)} = ${tn(d.VS1, 4)}$, common $${t2(d.L)} + (${t2(d.pC)} + ${t2(d.up)}) \\times ${t2(spread)} = ${tn(d.VC1, 4)}$ (${c.um}).`);
+  k.s(`**Pooled value after the campaign:** $${t2(d.q)} \\times ${tn(d.VS1, 4)} + ${t2(1 - d.q)} \\times ${tn(d.VC1, 4)} = ${tn(d.pooled, 4)}$ (${c.um}).`);
+  k.s(`**Equity stake sold:** $\\alpha = \\frac{${t2(d.K)}}{${tn(d.pooled, 4)}} = ${tn(d.alpha, 6)}$.`);
+  k.r(`**Star, equity:** $(1 - ${tn(d.alpha, 6)}) \\times ${tn(d.VS1, 4)} = ${tn(1 - d.alpha, 6)} \\times ${tn(d.VS1, 4)} = ${tn(d.eqS, 4)}$ (${c.um}).`, 'eqS', d.eqS);
+  k.r(`**Common, equity:** $${tn(1 - d.alpha, 6)} \\times ${tn(d.VC1, 4)} = ${tn(d.eqC, 4)}$ (${c.um}).`, 'eqC', d.eqC);
+  k.r(`**Star retains:** the gain is $${tn(d.eqS, 4)} - ${tn(d.VS, 4)} = ${tq(d.eqS - d.VS, 4)}$, compared with the NPV of ${tn(d.npv, 4)}. It is ${d.eqS - d.VS < d.npv ? 'less than' : 'not less than'} the full NPV, because the equity is sold too cheaply.`, 'retSe');
+  k.r(`**Common retains:** the gain is $${tn(d.eqC, 4)} - ${tn(d.VC, 4)} = ${tq(d.eqC - d.VC, 4)}$, compared with the NPV of ${tn(d.npv, 4)}. It is ${d.eqC - d.VC > d.npv ? 'more than' : 'not more than'} the full NPV, because the equity is sold at a price that is too high.`, 'retCe');
+  k.s(`**Debt is riskless:** the low cash flow ${t2(d.L)} covers the debt of ${t2(d.K)}, so it is fairly priced for both types.`);
+  k.r(`**Star, debt:** $${tn(d.VS1, 4)} - ${t2(d.K)} = ${tn(d.dS, 4)}$ (${c.um}).`, 'dS', d.dS);
+  k.r(`**Common, debt:** $${tn(d.VC1, 4)} - ${t2(d.K)} = ${tn(d.dC, 4)}$ (${c.um}).`, 'dC', d.dC);
+  k.r(`**Star retains with debt:** the gain is $${tn(d.dS, 4)} - ${tn(d.VS, 4)} = ${tn(d.dS - d.VS, 4)}$, exactly the NPV of ${tn(d.npv, 4)}.`, 'retSd');
+  k.r(`**Common retains with debt:** the gain is $${tn(d.dC, 4)} - ${tn(d.VC, 4)} = ${tn(d.dC - d.VC, 4)}$, exactly the NPV of ${tn(d.npv, 4)}.`, 'retCd');
+  k.r(`**Who issues equity:** a star would get ${tn(d.eqS - d.VS, 4)} from equity but the full ${tn(d.npv, 4)} from debt, so she avoids equity. Sophisticated investors infer that an equity issuer is a common hotel: only common entrepreneurs issue equity.`, 'whoE');
+  k.r(`**Who issues debt:** the debt is riskless and fairly priced for both types, so each keeps the full NPV of ${tn(d.npv, 4)}. Both types are willing to issue debt.`, 'whoD');
+  k.r(`**Fraction of equity:** an equity issuer is known to be common, so investors value the firm at ${tn(d.VC1, 4)}. $\\alpha = \\frac{${t2(d.K)}}{${tn(d.VC1, 4)}} = ${tn(d.sep, 6)}$, i.e. $${tp(d.sep, 2)}$.`, 'sep', d.sep * 100);
   const sol = p_(`True values: star ${f2(d.L)} + ${f2(d.pS)} × ${f2(d.H - d.L)} = ${f2(d.VS)}, common ${f2(d.VC)}; the market prices the average, ${f2(d.q)} × ${f2(d.VS)} + ${f2(1 - d.q)} × ${f2(d.VC)} = ${c.mil(d.V0)}. The campaign adds ${f2(d.up)} × ${f2(d.H - d.L)} = ${f2(d.up * (d.H - d.L))} for ${f2(d.K)}: NPV ${c.mil(d.npv)} for either type (star ${f2(d.VS1)}, common ${f2(d.VC1)}).`) +
     p_(`Equity at the pooled price: α = ${f2(d.K)} / ${f2(d.pooled)} = ${fmtNum(d.alpha, 4)}. Star keeps ${fmtNum(1 - d.alpha, 4)} × ${f2(d.VS1)} = ${c.mil(d.eqS)}, a gain of ${f2(d.eqS - d.VS)} < ${f2(d.npv)} (the shares are underpriced); common keeps ${c.mil(d.eqC)}, a gain of ${f2(d.eqC - d.VC)} > ${f2(d.npv)}.`) +
     p_(`Debt: the low cash flow ${f2(d.L)} covers ${f2(d.K)}, so the debt is riskless and fairly priced for both: star ${f2(d.VS1)} − ${f2(d.K)} = ${c.mil(d.dS)}, common ${c.mil(d.dC)}; both keep exactly the NPV.`) +
     p_(`Sophisticated investors know a star would never sell underpriced equity, so only common hotels issue equity, and both types can issue debt. An equity issuer is a common hotel: α = ${f2(d.K)} / ${f2(d.VC1)} = ${fmtNum(d.sep, 3)} (${pp(d.sep)}).`);
-  return { ...Q('PS3.hotel', '3', html, parts), solution: sol };
+  return { ...withCalc(Q('PS3.hotel', '3', html, parts), k.steps), solution: sol };
 }
 
 const PS3_short = () => shortAnswer('PS3.short', '3', BANK['3'].MC);
@@ -188,26 +243,34 @@ export function PS4_relevant(): Question {
 export function PS4_npvMc(): Question {
   const d = G.npvDraw(), { I, cf, study, machine, cann, hq, r } = d;
   const wrongs = [d.wrong, d.pv([-I, ...cf], r), d.pv([-I - machine, ...cf], r), d.pv([-I, ...cf.map(x => x - cann)], r), d.flows.reduce((a, x) => a + x, 0), d.pv([-I - study - machine, ...cf.map(x => x - cann - hq)], r)];
-  return mcNum('PS4.npvMc', '4', d.html + p_('What is the NPV of the project?'), d.npv, wrongs, one(d.c.s), { sol: G.npvSolution(d) });
+  const k = calc();
+  G.npvSteps(k, d, 'ans');
+  return mcNum('PS4.npvMc', '4', d.html + p_('What is the NPV of the project?'), d.npv, wrongs, one(d.c.s), { sol: G.npvSolution(d), calc: k.steps });
 }
 
 export function PS4_waccMc(): Question {
   const d = G.waccDraw(), { c } = d;
   const html = p_(`${d.name} is an all-equity company with a cost of capital of ${pp(d.rU, 1)}. It levers up to a debt-to-value ratio of ${P(d.dv, 0)}, kept constant, and debtholders expect ${pp(d.rD, 1)}. The tax rate is ${P(d.tau, 0)}. Free cash flows are ${c.mil(d.fcf, 1)} next year${d.g ? `, growing at ${pp(d.g, 1)} a year` : ' and every year'} forever.`);
   const sol = p_(`r<sub>E</sub> = ${pp(d.rU, 1)} + ${fmtNum(d.dv / (1 - d.dv), 3)} × (${pp(d.rU, 1)} − ${pp(d.rD, 1)}) = ${pp(d.rE)}; WACC = ${P(1 - d.dv, 0)} × ${pp(d.rE)} + ${P(d.dv, 0)} × ${pp(d.rD, 1)} × (1 − ${P(d.tau, 0)}) = ${pp(d.wacc)} = r<sub>U</sub> − D/V·τ·r<sub>D</sub>. Value ${f2(d.fcf)} / (${pp(d.wacc)}${d.g ? ` − ${pp(d.g, 1)}` : ''}) = ${c.mil(d.VL)}.`);
+  const k = calc();
   if (chance(0.5)) {
-    return mcNum('PS4.waccMc', '4', html + p_('What is the WACC?'), d.wacc, [d.rU, (1 - d.dv) * d.rE + d.dv * d.rD, d.rU - d.tau * d.rD, (1 - d.dv) * d.rU + d.dv * d.rD * (1 - d.tau), d.rE * (1 - d.tau)], x => pp(x), { sol });
+    G.waccSteps(k, d, 1, 'ans', 'VL');
+    return mcNum('PS4.waccMc', '4', html + p_('What is the WACC?'), d.wacc, [d.rU, (1 - d.dv) * d.rE + d.dv * d.rD, d.rU - d.tau * d.rD, (1 - d.dv) * d.rU + d.dv * d.rD * (1 - d.tau), d.rE * (1 - d.tau)], x => pp(x), { sol, calc: k.steps });
   }
   const gg = d.g;
-  return mcNum('PS4.waccMc', '4', html + p_('What is the value of the levered company?'), d.VL, [d.VU, d.fcf / ((1 - d.dv) * d.rE + d.dv * d.rD - gg), d.VU + d.tau * d.dv * d.VU, d.fcf / (d.rE - gg)], mil(c.s), { sol });
+  G.waccSteps(k, d, 1, 'wacc', 'ans');
+  return mcNum('PS4.waccMc', '4', html + p_('What is the value of the levered company?'), d.VL, [d.VU, d.fcf / ((1 - d.dv) * d.rE + d.dv * d.rD - gg), d.VU + d.tau * d.dv * d.VU, d.fcf / (d.rE - gg)], mil(c.s), { sol, calc: k.steps });
 }
 
 export function PS4_betaMc(): Question {
   const d = G.betaDraw();
   const html = p_(`A firm with an equity beta of ${f2(d.bE + 0.4)} considers a project in a new line of business. A pure player in that business has an equity beta of ${f2(d.bE)}, a debt-to-equity ratio of ${f2(d.de)} and a debt beta of ${f2(d.bD)}. The risk-free rate is ${pp(d.rf, 1)} and the market risk premium ${pp(d.mrp, 1)}.`);
   const sol = p_(`Use the pure player’s business risk: β<sub>U</sub> = (${f2(d.bE)} + ${f2(d.de)} × ${f2(d.bD)}) / (1 + ${f2(d.de)}) = ${fmtNum(d.bU, 4)}, so r<sub>U</sub> = ${pp(d.rf, 1)} + ${fmtNum(d.bU, 4)} × ${pp(d.mrp, 1)} = ${pp(d.rU)}. The firm’s own beta reflects its existing business, not the project.`);
+  const k = calc();
+  k.s(`**Unlevered beta of the pure player:** $\\beta_U = \\frac{\\beta_E + \\frac{D}{E}\\beta_D}{1 + \\frac{D}{E}} = \\frac{${tn(d.bE, 2)} + ${tn(d.de, 2)} \\times ${tn(d.bD, 2)}}{1 + ${tn(d.de, 2)}} = \\frac{${tn(d.bE + d.de * d.bD, 4)}}{${tn(1 + d.de, 2)}} = ${tn(d.bU, 4)}$.`);
+  k.r(`**Cost of capital (CAPM):** $r_U = r_f + \\beta_U \\times \\text{MRP} = ${tn(d.rf, 3)} + ${tn(d.bU, 4)} \\times ${tn(d.mrp, 3)} = ${tn(d.rf, 3)} + ${tn(d.bU * d.mrp, 6)} = ${tn(d.rU, 6)} = ${tp(d.rU, 2)}$.`, 'ans', d.rU);
   return mcNum('PS4.betaMc', '4', html + p_('What is the project’s cost of capital if it is all-equity financed?'), d.rU,
-    [d.rf + d.bE * d.mrp, d.rf + (d.bE + 0.4) * d.mrp, d.rf + d.bE / (1 + d.de) * d.mrp, d.bU * d.mrp, d.rf + (d.bE * (1 + d.de)) * d.mrp], x => pp(x), { sol });
+    [d.rf + d.bE * d.mrp, d.rf + (d.bE + 0.4) * d.mrp, d.rf + d.bE / (1 + d.de) * d.mrp, d.bU * d.mrp, d.rf + (d.bE * (1 + d.de)) * d.mrp], x => pp(x), { sol, calc: k.steps });
 }
 
 export function PS4_terminalMc(): Question {
@@ -215,15 +278,17 @@ export function PS4_terminalMc(): Question {
   if (chance(0.5)) {
     const sale = rstep(2, 8, 0.5), book = rstep(0, 6, 0.5);
     if (Math.abs(sale - book) < 0.5) return PS4_terminalMc();
-    const salv = sale - tau * (sale - book);
+    const salv = sale - tau * (sale - book), k = calc();
+    k.r(`**After-tax cash flow:** only the gain over book value is taxed (a loss gives a tax credit). $${tn(sale, 2)} - ${tn(tau, 2)} \\times (${tn(sale, 2)} - ${tn(book, 2)}) = ${tn(sale, 2)} - ${tn(tau, 2)} \\times ${tq(sale - book, 2)} = ${tn(salv, 4)}$ (${c === '€' ? '€' : 'USD'} million).`, 'ans', salv);
     return mcNum('PS4.terminalMc', '4', p_(`At the end of a project, equipment with a book value of ${c}${f2(book)} million is sold for ${c}${f2(sale)} million. The tax rate is ${P(tau, 0)}. What after-tax cash flow does the sale bring?`), salv,
       [sale, sale * (1 - tau), book, sale + tau * (sale - book), book + (1 - tau) * sale], mil(c),
-      { sol: p_(`Only the gain over book value is taxed${sale < book ? ' (here a loss, which gives a tax credit)' : ''}: ${f2(sale)} − ${P(tau, 0)} × (${f2(sale)} − ${f2(book)}) = ${c}${f2(salv)} million.`) });
+      { calc: k.steps, sol: p_(`Only the gain over book value is taxed${sale < book ? ' (here a loss, which gives a tax credit)' : ''}: ${f2(sale)} − ${P(tau, 0)} × (${f2(sale)} − ${f2(book)}) = ${c}${f2(salv)} million.`) });
   }
-  const T = pick([3, 4, 5]), g = rstep(0.01, 0.04, 0.005), fcfT = rstep(5, 30, 0.5), tv = fcfT * (1 + g) / (r - g);
+  const T = pick([3, 4, 5]), g = rstep(0.01, 0.04, 0.005), fcfT = rstep(5, 30, 0.5), tv = fcfT * (1 + g) / (r - g), k = calc();
+  k.r(`**Continuation value:** the cash flow of year ${T + 1} is $${tn(fcfT, 2)} \\times (1 + ${tn(g, 3)}) = ${tn(fcfT * (1 + g), 4)}$, and $TV_{${T}} = \\frac{CF_{${T + 1}}}{r - g} = \\frac{${tn(fcfT * (1 + g), 4)}}{${tn(r, 2)} - ${tn(g, 3)}} = \\frac{${tn(fcfT * (1 + g), 4)}}{${tn(r - g, 3)}} = ${tn(tv, 4)}$ (${c === '€' ? '€' : 'USD'} million).`, 'ans', tv);
   return mcNum('PS4.terminalMc', '4', p_(`A project’s free cash flow in year ${T} is ${c}${f2(fcfT)} million and is expected to grow at ${pp(g, 1)} a year forever afterwards. The discount rate is ${pp(r, 0)}. What is the continuation value at the end of year ${T}?`), tv,
     [fcfT / (r - g), fcfT * (1 + g) / r, tv / (1 + r) ** T, fcfT / r, fcfT * (1 + g) / (r + g)], mil(c),
-    { sol: p_(`TV<sub>${T}</sub> = FCF<sub>${T + 1}</sub> / (r − g) = ${f2(fcfT)} × ${fmtNum(1 + g, 3)} / (${pp(r, 0)} − ${pp(g, 1)}) = ${c}${f2(tv)} million, a value at year ${T}.`) });
+    { calc: k.steps, sol: p_(`TV<sub>${T}</sub> = FCF<sub>${T + 1}</sub> / (r − g) = ${f2(fcfT)} × ${fmtNum(1 + g, 3)} / (${pp(r, 0)} − ${pp(g, 1)}) = ${c}${f2(tv)} million, a value at year ${T}.`) });
 }
 
 // Quiz: NPV of a master's degree against staying in the job.
@@ -254,15 +319,26 @@ export function PS4_msc(): Question {
     const items = shuffle(MSC_ITEMS).slice(0, rint(2, 4));
     const opts = ['Yes', 'No', 'It depends'];
     const parts: Part[] = chooseParts([
-      { part: N('What is the present value of the salaries you give up by leaving your job?', pvJob / 1000, 'k'), w: 0.5 },
-      { part: N('What is the present value today of the salaries after the MSc?', pvMsc / 1000, 'k'), w: 0.5 },
-      { part: N('What is the NPV of pursuing the MSc?', npv / 1000, 'k'), must: true },
-      { part: items.map(([t, a]) => C(`Would this affect the calculation? ${t}`, opts, a)), w: 0.75 },
+      { part: N('What is the present value of the salaries you give up by leaving your job?', pvJob / 1000, 'k', { key: 'pvJob' }), w: 0.5 },
+      { part: N('What is the present value today of the salaries after the MSc?', pvMsc / 1000, 'k', { key: 'pvMsc' }), w: 0.5 },
+      { part: N('What is the NPV of pursuing the MSc?', npv / 1000, 'k', { key: 'npv' }), must: true },
+      { part: items.map(([t, a], i) => C(`Would this affect the calculation? ${t}`, opts, a, 'item' + i)), w: 0.75 },
     ], 2, 4);
+    const k = calc(), gaSteps = (C0: number, g: number, n: number, label: string, res: number, extra: string) => {
+      const ratio = (1 + g) / (1 + r), pw = ratio ** n;
+      k.s(`**${label}, growing annuity:** $PV = \\frac{C}{r - g}\\left[1 - \\left(\\frac{1 + g}{1 + r}\\right)^{n}\\right]$ with $C = ${tn(C0, 0)}$, $r = ${tn(r, 2)}$, $g = ${tn(g, 4)}$, $n = ${n}$. Ratio $\\frac{${tn(1 + g, 4)}}{${tn(1 + r, 2)}} = ${tn(ratio, 6)}$, power $${tn(ratio, 6)}^{${n}} = ${tn(pw, 6)}$, bracket $1 - ${tn(pw, 6)} = ${tn(1 - pw, 6)}$, factor $\\frac{${tn(C0, 0)}}{${tn(r - g, 4)}} = ${tn(C0 / (r - g), 2)}$. Product: $${tn(C0 / (r - g), 2)} \\times ${tn(1 - pw, 6)} = ${tn(res, 2)}$ (€)${extra}.`);
+    };
+    gaSteps(S1, g1, n1, 'Job', pvJob, '');
+    k.r(`**Salaries given up:** $${tn(pvJob, 2)}$ € today, i.e. $${tn(pvJob / 1000, 4)}$ thousand.`, 'pvJob', pvJob / 1000);
+    const ga2 = ga(S2, g2, n2);
+    gaSteps(S2, g2, n2, 'MSc', ga2, `, valued ${D} year${D > 1 ? 's' : ''} before the first salary`);
+    k.r(`**Present value of the MSc salaries:** discount by ${D} year${D > 1 ? 's' : ''}. $\\frac{${tn(ga2, 2)}}{(1 + ${tn(r, 2)})^{${D}}} = \\frac{${tn(ga2, 2)}}{${tn((1 + r) ** D, 6)}} = ${tn(pvMsc, 2)}$ (€), i.e. $${tn(pvMsc / 1000, 4)}$ thousand.`, 'pvMsc', pvMsc / 1000);
+    k.r(`**NPV of the MSc:** salaries after the degree minus salaries given up minus tuition and books (the party is consumption and left out). $${tn(pvMsc, 2)} - ${tn(pvJob, 2)} - ${tn(tuition, 0)} - ${tn(books, 0)} = ${tn(npv, 2)}$ (€), i.e. $${tn(npv / 1000, 4)}$ thousand.`, 'npv', npv / 1000);
+    items.forEach(([t, a, why], i) => k.r(`**${t}:** ${opts[a]}, ${why}.`, 'item' + i));
     const sol = p_(`Growing annuities, PV = C / (r − g) × [1 − ((1 + g)/(1 + r))<sup>n</sup>]. Job: ${e(S1)} / (${pp(r, 0)} − ${pp(g1, 1)}) × [1 − (${fmtNum(1 + g1, 4)}/${fmtNum(1 + r, 2)})<sup>${n1}</sup>] = ${e(pvJob)}. MSc: ${n2} salaries from year ${D + 1}, valued at year ${D} and discounted ${D} year${D > 1 ? 's' : ''}: ${e(S2)} / (${pp(r, 0)} − ${pp(g2, 1)}) × [1 − (${fmtNum(1 + g2, 4)}/${fmtNum(1 + r, 2)})<sup>${n2}</sup>] / ${fmtNum(1 + r, 2)}<sup>${D}</sup> = ${e(pvMsc)}.`) +
       p_(`NPV = ${e(pvMsc)} − ${e(pvJob)} − ${e(tuition)} − ${e(books)} = ${e(npv)}, or ${fmtNum(npv / 1000, 2)} thousand. The party is left out: it is consumption worth what it costs.`) +
       p_(items.map(([t, a, why]) => `${t}: <b>${opts[a]}</b>, ${why}.`).join('<br>'));
-    return { ...Q('PS4.msc', '4', html, parts), solution: sol };
+    return { ...withCalc(Q('PS4.msc', '4', html, parts), k.steps), solution: sol };
   }
 }
 

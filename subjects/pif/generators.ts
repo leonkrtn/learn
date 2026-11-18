@@ -2,7 +2,7 @@
 // user-defined functions) and for the finance cases of the course (progressive income tax, uniform and Normal simulation,
 // summary statistics and covariance, Sharpe and Sortino ratios). Every answer is computed from the same inputs the
 // question shows; numeric parts use the 2% tolerance, counts, cells and labels are multiple choice.
-import { C, N, P, Q, chance, chooseParts, eur, fmtNum, p_, pick, rint, rstep, shuffle, table } from '@/lib/engine/gen-helpers';
+import { C, K, N, P, Q, calc, chance, chooseParts, eur, fmtNum, p_, pick, rint, rstep, shuffle, table, tn, tq, withCalc } from '@/lib/engine/gen-helpers';
 import { mcText } from '@/lib/engine/mc';
 import type { ChoicePart, Part, Question } from '@/lib/engine/types';
 
@@ -123,6 +123,41 @@ function taxSheet(t: TaxTable, withF: boolean, first = 3): string {
 const sh = (x: number) => fmtNum(x, 0);
 
 // ---------------------------------------------------------------------------------------------------------------
+// Worked calculations (traces and statistics)
+// ---------------------------------------------------------------------------------------------------------------
+
+type CK = ReturnType<typeof calc>;
+const sumTex = (a: number[], d: number) => a.map(x => tq(x, d)).join(' + ');
+
+/** Mean, deviations, squared deviations, variance and standard deviation (divisor n − 1), one step each. */
+function stdCalc(k: CK, xs: number[], who: string, keys: { mean?: string; vr?: string; sd?: string } = {}, dx = 2, dm = 6, dq = 8) {
+  const n = xs.length, tot = xs.reduce((s, x) => s + x, 0), m = tot / n, dev = xs.map(x => x - m);
+  const sq = dev.map(d => d * d), ss = sq.reduce((s, x) => s + x, 0), vr = ss / (n - 1), sd = Math.sqrt(vr);
+  const mMd = `**Mean of ${who}:** $\\bar{x} = \\frac{${sumTex(xs, dx)}}{${n}} = \\frac{${tn(tot, dx)}}{${n}} = ${tn(m, dm)}$.`;
+  if (keys.mean) k.r(mMd, keys.mean, m); else k.s(mMd);
+  k.s(`**Deviations from the mean (${who}):** ` + dev.map((d, i) => `$x_{${i + 1}} - \\bar{x} = ${tq(xs[i], dx)} - ${tq(m, dm)} = ${tn(d, dm)}$`).join(', ') + '.');
+  k.s(`**Squared deviations (${who}):** ` + dev.map((d, i) => `$(${tn(d, dm)})^{2} = ${tn(sq[i], dq)}$`).join(', ') + `. Their sum is $${sq.map(x => tn(x, dq)).join(' + ')} = ${tn(ss, dq)}$.`);
+  const vMd = `**Variance of ${who}:** divide by $n - 1 = ${n - 1}$ (not by ${n}): $s^{2} = \\frac{${tn(ss, dq)}}{${n - 1}} = ${tn(vr, dq)}$.`;
+  if (keys.vr) k.r(vMd, keys.vr, vr); else k.s(vMd);
+  const sMd = `**StDev_S of ${who}:** $s = \\sqrt{${tn(vr, dq)}} = ${tn(sd, dm)}$.`;
+  if (keys.sd) k.r(sMd, keys.sd, sd); else k.s(sMd);
+  return { m, dev, ss, vr, sd };
+}
+
+/** Progressive tax: one step per bracket reached, then the sum (result step with the given key). */
+function taxCalc(k: CK, income: number, key: string, t: TaxTable = TAX, label = 'Total tax') {
+  const kb = bracketOf(income, t), parts: number[] = [];
+  for (let i = 0; i <= kb; i++) {
+    const top = Math.min(income, t.to[i] ?? Infinity), w = top - t.from[i], tx = w * t.rate[i] / 100;
+    parts.push(tx);
+    k.s(`**Bracket ${i + 1} (row ${i + 3}):** only the income between ${tn(t.from[i], 0)} and ${tn(top, 0)} is taxed at ${tn(t.rate[i], 1)}%: $(${tn(top, 0)} - ${tn(t.from[i], 0)}) \\times ${tn(t.rate[i], 1)}\\% = ${tn(w, 0)} \\times ${tn(t.rate[i] / 100, 3)} = ${tn(tx, 4)}$.`);
+  }
+  const tax = parts.reduce((s, x) => s + x, 0);
+  k.r(`**${label}:** add the bracket amounts: $${parts.map(x => tn(x, 4)).join(' + ')} = ${tn(tax, 4)}$ (€).`, key, tax);
+  return tax;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // Class 1: variables, references and loops
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -130,26 +165,33 @@ const sh = (x: number) => fmtNum(x, 0);
 export function L1_trace(): Question {
   const kind = pick(['add', 'addi', 'mul', 'sq'] as const);
   const a = rint(1, 3), b = a + rint(3, 6), r = rint(1, 12), c = rint(1, 6);
-  let s0 = 0, body = '', f: (x: number, i: number) => number;
-  if (kind === 'add') { s0 = rint(0, 20); const k = rint(2, 9); body = `x = x + ${k}`; f = x => x + k; }
-  else if (kind === 'addi') { s0 = rint(0, 10); const k = rint(2, 6); body = `x = x + ${k} * i`; f = (x, i) => x + k * i; }
-  else if (kind === 'mul') { s0 = pick([100, 1000, 50, 200]); const g = pick([1.02, 1.05, 1.1, 0.9, 1.03]); body = `x = x * ${vb(g)}`; f = x => x * g; }
-  else { s0 = rint(0, 5); body = 'x = x + i * i'; f = (x, i) => x + i * i; }
+  let s0 = 0, body = '', f: (x: number, i: number) => number, tex: (x: number, i: number) => string;
+  if (kind === 'add') { s0 = rint(0, 20); const k = rint(2, 9); body = `x = x + ${k}`; f = x => x + k; tex = x => `${tn(x, 0)} + ${k}`; }
+  else if (kind === 'addi') { s0 = rint(0, 10); const k = rint(2, 6); body = `x = x + ${k} * i`; f = (x, i) => x + k * i; tex = (x, i) => `${tn(x, 0)} + ${k} \\times ${i}`; }
+  else if (kind === 'mul') { s0 = pick([100, 1000, 50, 200]); const g = pick([1.02, 1.05, 1.1, 0.9, 1.03]); body = `x = x * ${vb(g)}`; f = x => x * g; tex = x => `${tn(x, 6)} \\times ${tn(g, 2)}`; }
+  else { s0 = rint(0, 5); body = 'x = x + i * i'; f = (x, i) => x + i * i; tex = (x, i) => `${tn(x, 0)} + ${i}^{2}`; }
   const run = (lo: number, hi: number) => { let x = s0; for (let i = lo; i <= hi; i++) x = f(x, i); return x; };
   const ans = run(a, b);
   const lines = ['Sub Loop_Test()', '    Dim x As Double', '    Dim i As Long', `    x = ${s0}`, `    For i = ${a} To ${b}`, `        ${body}`, '    Next', `    Worksheets("Sheet1").Cells(${r}, ${c}) = x`, '    MsgBox ("i = " & i)', 'End Sub'];
   const val: Part = kind === 'mul' ? N('Value of x written to the sheet', ans, 'n', { abs: 0.005 }) : CN('Value of x written to the sheet', ans, [run(a, b - 1), run(a, b + 1), run(a + 1, b), ans - s0]);
   const parts: Part[] = [
-    val,
-    CT('Cell that receives x', addr(r, c), [addr(c, r), addr(r, c + 1), addr(r + 1, c), colL(r) + c, addr(r, c + 2)]),
-    CT('Message shown by the MsgBox', 'i = ' + (b + 1), ['i = ' + b, 'i = ' + (b - 1), 'i = ' + a, 'i = ' + vb(+ans.toFixed(4))]),
+    K(val, 'val'),
+    K(CT('Cell that receives x', addr(r, c), [addr(c, r), addr(r, c + 1), addr(r + 1, c), colL(r) + c, addr(r, c + 2)]), 'cell'),
+    K(CT('Message shown by the MsgBox', 'i = ' + (b + 1), ['i = ' + b, 'i = ' + (b - 1), 'i = ' + a, 'i = ' + vb(+ans.toFixed(4))]), 'msg'),
   ];
   const trace: string[][] = [];
   let x = s0;
   for (let i = a; i <= b; i++) { x = f(x, i); trace.push([String(i), f4(x)]); }
   const sol = p_(`The loop runs ${b - a + 1} times, for i = ${a} to ${b}. x after each iteration:`) + table(['i', 'x'], trace) +
     p_(`Cells(${r}, ${c}) is row ${r}, column ${c} = ${addr(r, c)}. Next raises i once more after the last pass, so the loop ends with i = ${b + 1}.`);
-  return { ...Q('L1.trace', 1, p_('Read the Sub and answer the questions.') + code(lines), parts), solution: sol };
+  const cc = calc(), dd = kind === 'mul' ? 6 : 0;
+  cc.s(`**Start:** \`x = ${s0}\`. The loop runs for i = ${a} to ${b}, that is ${b - a + 1} passes.`);
+  let xv = s0;
+  for (let i = a; i <= b; i++) { const nx = f(xv, i); cc.s(`**Pass i = ${i}:** $x = ${tex(xv, i)} = ${tn(nx, dd)}$.`); xv = nx; }
+  cc.r(`**Value of x:** after the last pass (i = ${b}) x = ${tn(ans, dd)}, and \`Cells(${r}, ${c}) = x\` writes this value.`, 'val', kind === 'mul' ? ans : undefined);
+  cc.r(`**Cell:** \`Cells(${r}, ${c})\` is row ${r}, column ${c}; column ${c} is the letter ${colL(c)}, so the cell is ${addr(r, c)}.`, 'cell');
+  cc.r(`**MsgBox:** after the pass i = ${b}, \`Next\` raises i once more to ${b} + 1 = ${b + 1}. The test i <= ${b} fails, the loop ends and i stays at ${b + 1}, so the box shows "i = ${b + 1}".`, 'msg');
+  return { ...withCalc(Q('L1.trace', 1, p_('Read the Sub and answer the questions.') + code(lines), parts), cc.steps), solution: sol };
 }
 
 /** Copy-paste with code: which cells a loop writes and what they hold. */
@@ -163,15 +205,20 @@ export function L1_cells(): Question {
   const lines = ['Sub Copy_Prices()', '    Dim i As Long', `    For i = ${a} To ${b}`, `        Worksheets("Sheet1").Cells(i${k ? ' + ' + k : ''}, ${dc}) = ${expr}`, '    Next', 'End Sub'];
   const j = rint(a, b);
   const parts: Part[] = [
-    CT('Last cell written by the loop', addr(b + k, dc), [addr(b, dc), addr(b + k + 1, dc), addr(b + k, sc), addr(dc, b + k), addr(a + k, dc)]),
-    CN('Number of cells written', b - a + 1, [b - a, b - a + 2, b]),
-    N(`Value written to ${addr(j + k, dc)}`, prices[j] * m, 'n', { abs: 0.005 }),
+    K(CT('Last cell written by the loop', addr(b + k, dc), [addr(b, dc), addr(b + k + 1, dc), addr(b + k, sc), addr(dc, b + k), addr(a + k, dc)]), 'last'),
+    K(CN('Number of cells written', b - a + 1, [b - a, b - a + 2, b]), 'cnt'),
+    K(N(`Value written to ${addr(j + k, dc)}`, prices[j] * m, 'n', { abs: 0.005 }), 'val'),
   ];
   const rows: [number, (string | number)[]][] = Array.from({ length: b }, (_, i) => [i + 1, [prices[i + 1]]]);
   const html = p_(`Column ${colL(sc)} of Sheet1 holds share prices:`) + sheet([sc], rows) + p_('The following Sub runs:') + code(lines);
   const sol = p_(`i runs from ${a} to ${b}: ${b - a + 1} iterations. Each reads ${colL(sc)}i (row i, column ${sc}) and writes row i${k ? ' + ' + k : ''}, column ${dc} (${colL(dc)}). The last write goes to ${addr(b + k, dc)}.`) +
     p_(`${addr(j + k, dc)} receives the price in ${addr(j, sc)}${m === 1 ? '' : ' × ' + vb(m)}: ${f2(prices[j])}${m === 1 ? '' : ' × ' + vb(m) + ' = ' + f2(prices[j] * m)}.`);
-  return { ...Q('L1.cells', 1, html, parts), solution: sol };
+  const cc = calc(), np = b - a + 1;
+  cc.r(`**Passes:** \`For i = ${a} To ${b}\` runs ${b} - ${a} + 1 = ${np} times, and every pass writes one cell.`, 'cnt');
+  cc.r(`**Last cell:** in the last pass i = ${b} the target is \`Cells(i${k ? ' + ' + k : ''}, ${dc})\` = \`Cells(${b + k}, ${dc})\`: row ${b + k}, column ${dc}, which is the letter ${colL(dc)}, so ${addr(b + k, dc)}.`, 'last');
+  cc.r(`**Value:** ${addr(j + k, dc)} is written in the pass i = ${j}, which reads \`Cells(${j}, ${sc})\` = ${addr(j, sc)} = ${tn(prices[j], 2)}` +
+    (m === 1 ? `, so the value is ${tn(prices[j], 2)}.` : ` and multiplies it by ${vb(m)}: $${tn(prices[j], 2)} \\times ${vb(m)} = ${tn(prices[j] * m, 4)}$.`), 'val', prices[j] * m);
+  return { ...withCalc(Q('L1.cells', 1, html, parts), cc.steps), solution: sol };
 }
 
 /** Types, assignment and concatenation in a small portfolio Sub. */
@@ -185,14 +232,19 @@ export function L1_types(): Question {
   const lines = ['Sub My_Portfolio()', '    Dim ticker As String', '    Dim shares As Long', '    Dim price As Double', '    Dim total', '', `    ticker = "${ticker}"`, `    shares = ${vb(q)}`, `    price = ${vb(p)}`, '    total = shares * price', '', '    MsgBox ("Stock: " & ticker & ", Value: " & total)', 'End Sub'];
   const msg = `Stock: ${ticker}, Value: ${vb(total)}`;
   const parts = chooseParts([
-    { part: CN('Value stored in shares', shares, [q === shares ? shares + 1 : q, Math.floor(q), Math.ceil(q) === shares ? Math.floor(q) : Math.ceil(q)], x => vb(x)), w: q === shares ? 0.3 : 0.9 },
-    { part: N('Value of total', total, 'n', { abs: 0.005 }), must: true },
-    { part: CT('Type of the variable total', 'Variant', ['Double', 'Long', 'String']), w: 0.5 },
-    { part: CT('Text shown by the MsgBox', msg, ['Stock: ticker, Value: total', `Stock: ${ticker}, Value: ${vb(q * p)}`, `Stock: ${ticker}, Value: shares * price`, `Stock:${ticker},Value:${vb(total)}`]), w: 0.7 },
+    { part: K(CN('Value stored in shares', shares, [q === shares ? shares + 1 : q, Math.floor(q), Math.ceil(q) === shares ? Math.floor(q) : Math.ceil(q)], x => vb(x)), 'sh'), w: q === shares ? 0.3 : 0.9 },
+    { part: K(N('Value of total', total, 'n', { abs: 0.005 }), 'tot'), must: true },
+    { part: K(CT('Type of the variable total', 'Variant', ['Double', 'Long', 'String']), 'type'), w: 0.5 },
+    { part: K(CT('Text shown by the MsgBox', msg, ['Stock: ticker, Value: total', `Stock: ${ticker}, Value: ${vb(q * p)}`, `Stock: ${ticker}, Value: shares * price`, `Stock:${ticker},Value:${vb(total)}`]), 'msg'), w: 0.7 },
   ], 3, 3);
+  const k = calc();
+  k.r(q === shares ? `**shares:** the variable is a Long, so ${vb(q)} is stored as the whole number ${shares}.` : `**shares:** the variable is a Long (whole numbers only), so ${vb(q)} is rounded to the nearest whole number, ${shares}; the decimals are lost.`, 'sh');
+  k.r(`**total:** $\\text{shares} \\times \\text{price} = ${shares} \\times ${tn(p, 2)} = ${tn(total, 2)}$ (the stored ${shares}, not ${vb(q)}).`, 'tot', total);
+  k.r('**Type of total:** it is declared with `Dim total` and no type, so VBA makes it a Variant.', 'type');
+  k.r(`**MsgBox:** \`&\` glues the pieces together: "Stock: ", ${ticker}, ", Value: ", ${vb(total)}, which gives "${msg}".`, 'msg');
   const sol = p_(`shares is a Long, so ${vb(q)} is stored as the whole number ${shares}.${q === shares ? '' : ' The decimals are lost before the multiplication.'}`) +
     p_(`total has no type, so it is a Variant; it holds ${shares} × ${vb(p)} = ${vb(total)}. & glues the pieces into “${esc(msg)}”.`);
-  return { ...Q('L1.types', 1, p_('Read the Sub and answer the questions.') + code(lines), parts), solution: sol };
+  return { ...withCalc(Q('L1.types', 1, p_('Read the Sub and answer the questions.') + code(lines), parts), k.steps), solution: sol };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -207,28 +259,59 @@ export function L2_array(): Question {
   const total = prices.reduce((s, x) => s + x, 0);
   const head = ['Sub Store_Prices()', `    Dim prices(1 To ${n}) As Double`, '    Dim total As Double', '    Dim i As Long'];
   let lines: string[] = [], parts: Part[] = [], sol = '';
+  const cc = calc();
+  const sumPasses = (via: (i: number) => string) => {
+    let acc = 0;
+    prices.forEach((x, i) => { cc.s(`**Pass i = ${i + 1}:** \`${via(i + 1)}\` = ${tn(x, 2)}, so $total = ${tn(acc, 2)} + ${tn(x, 2)} = ${tn(acc + x, 2)}$.`); acc += x; });
+  };
   if (kind === 'single') {
     lines = ['Sub Sum_Prices()', '    Dim price As Double', '    Dim total As Double', '    Dim i As Long', '    total = 0', `    For i = 1 To ${n}`, '        price = Worksheets("Sheet1").Cells(i, 2)', '        total = total + price', '    Next', '    MsgBox ("Total = " & total)', 'End Sub'];
-    parts = [N('Total shown by the MsgBox', total, 'n', { abs: 0.005 }), CN('Value of price after the loop', prices[n - 1], [prices[0], total, prices[n - 2]], f2), CN('Value of i after the loop', n + 1, [n, n - 1, 1])];
+    parts = [K(N('Total shown by the MsgBox', total, 'n', { abs: 0.005 }), 'tot'), K(CN('Value of price after the loop', prices[n - 1], [prices[0], total, prices[n - 2]], f2), 'price'), K(CN('Value of i after the loop', n + 1, [n, n - 1, 1]), 'i')];
+    sumPasses(i => `price = B${i}`);
+    cc.r(`**Total:** the last pass leaves total = ${tn(total, 2)}, and the MsgBox shows "Total = ${vb(total)}".`, 'tot', total);
+    cc.r(`**price:** every pass overwrites the single variable, so after the last pass (i = ${n}) it holds B${n} = ${tn(prices[n - 1], 2)}.`, 'price');
+    cc.r(`**i after the loop:** after the pass i = ${n}, \`Next\` raises i to ${n} + 1 = ${n + 1}, the test fails and the loop ends.`, 'i');
     sol = p_(`total accumulates ${prices.map(f2).join(' + ')} = ${f2(total)}. The single variable price is overwritten in every iteration, so only the last value, ${f2(prices[n - 1])}, survives; an array would keep all of them.`);
   } else if (kind === 'avg') {
     lines = [...head, '    total = 0', `    For i = 1 To ${n}`, '        prices(i) = Worksheets("Sheet1").Cells(i, 2)', '        total = total + prices(i)', '    Next', `    Worksheets("Sheet1").Cells(${n + 2}, 2) = total / ${n}`, 'End Sub'];
     const k = rint(1, n);
-    parts = [N(`Value written to B${n + 2}`, total / n, 'n', { abs: 0.005 }), N('Value of total after the loop', total, 'n', { abs: 0.005 }), CN(`Value of prices(${k}) after the loop`, prices[k - 1], [prices[n - 1], total, prices[(k) % n]], f2)];
+    parts = [K(N(`Value written to B${n + 2}`, total / n, 'n', { abs: 0.005 }), 'avg'), K(N('Value of total after the loop', total, 'n', { abs: 0.005 }), 'tot'), K(CN(`Value of prices(${k}) after the loop`, prices[k - 1], [prices[n - 1], total, prices[(k) % n]], f2), 'pk')];
+    sumPasses(i => `prices(${i}) = B${i}`);
+    cc.r(`**Total:** after the last pass total = ${tn(total, 2)}.`, 'tot', total);
+    cc.r(`**Average:** $\\frac{total}{${n}} = \\frac{${tn(total, 2)}}{${n}} = ${tn(total / n, 4)}$, written to B${n + 2}.`, 'avg', total / n);
+    cc.r(`**prices(${k}):** the array keeps every value, so prices(${k}) = B${k} = ${tn(prices[k - 1], 2)}.`, 'pk');
     sol = p_(`total = ${prices.map(f2).join(' + ')} = ${f2(total)}; average = ${f2(total)} / ${n} = ${f2(total / n)}. The array still holds every price, so prices(${k}) = ${f2(prices[k - 1])}.`);
   } else if (kind === 'max') {
     const mx = Math.max(...prices);
     lines = [...head, '    Dim max_price As Double', '    total = 0', `    For i = 1 To ${n}`, '        prices(i) = Worksheets("Sheet1").Cells(i, 2)', '        total = total + prices(i)', '    Next', '    max_price = prices(1)', `    For i = 2 To ${n}`, '        If prices(i) > max_price Then', '            max_price = prices(i)', '        End If', '    Next', '    MsgBox ("Max = " & max_price & ", total = " & total)', 'End Sub'];
-    parts = [CN('Value of max_price', mx, [prices[0], prices[n - 1], Math.min(...prices)], f2), N('Value of total', total, 'n', { abs: 0.005 })];
+    parts = [K(CN('Value of max_price', mx, [prices[0], prices[n - 1], Math.min(...prices)], f2), 'mx'), K(N('Value of total', total, 'n', { abs: 0.005 }), 'tot')];
+    sumPasses(i => `prices(${i}) = B${i}`);
+    cc.r(`**Total:** after the last pass total = ${tn(total, 2)}.`, 'tot', total);
+    let cur = prices[0];
+    cc.s(`**Start:** \`max_price = prices(1)\` = ${tn(cur, 2)}.`);
+    for (let i = 2; i <= n; i++) {
+      const bigger = prices[i - 1] > cur;
+      cc.s(`**Pass i = ${i}:** prices(${i}) = ${tn(prices[i - 1], 2)} compared with max_price = ${tn(cur, 2)}: ${bigger ? 'larger, so max_price = ' + tn(prices[i - 1], 2) : 'not larger, so max_price stays'}.`);
+      if (bigger) cur = prices[i - 1];
+    }
+    cc.r(`**max_price:** after the last pass it holds ${tn(mx, 2)}, the largest price.`, 'mx');
     sol = p_(`max_price starts at prices(1) = ${f2(prices[0])} and is replaced whenever a later price is larger: the maximum is ${f2(mx)}. total = ${f2(total)}.`);
   } else {
     const cnt = prices.filter(x => x > th).length;
     lines = [...head, '    Dim cnt As Long', '    cnt = 0', `    For i = 1 To ${n}`, '        prices(i) = Worksheets("Sheet1").Cells(i, 2)', `        If prices(i) > ${th} Then`, '            cnt = cnt + 1', '        End If', '    Next', '    MsgBox ("Count = " & cnt)', 'End Sub'];
-    parts = [CN('Count shown by the MsgBox', cnt, [n - cnt, cnt + 1, n]), CN('Value of i after the loop', n + 1, [n, n - 1, 1])];
+    parts = [K(CN('Count shown by the MsgBox', cnt, [n - cnt, cnt + 1, n]), 'cnt'), K(CN('Value of i after the loop', n + 1, [n, n - 1, 1]), 'i')];
+    let run = 0;
+    prices.forEach((x, i) => {
+      const yes = x > th;
+      if (yes) run++;
+      cc.s(`**Pass i = ${i + 1}:** prices(${i + 1}) = ${tn(x, 2)}; \`${tn(x, 2)} > ${th}\` is ${yes ? 'true, so cnt = ' + run : 'false, cnt stays ' + run}.`);
+    });
+    cc.r(`**Count:** ${cnt} of the ${n} prices are above ${th}.`, 'cnt');
+    cc.r(`**i after the loop:** after the pass i = ${n}, \`Next\` raises i to ${n} + 1 = ${n + 1}, the test fails and the loop ends.`, 'i');
     sol = p_(`Prices above ${th}: ${prices.filter(x => x > th).map(f2).join(', ') || 'none'}, so cnt = ${cnt}. After the loop i = ${n + 1}.`);
   }
   const html = p_('Sheet1 holds these prices in column B:') + sheet([2], prices.map((x, i) => [i + 1, [x]])) + p_('Read the Sub and answer the questions.') + code(lines);
-  return { ...Q('L2.array', 2, html, parts), solution: sol };
+  return { ...withCalc(Q('L2.array', 2, html, parts), cc.steps), solution: sol };
 }
 
 const SIGNALS = ['Strong Buy', 'Buy', 'Hold', 'Sell'];
@@ -252,11 +335,27 @@ export function L2_signal(): Question {
   const pool = shuffle([strong + pick([0.01, 0.02, 0.05]), th, -th, th + 0.005, -th - 0.01, 0, th / 2, strong, -0.05]);
   const rets = [pool[0], ...pool.slice(1).filter(x => x !== pool[0]).slice(0, 2)];
   if (!rets.some(r => r > strong)) rets[0] = strong + 0.02;
-  const parts = rets.map(r => C(`B3 holds ${vb(r)}: message shown`, SIGNALS, SIGNALS.indexOf(sig(r))));
+  const parts = rets.map((r, i) => C(`B3 holds ${vb(r)}: message shown`, SIGNALS, SIGNALS.indexOf(sig(r)), 'r' + i));
+  const k = calc();
+  const tests: [string, (r: number) => boolean, string][] = wrongOrder
+    ? [[`ret ${op} ${vb(th)}`, buy, 'Buy'], [`ret > ${vb(strong)}`, r => r > strong, 'Strong Buy']]
+    : [[`ret > ${vb(strong)}`, r => r > strong, 'Strong Buy'], [`ret ${op} ${vb(th)}`, buy, 'Buy']];
+  tests.push([`ret < ${vb(-th)}`, r => r < -th - 1e-12, 'Sell']);
+  k.s(`**Order of the tests:** VBA checks the conditions from top to bottom and runs only the first branch whose condition is true.`);
+  rets.forEach((r, i) => {
+    const seen: string[] = [];
+    let res = 'Hold';
+    for (const [t, f, lab] of tests) {
+      const ok = f(r);
+      seen.push(`\`${t.replace('ret', vb(r))}\` is ${ok ? 'true' : 'false'}`);
+      if (ok) { res = lab; break; }
+    }
+    k.r(`**B3 = ${vb(r)}:** ` + seen.join(', ') + (res === 'Hold' ? ' and no test is true, so the Else branch shows "Hold".' : `, so the first true test decides: "${res}".`), 'r' + i);
+  });
   const sol = (wrongOrder ? p_(`The Buy test comes first. VBA runs the first true branch only, so every return above ${vb(strong)} already triggers “Buy” and “Strong Buy” is never reached.`) : '') +
     p_(rets.map(r => `ret = ${vb(r)} → ${sig(r)}`).join('; ') + '.') +
     p_(`Boundary values: ${op} ${vb(th)} ${ge ? 'includes' : 'excludes'} ${vb(th)} itself, and < ${vb(-th)} excludes ${vb(-th)}.`);
-  return { ...Q('L2.signal', 2, p_('Read the Sub. What does it show for each value in B3?') + code(lines), parts), solution: sol };
+  return { ...withCalc(Q('L2.signal', 2, p_('Read the Sub. What does it show for each value in B3?') + code(lines), parts), k.steps), solution: sol };
 }
 
 const NAMES = ['Alice', 'Bob', 'Carol', 'David', 'Eve', 'Frank', 'Grace', 'Hugo', 'Ines', 'João', 'Kira', 'Luis'];
@@ -275,15 +374,26 @@ export function L2_filter(): Question {
   const eq = sal.findIndex(s => s === th);
   const k = eq >= 0 && chance(0.7) ? eq : rint(0, n - 1);
   const parts: Part[] = [
-    CN('Number shown by the MsgBox', cnt, [n - cnt, cnt + 1, cnt - 1, n]),
-    C(`Label written to C${k + 1}`, ['Senior', 'Junior'], senior(sal[k]) ? 0 : 1),
-    ...(withSum ? [N('Value of senior_total after the loop', sum, 'eur')] : []),
+    K(CN('Number shown by the MsgBox', cnt, [n - cnt, cnt + 1, cnt - 1, n]), 'cnt'),
+    C(`Label written to C${k + 1}`, ['Senior', 'Junior'], senior(sal[k]) ? 0 : 1, 'lab'),
+    ...(withSum ? [N('Value of senior_total after the loop', sum, 'eur', { key: 'sum' })] : []),
   ];
+  const cc = calc();
+  let c = 0, tot = 0;
+  names.forEach((nm, i) => {
+    const s = sal[i], yes = senior(s);
+    if (yes) { c++; tot += s; }
+    cc.s(`**Row ${i + 1} (${nm}):** \`${s} ${op} ${th}\` is ${yes ? 'true' : 'false'}, so C${i + 1} = "${yes ? 'Senior' : 'Junior'}"` +
+      (yes ? `, \`senior_count = ${c}\`` + (withSum ? `, \`senior_total = ${tot - s} + ${s} = ${tot}\`` : '') : '') + '.');
+  });
+  cc.r(`**Count:** ${cnt} of the ${n} employees pass the test, so the MsgBox shows "Senior employees: ${cnt}".`, 'cnt');
+  cc.r(`**Label in C${k + 1}:** ${names[k]} earns ${sh(sal[k])}; \`${sal[k]} ${op} ${th}\` is ${senior(sal[k]) ? 'true' : 'false'}${sal[k] === th ? ' (the salary equals the threshold, so the operator decides)' : ''}, so the label is "${senior(sal[k]) ? 'Senior' : 'Junior'}".`, 'lab');
+  cc.r(`**senior_total:** the salaries of the seniors add up to ${tot}.`, 'sum', sum);
   const html = p_('Sheet1 holds names in column A and salaries in column B:') + sheet([1, 2], names.map((nm, i) => [i + 1, [nm, sal[i]]])) + p_('Read the Sub and answer the questions.') + code(lines);
   const sol = p_(`Seniors (salary ${op} ${sh(th)}): ${names.filter((_, i) => senior(sal[i])).join(', ') || 'none'}, so senior_count = ${cnt}.`) +
     p_(`Row ${k + 1}: ${names[k]} earns ${sh(sal[k])}, label “${senior(sal[k]) ? 'Senior' : 'Junior'}”.${sal[k] === th ? ` The salary equals the threshold, so ${op} decides.` : ''}`) +
     (withSum ? p_(`senior_total = ${sal.filter(senior).map(sh).join(' + ') || '0'} = ${sh(sum)}.`) : '');
-  return { ...Q('L2.filter', 2, html, parts), solution: sol };
+  return { ...withCalc(Q('L2.filter', 2, html, parts), cc.steps), solution: sol };
 }
 
 const ERRS = ['Subscript out of range', 'Type mismatch', 'Expected: End If', 'Run-time error 91 (object variable not set)', 'No error: the code runs'];
@@ -315,10 +425,10 @@ export function L3_tax(): Question {
   const inTable = TAX.to[k] != null;
   const rowOpts = TAX.to.slice(0, 8).map((_, i) => 'B' + (i + 3));
   const parts = chooseParts([
-    { part: N('Total tax', tax, 'eur'), must: true },
-    ...(inTable ? [{ part: C('Cell to overwrite with the income', rowOpts, k), w: 0.7 }] : []),
-    { part: N('Average tax rate (tax ÷ income)', tax / income * 100, 'pct', { abs: 0.01 }), w: 0.5 },
-    { part: N('Marginal tax rate', TAX.rate[k], 'pct', { abs: 0.01 }), w: 0.4 },
+    { part: K(N('Total tax', tax, 'eur'), 'tax'), must: true },
+    ...(inTable ? [{ part: K(C('Cell to overwrite with the income', rowOpts, k), 'cell'), w: 0.7 }] : []),
+    { part: K(N('Average tax rate (tax ÷ income)', tax / income * 100, 'pct', { abs: 0.01 }), 'avg'), w: 0.5 },
+    { part: K(N('Marginal tax rate', TAX.rate[k], 'pct', { abs: 0.01 }), 'marg'), w: 0.4 },
   ], 2, 3);
   const html = p_(`The income tax table of Case 1 is on Sheet2, rows 3 to 11${withF ? ', with the helper columns D to F' : ''}:`) + taxSheet(TAX, withF) +
     p_(`A client earns <b>€${sh(income)}</b>.`);
@@ -327,7 +437,12 @@ export function L3_tax(): Question {
   const sol = p_(`The income lies in row ${k + 3} (${sh(TAX.from[k])} to ${TAX.to[k] == null ? 'no limit' : sh(TAX.to[k]!)}).` + (inTable ? ` In the worksheet: overwrite B${k + 3} with ${sh(income)}, read F${k + 3}, restore B${k + 3}.` : ' The top bracket has no upper threshold to overwrite; compute the last bracket by hand.')) +
     '<ul>' + steps.map(s => '<li>' + s + '</li>').join('') + '</ul>' +
     p_(`Total tax ${eur(tax)}; average rate ${f2(tax / income * 100)}%, marginal rate ${fmtNum(TAX.rate[k], 1)}%.`);
-  return { ...Q('L3.tax', 3, html, parts), solution: sol };
+  const kc = calc();
+  taxCalc(kc, income, 'tax');
+  kc.r(`**Average rate:** $\\frac{\\text{tax}}{\\text{income}} = \\frac{${tn(tax, 4)}}{${tn(income, 0)}} = ${tn(tax / income, 6)}$, that is $${tn(tax / income * 100, 4)}\\%$.`, 'avg', tax / income * 100);
+  kc.r(`**Marginal rate:** the last euro of the income lies in bracket ${k + 1} (row ${k + 3}), which is taxed at ${tn(TAX.rate[k], 1)}%.`, 'marg', TAX.rate[k]);
+  if (inTable) kc.r(`**Cell:** the income ${tn(income, 0)} is ${k > 0 ? 'above the threshold ' + tn(TAX.to[k - 1] as number, 0) + ' of the row before and ' : ''}at most the upper threshold ${tn(TAX.to[k] as number, 0)} in B${k + 3}, so B${k + 3} is the cell to overwrite.`, 'cell');
+  return { ...withCalc(Q('L3.tax', 3, html, parts), kc.steps), solution: sol };
 }
 
 /** A new progressive table: bracket width, bracket tax, cumulative tax and the tax for an income. */
@@ -343,15 +458,25 @@ export function L3_table(): Question {
   const width = (to[j] as number) - from[j], ej = width * rate[j] / 100;
   const cumJ = taxOf(to[j] as number, t), tax = taxOf(income, t);
   const parts = chooseParts([
-    { part: N(`Tax of the bracket in row ${j + 3} (column E)`, ej, 'eur'), w: 0.6 },
-    { part: N(`Cumulative tax in F${j + 3}`, cumJ, 'eur'), w: 0.6 },
-    { part: N(`Tax for an income of €${sh(income)}`, tax, 'eur'), must: true },
-    { part: N('Average tax rate for that income', tax / income * 100, 'pct', { abs: 0.01 }), w: 0.4 },
+    { part: K(N(`Tax of the bracket in row ${j + 3} (column E)`, ej, 'eur'), 'ej'), w: 0.6 },
+    { part: K(N(`Cumulative tax in F${j + 3}`, cumJ, 'eur'), 'cum'), w: 0.6 },
+    { part: K(N(`Tax for an income of €${sh(income)}`, tax, 'eur'), 'tax'), must: true },
+    { part: K(N('Average tax rate for that income', tax / income * 100, 'pct', { abs: 0.01 }), 'avg'), w: 0.4 },
   ], 2, 3);
   const html = p_('A consulting client uses this progressive tax table (D = B − A, E = D × C / 100, F = cumulative sum of E):') + taxSheet(t, false);
   const sol = p_(`Row ${j + 3}: width ${sh(to[j] as number)} − ${sh(from[j])} = ${sh(width)}, tax ${sh(width)} × ${fmtNum(rate[j], 1)}% = ${f2(ej)}; F${j + 3} = ${f2(cumJ)}.`) +
     p_(`€${sh(income)} lies in row ${k + 3}: tax = F${k + 2} (tax up to ${sh(from[k])}, ${f2(taxOf(from[k], t))}) + (${sh(income)} − ${sh(from[k])}) × ${fmtNum(rate[k], 1)}% = ${f2(tax)}; average rate ${f2(tax / income * 100)}%.`);
-  return { ...Q('L3.table', 3, html, parts), solution: sol };
+  const kc = calc(), bt: number[] = [];
+  for (let i = 0; i <= j; i++) {
+    const w = (to[i] as number) - from[i], e = w * rate[i] / 100;
+    bt.push(e);
+    const md = `**Row ${i + 3}:** width $D = ${tn(to[i] as number, 0)} - ${tn(from[i], 0)} = ${tn(w, 0)}$, bracket tax $E = ${tn(w, 0)} \\times ${tn(rate[i], 1)} / 100 = ${tn(e, 4)}$.`;
+    if (i === j) kc.r(md, 'ej', ej); else kc.s(md);
+  }
+  kc.r(`**Cumulative tax F${j + 3}:** add the bracket taxes E of rows 3 to ${j + 3}: $${bt.map(x => tn(x, 4)).join(' + ')} = ${tn(cumJ, 4)}$.`, 'cum', cumJ);
+  taxCalc(kc, income, 'tax', t);
+  kc.r(`**Average rate:** $\\frac{${tn(tax, 4)}}{${tn(income, 0)}} = ${tn(tax / income, 6)}$, that is $${tn(tax / income * 100, 4)}\\%$.`, 'avg', tax / income * 100);
+  return { ...withCalc(Q('L3.table', 3, html, parts), kc.steps), solution: sol };
 }
 
 /** The core loop of income_tax_main: Exit For, the cells used, and < versus <=. */
@@ -367,10 +492,10 @@ export function L3_code(): Question {
   const html = p_('Step 2 of income_tax_main has saved the upper thresholds B3:B11 of Sheet2 in upper(1 To 9) with upper(i) = Cells(i + 2, 2). B11 is empty (the top bracket has no limit). Columns D to F compute the bracket widths, bracket taxes and the cumulative tax from A to C.') +
     taxSheet(TAX, false) + p_(`Step 3 runs with <b>income = ${vb(income)}</b>:`) + code(lines);
   const parts: Part[] = [
-    CN('Value of i when Exit For runs', i, [i + 1, i - 1, 9]),
-    CT('Cell overwritten with the income', addr(i + 2, 2), [addr(i + 1, 2), addr(i + 3, 2), addr(i + 2, 6), addr(i, 2)]),
-    CT('Cell the tax is read from', addr(i + 2, 6), [addr(i + 2, 5), addr(i + 1, 6), addr(i + 2, 2), addr(i, 6)]),
-    N('Tax read into the variable tax', tax, 'eur'),
+    K(CN('Value of i when Exit For runs', i, [i + 1, i - 1, 9]), 'i'),
+    K(CT('Cell overwritten with the income', addr(i + 2, 2), [addr(i + 1, 2), addr(i + 3, 2), addr(i + 2, 6), addr(i, 2)]), 'ow'),
+    K(CT('Cell the tax is read from', addr(i + 2, 6), [addr(i + 2, 5), addr(i + 1, 6), addr(i + 2, 2), addr(i, 6)]), 'rd'),
+    K(N('Tax read into the variable tax', tax, 'eur'), 'tax'),
   ];
   const eqTh = upper.indexOf(income) + 1;
   const sol = p_(`The first i with income ${op} upper(i) is i = ${i} (upper(${i}) = ${sh(upper[i - 1])}), so row ${i + 2}: overwrite B${i + 2}, read F${i + 2}, Exit For.`) +
@@ -378,7 +503,22 @@ export function L3_code(): Question {
       ? `The income equals upper(${eqTh}), and with < that row is skipped: row ${i + 2} is overwritten instead. Its bracket width becomes 0, so F${i + 2} equals F${eqTh + 2} and the tax is still right.`
       : `The income equals upper(${eqTh}); <= keeps it in row ${eqTh + 2}, so F${eqTh + 2} is the tax directly.`) : '') +
     p_(`Tax = ${eur(tax)}. Without Exit For, later rows would also satisfy the condition and be overwritten, giving the wrong tax.`);
-  return { ...Q('L3.code', 3, html, parts), solution: sol };
+  const kc = calc();
+  for (let p = 1; p <= i; p++) {
+    const u = upper[p - 1], ok = strict ? income < u : income <= u;
+    kc.s(`**Pass i = ${p}:** \`upper(${p})\` = ${sh(u)}; the test \`income ${op} upper(${p})\` is \`${vb(income)} ${op} ${u}\`, which is ${ok ? 'true, so the code inside the If runs' : 'false, so the loop continues'}.`);
+  }
+  kc.r(`**Exit For:** the first true test is in pass i = ${i}, so Exit For leaves the loop with i = ${i}.`, 'i');
+  kc.r(`**Cell overwritten:** \`Cells(i + 2, 2)\` = \`Cells(${i + 2}, 2)\`: row ${i + 2}, column 2, which is the letter ${colL(2)}, so ${addr(i + 2, 2)}.`, 'ow');
+  kc.r(`**Cell read:** \`Cells(i + 2, 6)\` = \`Cells(${i + 2}, 6)\`: row ${i + 2}, column 6, which is the letter ${colL(6)}, so ${addr(i + 2, 6)}.`, 'rd');
+  const tb: number[] = [];
+  for (let m = 0; m < i; m++) {
+    const top = Math.min(income, TAX.to[m] as number), w = Math.max(0, top - TAX.from[m]), e = w * TAX.rate[m] / 100;
+    tb.push(e);
+    kc.s(`**Row ${m + 3}:** width $D = ${tn(top, 0)} - ${tn(TAX.from[m], 0)} = ${tn(w, 0)}$ (the overwritten ${addr(i + 2, 2)} holds the income), bracket tax $E = ${tn(w, 0)} \\times ${tn(TAX.rate[m], 1)} / 100 = ${tn(e, 4)}$.`);
+  }
+  kc.r(`**Tax read from ${addr(i + 2, 6)}:** the cumulative sum of the bracket taxes of rows 3 to ${i + 2}: $${tb.map(x => tn(x, 4)).join(' + ')} = ${tn(tax, 4)}$ (€).`, 'tax', tax);
+  return { ...withCalc(Q('L3.code', 3, html, parts), kc.steps), solution: sol };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -396,14 +536,22 @@ export function L4_call(): Question {
   const eq = inc.indexOf(th);
   const kk = eq >= 0 && chance(0.6) ? eq : rint(0, inc.length - 1), rk = a + kk;
   const parts: Part[] = [
-    CN('Number of cells that receive “High”', high, [inc.length - high, high + 1, inc.length]),
-    CT(`Cell that receives the label for the income in A${rk}`, addr(rk + off, oc), [addr(rk, oc === 2 ? 3 : 2), addr(rk + off + 1, oc), addr(rk, 1), addr(rk + off, oc + 1)].filter(x => x !== addr(rk + off, oc)).concat(addr(rk + off + 2, oc))),
-    C(`Label written for the income in A${rk}`, ['High', 'Low'], inc[kk] > th ? 0 : 1),
+    K(CN('Number of cells that receive “High”', high, [inc.length - high, high + 1, inc.length]), 'high'),
+    K(CT(`Cell that receives the label for the income in A${rk}`, addr(rk + off, oc), [addr(rk, oc === 2 ? 3 : 2), addr(rk + off + 1, oc), addr(rk, 1), addr(rk + off, oc + 1)].filter(x => x !== addr(rk + off, oc)).concat(addr(rk + off + 2, oc))), 'cell'),
+    K(C(`Label written for the income in A${rk}`, ['High', 'Low'], inc[kk] > th ? 0 : 1), 'lab'),
   ];
   const html = p_('Column A of Sheet1 holds incomes:') + sheet([1], inc.map((x, i) => [a + i, [x]])) + p_('Test_Classify is run.') + code(lines);
   const sol = p_(`Test_Classify reads row r and passes income and r${off ? ' + ' + off : ''} to Classify, which writes to column ${oc} (${colL(oc)}). Above ${sh(th)}: ${inc.filter(x => x > th).map(sh).join(', ') || 'none'} → ${high} × “High”.`) +
     p_(`A${rk} = ${sh(inc[kk])} → ${addr(rk + off, oc)} gets “${inc[kk] > th ? 'High' : 'Low'}”.${inc[kk] === th ? ' An income equal to the threshold is not > ' + sh(th) + ', so it is Low.' : ''}`);
-  return { ...Q('L4.call', 4, html, parts), solution: sol };
+  const k = calc();
+  inc.forEach((x, i) => {
+    const r = a + i, hi = x > th;
+    k.s(`**Pass r = ${r}:** \`income = Cells(${r}, 1)\` = ${x}; \`${x} > ${th}\` is ${hi ? 'true' : 'false'}, so "${hi ? 'High' : 'Low'}" goes to \`Cells(${r}${off ? ' + ' + off : ''}, ${oc})\` = ${addr(r + off, oc)}.`);
+  });
+  k.r(`**Count of "High":** ${high} of the ${inc.length} incomes are above ${th}.`, 'high');
+  k.r(`**Cell for A${rk}:** r = ${rk} is passed as \`out_row\` = ${rk}${off ? ' + ' + off + ' = ' + (rk + off) : ''}; the column is ${oc}, the letter ${colL(oc)}, so the cell is ${addr(rk + off, oc)}.`, 'cell');
+  k.r(`**Label for A${rk}:** income ${inc[kk]}; \`${inc[kk]} > ${th}\` is ${inc[kk] > th ? 'true' : 'false'}${inc[kk] === th ? ' (equal to the threshold, not greater)' : ''}, so the label is "${inc[kk] > th ? 'High' : 'Low'}".`, 'lab');
+  return { ...withCalc(Q('L4.call', 4, html, parts), k.steps), solution: sol };
 }
 
 /** Tax_Batch: outer loop over clients, inner Sub Tax_One per client. */
@@ -413,15 +561,20 @@ export function L4_batch(): Question {
   const lines = ['Sub Tax_Batch()', '    Dim n_clients As Long', `    n_clients = ${n}`, '    Dim i As Long', '    Dim client_income As Double', '    For i = 1 To n_clients',
     `        client_income = Worksheets("Sheet1").Cells(i + ${off}, 1)`, `        Call Tax_One(client_income, i + ${off}, ${oc})`, '    Next', 'End Sub'];
   const parts = chooseParts([
-    { part: CT(`Cell that receives the tax of client i = ${k}`, addr(k + off, oc), [addr(k, oc), addr(k + off, 1), addr(k + off + 1, oc), addr(oc, k + off)]), must: true },
-    { part: CN('Last row read from column A', n + off, [n, n + off - 1, n + off + 1]), w: 0.6 },
-    { part: CN('Number of times Tax_One runs', n, [n + 1, n - 1, n + off]), w: 0.4 },
-    { part: N(`Tax written for client i = ${k}, whose income is €${sh(income)}`, taxOf(income), 'eur'), w: 0.7 },
+    { part: K(CT(`Cell that receives the tax of client i = ${k}`, addr(k + off, oc), [addr(k, oc), addr(k + off, 1), addr(k + off + 1, oc), addr(oc, k + off)]), 'cell'), must: true },
+    { part: K(CN('Last row read from column A', n + off, [n, n + off - 1, n + off + 1]), 'last'), w: 0.6 },
+    { part: K(CN('Number of times Tax_One runs', n, [n + 1, n - 1, n + off]), 'times'), w: 0.4 },
+    { part: K(N(`Tax written for client i = ${k}, whose income is €${sh(income)}`, taxOf(income), 'eur'), 'tax'), w: 0.7 },
   ], 3, 3);
   const html = p_('Tax_One(income, out_row, out_col) computes the tax with the Case 1 table and writes it to row out_row, column out_col of Sheet1. The table is:') + taxSheet(TAX, false) + code(lines);
   const sol = p_(`Client i is read from row i + ${off} and written to row i + ${off}, column ${oc} (${colL(oc)}). Client ${k}: ${addr(k + off, oc)}. The loop calls Tax_One ${n} times and reads rows ${1 + off} to ${n + off}.`) +
     p_(`Tax for €${sh(income)}: ${eur(taxOf(income))}.`);
-  return { ...Q('L4.batch', 4, html, parts), solution: sol };
+  const kc = calc();
+  kc.r(`**Number of calls:** \`For i = 1 To ${n}\` runs ${n} times and calls Tax_One once per pass.`, 'times');
+  kc.r(`**Last row read:** in the last pass i = ${n} the row is \`i + ${off}\` = ${n} + ${off} = ${n + off}.`, 'last');
+  kc.r(`**Cell for client ${k}:** row \`i + ${off}\` = ${k} + ${off} = ${k + off}; the column is ${oc}, the letter ${colL(oc)}, so the cell is ${addr(k + off, oc)}.`, 'cell');
+  taxCalc(kc, income, 'tax');
+  return { ...withCalc(Q('L4.batch', 4, html, parts), kc.steps), solution: sol };
 }
 
 const DESIGN: [string, string][] = [
@@ -444,14 +597,19 @@ export function L4_args(): Question {
   const j = rint(0, calls.length - 1), d = pick(DESIGN);
   const x = calls[j];
   const parts: Part[] = [
-    CT(`Cell written by call number ${j + 1}`, addr(x.r, x.c), [addr(x.c, x.r), colL(x.r > 26 ? 1 : x.r) + x.c, addr(x.r, x.c + 1), addr(x.r + 1, x.c)]),
-    N(`Value written by call number ${j + 1}`, taxOf(x.inc), 'eur'),
-    C(`Tax_Batch loops over clients and calls Tax_One. Which Sub changes? ${d[0]}`, ['Tax_Batch', 'Tax_One', 'Both', 'Neither'], ['Tax_Batch', 'Tax_One', 'Both', 'Neither'].indexOf(d[1])),
+    K(CT(`Cell written by call number ${j + 1}`, addr(x.r, x.c), [addr(x.c, x.r), colL(x.r > 26 ? 1 : x.r) + x.c, addr(x.r, x.c + 1), addr(x.r + 1, x.c)]), 'cell'),
+    K(N(`Value written by call number ${j + 1}`, taxOf(x.inc), 'eur'), 'val'),
+    K(C(`Tax_Batch loops over clients and calls Tax_One. Which Sub changes? ${d[0]}`, ['Tax_Batch', 'Tax_One', 'Both', 'Neither'], ['Tax_Batch', 'Tax_One', 'Both', 'Neither'].indexOf(d[1])), 'des'),
   ];
   const html = p_('Tax_One(income As Double, out_row As Long, out_col As Long) computes the tax with the Case 1 table and writes it to Cells(out_row, out_col) of Sheet1.') + taxSheet(TAX, false) + code(lines);
   const sol = p_(`Arguments are matched by position: income ${sh(x.inc)}, row ${x.r}, column ${x.c} → ${addr(x.r, x.c)} receives ${eur(taxOf(x.inc))}.`) +
     p_(`${d[0]} → ${d[1]}. The outer Sub owns the data layout (how many clients, where they are, where results go); the inner Sub owns the tax logic (the table and its brackets).${d[1] === 'Neither' ? ' A rate is read from the worksheet, so no code changes.' : ''}`);
-  return { ...Q('L4.args', 4, html, parts), solution: sol };
+  const kc = calc();
+  kc.s(`**Arguments:** call number ${j + 1} is \`Call Tax_One(${x.inc}, ${x.r}, ${x.c})\`; they are matched by position: income = ${x.inc}, out_row = ${x.r}, out_col = ${x.c}.`);
+  kc.r(`**Cell:** \`Cells(${x.r}, ${x.c})\` is row ${x.r}, column ${x.c}; column ${x.c} is the letter ${colL(x.c)}, so the cell is ${addr(x.r, x.c)}.`, 'cell');
+  taxCalc(kc, x.inc, 'val');
+  kc.r(`**Which Sub changes:** "${d[0]}" ${d[1] === 'Neither' ? 'only changes data in the worksheet, which the code reads, so neither Sub changes.' : d[1] === 'Tax_Batch' ? 'concerns the client list or where results go, which Tax_Batch (the outer loop) owns.' : 'concerns the tax table and its brackets, which Tax_One owns.'}`, 'des');
+  return { ...withCalc(Q('L4.args', 4, html, parts), kc.steps), solution: sol };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -469,16 +627,23 @@ export function L5_uniform(): Question {
   const g = (u: number) => u * (b - a) + a;
   const lines = ['    a = ' + vb(a), '    b = ' + vb(b), '    For i = 1 To 40', '        ret = Rnd() * (b - a) + a', '        ws.Cells(i + 2, 1) = ret', '    Next'];
   const parts = chooseParts([
-    { part: Nd(`ret when Rnd() returns ${vb(u1)}`, g(u1)), must: true },
-    { part: Nd(`ret when Rnd() returns ${vb(u2)}`, g(u2)), w: 0.6 },
-    { part: Nd('Average of many simulated returns', (a + b) / 2), w: 0.5 },
-    { part: CT('Range of possible values of ret', `[${vb(a)}, ${vb(b)})`, [`[${vb(a)}, ${vb(b)}]`, `[0, ${vb(b - a)})`, `[${vb(a)}, ${vb(a + b)})`, '[0, 1)']), w: 0.5 },
-    { part: CT('Row of the cell that receives the draw of i = 1', 'Row 3', ['Row 1', 'Row 2', 'Row 4']), w: 0.3 },
+    { part: K(Nd(`ret when Rnd() returns ${vb(u1)}`, g(u1)), 'r1'), must: true },
+    { part: K(Nd(`ret when Rnd() returns ${vb(u2)}`, g(u2)), 'r2'), w: 0.6 },
+    { part: K(Nd('Average of many simulated returns', (a + b) / 2), 'avg'), w: 0.5 },
+    { part: K(CT('Range of possible values of ret', `[${vb(a)}, ${vb(b)})`, [`[${vb(a)}, ${vb(b)}]`, `[0, ${vb(b - a)})`, `[${vb(a)}, ${vb(a + b)})`, '[0, 1)']), 'rng'), w: 0.5 },
+    { part: K(CT('Row of the cell that receives the draw of i = 1', 'Row 3', ['Row 1', 'Row 2', 'Row 4']), 'row'), w: 0.3 },
   ], 2, 3);
   const html = p_('Uniform_Returns simulates daily returns (rows 1 and 2 hold the title and headers):') + code(lines) + p_('Enter returns as decimals, e.g. 0.0123.');
   const sol = p_(`ret = u × (${vb(b)} − (${vb(a)})) + (${vb(a)}) = u × ${vb(b - a)} ${a < 0 ? '− ' + vb(-a) : '+ ' + vb(a)}. For u = ${vb(u1)}: ${vb(+g(u1).toFixed(6))}; for u = ${vb(u2)}: ${vb(+g(u2).toFixed(6))}.`) +
     p_(`Rnd() lies in [0, 1), so ret lies in [${vb(a)}, ${vb(b)}): it can equal a but never b. The midpoint ${vb((a + b) / 2)} is the average. i + 2 skips the two header rows, so i = 1 lands in row 3.`);
-  return { ...Q('L5.uniform', 5, html, parts), solution: sol };
+  const k = calc(), w = b - a;
+  k.s(`**Width of the range:** $b - a = ${tn(b, 4)} - ${tq(a, 4)} = ${tn(w, 4)}$.`);
+  k.r(`**Draw ${vb(u1)}:** $ret = u \\times (b - a) + a = ${tn(u1, 2)} \\times ${tn(w, 4)} + ${tq(a, 4)} = ${tq(u1 * w, 6)} + ${tq(a, 4)} = ${tn(g(u1), 6)}$.`, 'r1', g(u1));
+  k.r(`**Draw ${vb(u2)}:** $ret = ${tn(u2, 2)} \\times ${tn(w, 4)} + ${tq(a, 4)} = ${tq(u2 * w, 6)} + ${tq(a, 4)} = ${tn(g(u2), 6)}$.`, 'r2', g(u2));
+  k.r(`**Average:** Rnd() averages 0.5, so the average return is $\\frac{a + b}{2} = \\frac{${tq(a, 4)} + ${tn(b, 4)}}{2} = ${tn((a + b) / 2, 6)}$.`, 'avg', (a + b) / 2);
+  k.r(`**Range:** Rnd() lies in \`[0, 1)\`. For u = 0 the formula gives ret = a = ${vb(a)}; as u approaches 1, ret approaches b = ${vb(b)} but never reaches it, so the range is \`[${vb(a)}, ${vb(b)})\`.`, 'rng');
+  k.r('**Row:** `ws.Cells(i + 2, 1)` with i = 1 is `Cells(3, 1)`, so the draw lands in row 3 (rows 1 and 2 hold title and headers).', 'row');
+  return { ...withCalc(Q('L5.uniform', 5, html, parts), k.steps), solution: sol };
 }
 
 const PROBS = [0.975, 0.025, 0.95, 0.05, 0.9, 0.1, 0.99, 0.01, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.85, 0.15];
@@ -490,16 +655,21 @@ export function L5_norm(): Question {
   const z1 = +normSInv(p1).toFixed(4), z2 = +normSInv(p2).toFixed(4);
   const hi = Math.max(p1, 1 - p1);
   const parts = chooseParts([
-    { part: Nd(`NormInv(${vb(p1)}, ${vb(mu)}, ${vb(s)})`, mu + s * z1), must: true },
-    { part: Nd(`NormInv(${vb(p2)}, ${vb(mu)}, ${vb(s)})`, mu + s * z2), w: 0.6 },
-    { part: Nd(`NormInv(0.5, ${vb(mu)}, ${vb(s)})`, mu), w: 0.3 },
-    { part: N(`Share of draws between ${vb(+(mu - s * Math.abs(normSInv(hi))).toFixed(5))} and ${vb(+(mu + s * Math.abs(normSInv(hi))).toFixed(5))}`, (2 * hi - 1) * 100, 'pct', { abs: 0.01 }), w: 0.5 },
+    { part: K(Nd(`NormInv(${vb(p1)}, ${vb(mu)}, ${vb(s)})`, mu + s * z1), 'n1'), must: true },
+    { part: K(Nd(`NormInv(${vb(p2)}, ${vb(mu)}, ${vb(s)})`, mu + s * z2), 'n2'), w: 0.6 },
+    { part: K(Nd(`NormInv(0.5, ${vb(mu)}, ${vb(s)})`, mu), 'mid'), w: 0.3 },
+    { part: K(N(`Share of draws between ${vb(+(mu - s * Math.abs(normSInv(hi))).toFixed(5))} and ${vb(+(mu + s * Math.abs(normSInv(hi))).toFixed(5))}`, (2 * hi - 1) * 100, 'pct', { abs: 0.01 }), 'share'), w: 0.5 },
   ], 2, 3);
   const html = p_(`Normal_Returns draws daily returns with ${ic(`Application.WorksheetFunction.NormInv(Rnd(), ${vb(mu)}, ${vb(s)})`)}. Standard normal quantiles: NORM.S.INV(${vb(p1)}) = ${vb(z1)}, NORM.S.INV(${vb(p2)}) = ${vb(z2)}${hi !== p1 && hi !== p2 ? `, NORM.S.INV(${vb(hi)}) = ${vb(+normSInv(hi).toFixed(4))}` : ''}.`) +
     p_('Enter returns as decimals.');
   const sol = p_(`NormInv(p, μ, σ) = μ + σ × z(p): ${vb(mu)} + ${vb(s)} × ${vb(z1)} = ${vb(+(mu + s * z1).toFixed(6))}; ${vb(mu)} + ${vb(s)} × ${vb(z2)} = ${vb(+(mu + s * z2).toFixed(6))}. p = 0.5 gives the mean.`) +
     p_(`Between the ${vb(+(1 - hi).toFixed(3))} and ${vb(hi)} quantiles lie ${f2((2 * hi - 1) * 100)}% of the draws.`);
-  return { ...Q('L5.norm', 5, html, parts), solution: sol };
+  const k = calc(), zh = +normSInv(hi).toFixed(4);
+  k.r(`**NormInv(${vb(p1)}):** $\\mu + \\sigma \\times z = ${tn(mu, 4)} + ${tn(s, 4)} \\times ${tq(z1, 4)} = ${tn(mu, 4)} + ${tq(s * z1, 6)} = ${tn(mu + s * z1, 6)}$, with z = NORM.S.INV(${vb(p1)}) = ${tn(z1, 4)}.`, 'n1', mu + s * z1);
+  k.r(`**NormInv(${vb(p2)}):** $${tn(mu, 4)} + ${tn(s, 4)} \\times ${tq(z2, 4)} = ${tn(mu, 4)} + ${tq(s * z2, 6)} = ${tn(mu + s * z2, 6)}$, with z = NORM.S.INV(${vb(p2)}) = ${tn(z2, 4)}.`, 'n2', mu + s * z2);
+  k.r(`**NormInv(0.5):** the median of a standard Normal is z = 0, so the result is the mean: $${tn(mu, 4)} + ${tn(s, 4)} \\times 0 = ${tn(mu, 6)}$.`, 'mid', mu);
+  k.r(`**Share between the quantiles:** the interval is the mean plus and minus ${tn(zh, 4)} standard deviations, i.e. it runs from the ${tn(1 - hi, 3)} to the ${tn(hi, 3)} quantile. Its probability is $${tn(hi, 3)} - ${tn(1 - hi, 3)} = ${tn(2 * hi - 1, 3)}$, that is $${tn((2 * hi - 1) * 100, 2)}\\%$.`, 'share', (2 * hi - 1) * 100);
+  return { ...withCalc(Q('L5.norm', 5, html, parts), k.steps), solution: sol };
 }
 
 /** Writing a 2D array to a Range in one step: sizes and positions. */
@@ -510,14 +680,18 @@ export function L5_array(): Question {
     `    Set ret_range = ws.Range(ws.Cells(${r0}, ${c0}), ws.Cells(?, ?))`, `    For i = 1 To ${T}`, `        For j = 1 To ${n}`, '            returns(i, j) = Application.WorksheetFunction.NormInv(Rnd(), 0, 0.01)', '        Next j', '    Next i', '    ret_range.Value = returns', 'End Sub'];
   const br = addr(r0 + T - 1, c0 + n - 1);
   const parts = chooseParts([
-    { part: CT('Bottom-right cell the Range must end at (the ? marks)', br, [addr(r0 + T, c0 + n - 1), addr(T, n), addr(r0 + T - 1, c0 + n), addr(n, r0 + T - 1), addr(T, c0 + n - 1)]), must: true },
-    { part: CN('Number of random draws written', T * n, [T + n, T * n - n, (T + 1) * n, T]), w: 0.6 },
-    { part: CT(`Cell that receives returns(${i}, ${j})`, addr(r0 + i - 1, c0 + j - 1), [addr(i, j), addr(r0 + i, c0 + j - 1), addr(r0 + i - 1, c0 + j), addr(j, i)]), w: 0.7 },
+    { part: K(CT('Bottom-right cell the Range must end at (the ? marks)', br, [addr(r0 + T, c0 + n - 1), addr(T, n), addr(r0 + T - 1, c0 + n), addr(n, r0 + T - 1), addr(T, c0 + n - 1)]), 'br'), must: true },
+    { part: K(CN('Number of random draws written', T * n, [T + n, T * n - n, (T + 1) * n, T]), 'cnt'), w: 0.6 },
+    { part: K(CT(`Cell that receives returns(${i}, ${j})`, addr(r0 + i - 1, c0 + j - 1), [addr(i, j), addr(r0 + i, c0 + j - 1), addr(r0 + i - 1, c0 + j), addr(j, i)]), 'cell'), w: 0.7 },
   ], 2, 3);
   const html = p_('The array must match the Range exactly. Read the Sub:') + code(lines);
   const sol = p_(`The array has ${T} rows and ${n} column${n > 1 ? 's' : ''}; starting at ${addr(r0, c0)} the block ends ${T - 1} rows lower and ${n - 1} column${n === 2 ? '' : 's'} to the right: ${br}. That is ${T} × ${n} = ${T * n} draws, written in one step.`) +
     p_(`returns(i, j) lands in row ${r0} + i − 1, column ${c0} + j − 1: returns(${i}, ${j}) → ${addr(r0 + i - 1, c0 + j - 1)}.`);
-  return { ...Q('L5.array', 5, html, parts), solution: sol };
+  const k = calc();
+  k.r(`**Bottom-right cell:** the Range starts at ${addr(r0, c0)} (row ${r0}, column ${c0}). ${T} rows end in row $${r0} + ${T} - 1 = ${r0 + T - 1}$, and ${n} column${n > 1 ? 's' : ''} end in column $${c0} + ${n} - 1 = ${c0 + n - 1}$, the letter ${colL(c0 + n - 1)}. So the Range ends at ${br}, i.e. \`ws.Cells(${r0 + T - 1}, ${c0 + n - 1})\`.`, 'br');
+  k.r(`**Draws:** the array has ${T} rows and ${n} column${n > 1 ? 's' : ''}, so $${T} \\times ${n} = ${T * n}$ random numbers.`, 'cnt');
+  k.r(`**Cell for returns(${i}, ${j}):** row $${r0} + ${i} - 1 = ${r0 + i - 1}$, column $${c0} + ${j} - 1 = ${c0 + j - 1}$, the letter ${colL(c0 + j - 1)}, so ${addr(r0 + i - 1, c0 + j - 1)}.`, 'cell');
+  return { ...withCalc(Q('L5.array', 5, html, parts), k.steps), solution: sol };
 }
 
 const E5 = ['Run-time error 91 (object variable not set)', 'Run-time error 1004', 'Sub or Function not defined', 'Type mismatch', 'No error: the code runs'];
@@ -560,17 +734,25 @@ export function L6_stats(): Question {
   const html = p_(`Sheet1 holds ${n} simulated returns for two assets:`) + sheet([1, 2], x.map((v, i) => [i + 1, [v, y[i]]])) +
     code(['    Set col1 = ws.Range(ws.Cells(1, 1), ws.Cells(' + n + ', 1))', '    Set col2 = ws.Range(ws.Cells(1, 2), ws.Cells(' + n + ', 2))']) + p_('What do these WorksheetFunction calls return?');
   const parts = chooseParts([
-    { part: Nd('Average(col1)', mx, 1e-5), w: 0.6 },
-    { part: Nd('StDev_S(col1)', sx, 1e-5), w: 0.7 },
-    { part: Nd('Covariance_S(col1, col2)', cv, 5e-5), w: 0.8 },
-    { part: Nd('Covariance_S(col1, col1)', sx * sx, 5e-5), w: 0.4 },
-    { part: N('Correlation of the two assets', rho, 'n', { abs: 0.005 }), w: 0.5 },
-    { part: Nd('Sharpe ratio of asset 2, Average(col2) / StDev_S(col2) (r_f = 0)', mean(y) / sy, 0.002), w: 0.4 },
+    { part: K(Nd('Average(col1)', mx, 1e-5), 'avg'), w: 0.6 },
+    { part: K(Nd('StDev_S(col1)', sx, 1e-5), 'sd'), w: 0.7 },
+    { part: K(Nd('Covariance_S(col1, col2)', cv, 5e-5), 'cov'), w: 0.8 },
+    { part: K(Nd('Covariance_S(col1, col1)', sx * sx, 5e-5), 'var'), w: 0.4 },
+    { part: K(N('Correlation of the two assets', rho, 'n', { abs: 0.005 }), 'corr'), w: 0.5 },
+    { part: K(Nd('Sharpe ratio of asset 2, Average(col2) / StDev_S(col2) (r_f = 0)', mean(y) / sy, 0.002), 'shp'), w: 0.4 },
   ], 3, 4);
   const sol = p_(`Mean of asset 1 = ${f6(mx)}; StDev_S divides by n − 1 = ${n - 1}: s<sub>1</sub> = ${f6(sx)}, s<sub>2</sub> = ${f6(sy)}.`) +
     p_(`Covariance_S = Σ(x − x̄)(y − ȳ) / (n − 1) = ${f6(cv)}. With the same column twice it gives the variance, ${f6(sx * sx)} = s<sub>1</sub>². Correlation = ${f6(cv)} / (${f4(sx)} × ${f4(sy)}) = ${f4(rho)}.`) +
     p_(`Sharpe of asset 2 = ${f6(mean(y))} / ${f6(sy)} = ${f4(mean(y) / sy)}.`);
-  return { ...Q('L6.stats', 6, html, parts), solution: sol };
+  const k = calc();
+  const X = stdCalc(k, x, 'col1', { mean: 'avg', vr: 'var', sd: 'sd' });
+  const Y = stdCalc(k, y, 'col2');
+  const prods = X.dev.map((d, i) => d * Y.dev[i]), sp = prods.reduce((s, z) => s + z, 0);
+  k.s('**Products of matching deviations:** ' + prods.map((z, i) => `$(${tn(X.dev[i], 6)}) \\times (${tn(Y.dev[i], 6)}) = ${tn(z, 8)}$`).join(', ') + '.');
+  k.r(`**Covariance_S(col1, col2):** $\\frac{\\sum (x - \\bar{x})(y - \\bar{y})}{n - 1} = \\frac{${tn(sp, 8)}}{${n - 1}} = ${tn(cv, 8)}$.`, 'cov', cv);
+  k.r(`**Correlation:** $\\rho = \\frac{Cov}{s_1 s_2} = \\frac{${tn(cv, 8)}}{${tn(sx, 6)} \\times ${tn(sy, 6)}} = \\frac{${tn(cv, 8)}}{${tn(sx * sy, 8)}} = ${tn(rho, 6)}$.`, 'corr', rho);
+  k.r(`**Sharpe ratio of asset 2:** $\\frac{\\bar{y}}{s_2} = \\frac{${tn(Y.m, 6)}}{${tn(sy, 6)}} = ${tn(mean(y) / sy, 6)}$.`, 'shp', mean(y) / sy);
+  return { ...withCalc(Q('L6.stats', 6, html, parts), k.steps), solution: sol };
 }
 
 /** The covariance matrix: symmetry, diagonal, correlation and where Covar_Matrix writes each entry. */
@@ -589,14 +771,19 @@ export function L6_matrix(): Question {
   const p = rint(0, k - 1), q = rint(0, k - 1);
   const rho = M[lo][hi] / Math.sqrt(M[lo][lo] * M[hi][hi]);
   const parts = chooseParts([
-    { part: Nd('The missing covariance', M[hi][lo], 5e-5), must: true },
-    { part: Nd(`Standard deviation of asset ${a + 1}`, Math.sqrt(M[a][a]), 1e-4), w: 0.6 },
-    { part: N(`Correlation of assets ${lo + 1} and ${hi + 1}`, rho, 'n', { abs: 0.005 }), w: 0.7 },
-    { part: CT(`Cell that holds Cov(${p + 1}, ${q + 1})`, addr(r0 + p + 1, c0 + q + 1), [addr(r0 + q + 1, c0 + p + 1 + (p === q ? 1 : 0)), addr(r0 + p, c0 + q + 1), addr(p + 1, c0 + q + 1), addr(r0 + p + 1, c0 + q + 2)]), w: 0.6 },
+    { part: K(Nd('The missing covariance', M[hi][lo], 5e-5), 'miss'), must: true },
+    { part: K(Nd(`Standard deviation of asset ${a + 1}`, Math.sqrt(M[a][a]), 1e-4), 'sd'), w: 0.6 },
+    { part: K(N(`Correlation of assets ${lo + 1} and ${hi + 1}`, rho, 'n', { abs: 0.005 }), 'corr'), w: 0.7 },
+    { part: K(CT(`Cell that holds Cov(${p + 1}, ${q + 1})`, addr(r0 + p + 1, c0 + q + 1), [addr(r0 + q + 1, c0 + p + 1 + (p === q ? 1 : 0)), addr(r0 + p, c0 + q + 1), addr(p + 1, c0 + q + 1), addr(r0 + p + 1, c0 + q + 2)]), 'cell'), w: 0.6 },
   ], 3, 3);
   const sol = p_(`The matrix is symmetric, Cov(${hi + 1}, ${lo + 1}) = Cov(${lo + 1}, ${hi + 1}) = ${f4(M[lo][hi])}. The diagonal holds variances, so σ<sub>${a + 1}</sub> = √${f4(M[a][a])} = ${f4(Math.sqrt(M[a][a]))}.`) +
     p_(`ρ = ${f4(M[lo][hi])} / (√${f4(M[lo][lo])} × √${f4(M[hi][hi])}) = ${f4(rho)}. Entry (i, j) goes to row ${r0} + i, column ${c0 ? c0 + ' + ' : ''}j: Cov(${p + 1}, ${q + 1}) → ${addr(r0 + p + 1, c0 + q + 1)}.`);
-  return { ...Q('L6.matrix', 6, html, parts), solution: sol };
+  const kc = calc(), s1 = Math.sqrt(M[lo][lo]), s2 = Math.sqrt(M[hi][hi]);
+  kc.r(`**Missing entry:** the matrix is symmetric, so Cov(${hi + 1}, ${lo + 1}) = Cov(${lo + 1}, ${hi + 1}), the entry in row ${lo + 1}, column ${hi + 1}: ${tn(M[lo][hi], 4)}.`, 'miss', M[hi][lo]);
+  kc.r(`**Standard deviation of asset ${a + 1}:** the diagonal entry is the variance ${tn(M[a][a], 4)}, so $\\sigma = \\sqrt{${tn(M[a][a], 4)}} = ${tn(Math.sqrt(M[a][a]), 6)}$.`, 'sd', Math.sqrt(M[a][a]));
+  kc.r(`**Correlation:** $\\rho = \\frac{Cov}{\\sqrt{Var_{${lo + 1}}} \\times \\sqrt{Var_{${hi + 1}}}} = \\frac{${tn(M[lo][hi], 4)}}{\\sqrt{${tn(M[lo][lo], 4)}} \\times \\sqrt{${tn(M[hi][hi], 4)}}} = \\frac{${tn(M[lo][hi], 4)}}{${tn(s1, 6)} \\times ${tn(s2, 6)}} = \\frac{${tn(M[lo][hi], 4)}}{${tn(s1 * s2, 8)}} = ${tn(rho, 6)}$.`, 'corr', rho);
+  kc.r(`**Cell for Cov(${p + 1}, ${q + 1}):** the pass i = ${p + 1}, j = ${q + 1} writes to \`Cells(${r0} + i, ${c0 ? c0 + ' + ' : ''}j)\` = \`Cells(${r0 + p + 1}, ${c0 + q + 1})\`: row ${r0 + p + 1}, column ${c0 + q + 1}, the letter ${colL(c0 + q + 1)}, so ${addr(r0 + p + 1, c0 + q + 1)}.`, 'cell');
+  return { ...withCalc(Q('L6.matrix', 6, html, parts), kc.steps), solution: sol };
 }
 
 /** ws.Range(ws.Cells(r1, c1), ws.Cells(r2, c2)) and the summary table layout. */
@@ -607,13 +794,17 @@ export function L6_range(): Question {
   const block = `${addr(r1, c1)}:${addr(r2, c2)}`, cnt = (r2 - r1 + 1) * (c2 - c1 + 1);
   const jc = c1 + j - 1;
   const parts: Part[] = [
-    CT('Block of the first Range (col.Address without $ signs)', block, [`${addr(c1, r1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2 + 1, c2)}`, `${addr(r1, c1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2, c2 + 1)}`]),
-    CN('Number of cells in it', cnt, [r2 - r1 + 1, (r2 - r1) * (c2 - c1 + 1), (r2 - r1 + 1) * (c2 - c1), r2 * c2]),
-    CT(`Cell that receives the standard deviation of column ${colL(jc)}`, addr(r2 + 3, jc), [addr(r2 + 2, jc), addr(r2 + 3, j), addr(jc, r2 + 3), addr(r2 + 4, jc)]),
+    K(CT('Block of the first Range (col.Address without $ signs)', block, [`${addr(c1, r1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2 + 1, c2)}`, `${addr(r1, c1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2, c2 + 1)}`]), 'blk'),
+    K(CN('Number of cells in it', cnt, [r2 - r1 + 1, (r2 - r1) * (c2 - c1 + 1), (r2 - r1 + 1) * (c2 - c1), r2 * c2]), 'cnt'),
+    K(CT(`Cell that receives the standard deviation of column ${colL(jc)}`, addr(r2 + 3, jc), [addr(r2 + 2, jc), addr(r2 + 3, j), addr(jc, r2 + 3), addr(r2 + 4, jc)]), 'cell'),
   ];
   const sol = p_(`Range(top-left, bottom-right): Cells(${r1}, ${c1}) = ${addr(r1, c1)} and Cells(${r2}, ${c2}) = ${addr(r2, c2)}, so ${block}: ${r2 - r1 + 1} rows × ${c2 - c1 + 1} column${c2 > c1 ? 's' : ''} = ${cnt} cells.`) +
     p_(`In the loop the Set line builds one column per j; the mean goes to row ${r2 + 2}, StDev_S to row ${r2 + 3}: column ${colL(jc)} → ${addr(r2 + 3, jc)}.`);
-  return { ...Q('L6.range', 6, p_('Read the Sub and answer the questions.') + code(lines), parts), solution: sol };
+  const k = calc();
+  k.r(`**Block:** \`Cells(${r1}, ${c1})\` is row ${r1}, column ${c1} = ${addr(r1, c1)} (top left); \`Cells(${r2}, ${c2})\` is row ${r2}, column ${c2} = ${addr(r2, c2)} (bottom right). So the Range is ${block}.`, 'blk');
+  k.r(`**Number of cells:** rows $${r2} - ${r1} + 1 = ${r2 - r1 + 1}$, columns $${c2} - ${c1} + 1 = ${c2 - c1 + 1}$, so $${r2 - r1 + 1} \\times ${c2 - c1 + 1} = ${cnt}$ cells.`, 'cnt');
+  k.r(`**Cell for column ${colL(jc)}:** StDev_S is written to \`Cells(${r2} + 3, j)\` = \`Cells(${r2 + 3}, ${jc})\`: row ${r2 + 3}, column ${jc}, the letter ${colL(jc)}, so ${addr(r2 + 3, jc)} (the average goes one row higher, ${addr(r2 + 2, jc)}).`, 'cell');
+  return { ...withCalc(Q('L6.range', 6, p_('Read the Sub and answer the questions.') + code(lines), parts), k.steps), solution: sol };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -628,29 +819,52 @@ export function L7_trace(): Question {
     const fv = v0 * (1 + r) ** n;
     const lines = ['Function grow(v As Double, r As Double, n As Long) As Double', '    Dim i As Long', '    For i = 1 To n', '        v = v * (1 + r)', '    Next i', '    grow = v', 'End Function', '',
       'Sub Test_Grow()', '    Dim x As Double', '    Dim y As Double', `    x = ${v0}`, `    y = grow(x, ${vb(r)}, ${n})`, '    MsgBox (x & " / " & y)', 'End Sub'];
-    const parts: Part[] = [N(`Value of =grow(${v0}, ${vb(r)}, ${n}) in a cell`, fv, 'n', { abs: 0.005 }), N('Value of x shown by the MsgBox', fv, 'n', { abs: 0.005 }), CN(`Value of =grow(${v0}, ${vb(r)}, 0)`, v0, [0, v0 * (1 + r), 1], f4)];
+    const parts: Part[] = [K(N(`Value of =grow(${v0}, ${vb(r)}, ${n}) in a cell`, fv, 'n', { abs: 0.005 }), 'fv'), K(N('Value of x shown by the MsgBox', fv, 'n', { abs: 0.005 }), 'x'), K(CN(`Value of =grow(${v0}, ${vb(r)}, 0)`, v0, [0, v0 * (1 + r), 1], f4), 'zero')];
     const sol = p_(`grow compounds v for n periods: ${v0} × ${vb(1 + r)}<sup>${n}</sup> = ${f4(fv)}. With n = 0 the loop does not run and v = ${v0} is returned.`) +
       p_(`Arguments are passed ByRef by default. x is a Double variable passed to v As Double, so the loop changes x itself: the MsgBox shows ${f4(fv)} for x as well, not ${v0}.`);
-    return { ...Q('L7.trace', 7, p_('Read the function and the Sub that calls it.') + code(lines), parts), solution: sol };
+    const k = calc(), fac = 1 + r;
+    k.s(`**Setup:** \`grow(x, ${vb(r)}, ${n})\` passes v = ${v0}, r = ${vb(r)} and n = ${n}. The loop runs ${n} times; every pass multiplies v by 1 + r = ${tn(fac, 2)}.`);
+    let vv = v0;
+    for (let i = 1; i <= n; i++) { const nv = vv * fac; k.s(`**Pass i = ${i}:** $v = ${tn(vv, 6)} \\times ${tn(fac, 2)} = ${tn(nv, 6)}$.`); vv = nv; }
+    k.r(`**Function value:** $${tn(v0, 0)} \\times (1 + ${tn(r, 2)})^{${n}} = ${tn(v0, 0)} \\times ${tn(fac ** n, 6)} = ${tn(fv, 6)}$, and \`grow = v\` returns this number.`, 'fv', fv);
+    k.r(`**x after the call:** arguments are passed ByRef by default, so \`v\` is the same variable as \`x\` and the loop changed x itself. The MsgBox shows x = ${tn(fv, 6)}, not the original ${v0}.`, 'x', fv);
+    k.r(`**n = 0:** \`For i = 1 To 0\` does not run, so v is still ${v0} and grow returns ${v0}.`, 'zero');
+    return { ...withCalc(Q('L7.trace', 7, p_('Read the function and the Sub that calls it.') + code(lines), parts), k.steps), solution: sol };
   }
   if (kind === 'pv') {
     const cf = pick([100, 50, 1000, 200]), r = pick([0.04, 0.05, 0.06, 0.08, 0.1]), n = rint(2, 6);
     let pv = 0; for (let t = 1; t <= n; t++) pv += cf / (1 + r) ** t;
     const lines = ['Function pv_sum(cf As Double, r As Double, n As Long) As Double', '    Dim t As Long', '    Dim total As Double', '    For t = 1 To n', '        total = total + cf / (1 + r) ^ t', '    Next t', '    pv_sum = total', 'End Function'];
     let pv1 = 0; for (let t = 1; t <= n - 1; t++) pv1 += cf / (1 + r) ** t;
-    const parts: Part[] = [N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n})`, pv, 'n', { abs: 0.005 }), N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n - 1})`, pv1, 'n', { abs: 0.005 }), CN(`Value of =pv_sum(${cf}, ${vb(r)}, 0)`, 0, [cf, cf / (1 + r), 1], f4)];
+    const parts: Part[] = [K(N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n})`, pv, 'n', { abs: 0.005 }), 'pv'), K(N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n - 1})`, pv1, 'n', { abs: 0.005 }), 'pv1'), K(CN(`Value of =pv_sum(${cf}, ${vb(r)}, 0)`, 0, [cf, cf / (1 + r), 1], f4), 'zero')];
     const sol = p_(`pv_sum adds the discounted cash flows cf / (1 + r)<sup>t</sup> for t = 1 … n: ${f4(pv)} for n = ${n}, ${f4(pv1)} for n = ${n - 1}. total starts at 0 (default of a Double); with n = 0 the loop does not run and 0 is returned.`);
-    return { ...Q('L7.trace', 7, p_('A user-defined function is used in worksheet cells.') + code(lines), parts), solution: sol };
+    const k = calc();
+    let tot = 0;
+    k.s(`**Setup:** \`total\` starts at 0 (the default of a Double); pass t adds cf / (1 + r)^t with cf = ${cf} and r = ${vb(r)}.`);
+    for (let t = 1; t <= n; t++) {
+      const f = (1 + r) ** t, term = cf / f, prev = tot;
+      tot += term;
+      k.s(`**Pass t = ${t}:** $(1 + ${tn(r, 2)})^{${t}} = ${tn(f, 6)}$, so $${tn(cf, 0)} / ${tn(f, 6)} = ${tn(term, 6)}$ and $total = ${tn(prev, 6)} + ${tn(term, 6)} = ${tn(tot, 6)}$.`);
+    }
+    k.r(`**pv_sum with n = ${n}:** after the last pass (t = ${n}) total = ${tn(pv, 6)}, which the function returns.`, 'pv', pv);
+    k.r(`**pv_sum with n = ${n - 1}:** the loop stops after the pass t = ${n - 1}, so the result is the running total of that pass: ${tn(pv1, 6)}.`, 'pv1', pv1);
+    k.r('**n = 0:** the loop does not run, total keeps its start value 0 and the function returns 0.', 'zero');
+    return { ...withCalc(Q('L7.trace', 7, p_('A user-defined function is used in worksheet cells.') + code(lines), parts), k.steps), solution: sol };
   }
   const th = pick([0.01, 0.02, 0.03]);
   const lines = ['Function signal(ret As Double) As String', `    If ret > ${vb(th)} Then`, '        signal = "Buy"', `    ElseIf ret < ${vb(-th)} Then`, '        signal = "Sell"', '    End If', 'End Function'];
   const opts = ['Buy', 'Sell', 'Hold', 'An empty text ""'];
   const rets = shuffle([th + 0.01, -th - 0.01, 0, th, th / 2, -th]).slice(0, 3);
   const res = (r: number) => r > th + 1e-12 ? 0 : r < -th - 1e-12 ? 1 : 3;
-  const parts = rets.map(r => C(`=signal(${vb(r)}) returns`, opts, res(r)));
+  const parts = rets.map((r, i) => C(`=signal(${vb(r)}) returns`, opts, res(r), 'r' + i));
   const sol = p_(`Only two branches assign the function name. When neither condition holds (−${vb(th)} ≤ ret ≤ ${vb(th)}) the name is never assigned and the function returns the default of its type: an empty String. Add Else: signal = "Hold" to fix it.`) +
     p_(rets.map(r => `${vb(r)} → ${['Buy', 'Sell', '', '""'][res(r)]}`).join('; ') + '.');
-  return { ...Q('L7.trace', 7, p_('Read the function.') + code(lines), parts), solution: sol };
+  const k = calc();
+  rets.forEach((r, i) => {
+    const t1 = r > th + 1e-12, t2 = r < -th - 1e-12;
+    k.r(`**ret = ${vb(r)}:** \`ret > ${vb(th)}\` is ${t1 ? 'true, so signal = "Buy"' : 'false, and \`ret < ' + vb(-th) + '\` is ' + (t2 ? 'true, so signal = "Sell"' : 'false too: no branch runs, signal is never assigned and the function returns the default of a String, an empty text')}.`, 'r' + i);
+  });
+  return { ...withCalc(Q('L7.trace', 7, p_('Read the function.') + code(lines), parts), k.steps), solution: sol };
 }
 
 /** UniformArray(T, N, a, b): size, an element for a given draw, where an array result lands. */
@@ -659,14 +873,19 @@ export function L7_uniform(): Question {
   const r0 = rint(1, 5), c0 = rint(1, 4);
   const lines = ['Function UniformArray(T As Long, N As Long, a As Single, b As Single) As Variant', '    Dim my_array() As Double', '    ReDim my_array(1 To T, 1 To N)', '    Dim i As Integer, j As Integer', '    For i = 1 To T', '        For j = 1 To N', '            my_array(i, j) = Rnd() * (b - a) + a', '        Next j', '    Next i', '    UniformArray = my_array', 'End Function'];
   const parts = chooseParts([
-    { part: CN(`Number of draws returned by UniformArray(${T}, ${n}, ${vb(a)}, ${vb(b)})`, T * n, [T + n, T, n, (T - 1) * n]), must: true },
-    { part: Nd(`my_array(1, 1) if the first Rnd() returns ${vb(u)}`, u * (b - a) + a, 1e-6), w: 0.7 },
-    { part: CT(`The result is entered as an array formula starting in ${addr(r0, c0)}. Bottom-right cell of the block`, addr(r0 + T - 1, c0 + n - 1), [addr(r0 + n - 1, c0 + T - 1), addr(r0 + T, c0 + n), addr(T, n), addr(r0 + T - 1, c0 + n)]), w: 0.6 },
-    { part: CT('Why is my_array declared with Dim my_array() and then ReDim?', 'T and N are only known at run time; fixed bounds must be constants', ['ReDim makes the array two-dimensional', 'Dim cannot declare Double arrays', 'ReDim fills the array with zeros']), w: 0.5 },
+    { part: K(CN(`Number of draws returned by UniformArray(${T}, ${n}, ${vb(a)}, ${vb(b)})`, T * n, [T + n, T, n, (T - 1) * n]), 'cnt'), must: true },
+    { part: K(Nd(`my_array(1, 1) if the first Rnd() returns ${vb(u)}`, u * (b - a) + a, 1e-6), 'el'), w: 0.7 },
+    { part: K(CT(`The result is entered as an array formula starting in ${addr(r0, c0)}. Bottom-right cell of the block`, addr(r0 + T - 1, c0 + n - 1), [addr(r0 + n - 1, c0 + T - 1), addr(r0 + T, c0 + n), addr(T, n), addr(r0 + T - 1, c0 + n)]), 'br'), w: 0.6 },
+    { part: K(CT('Why is my_array declared with Dim my_array() and then ReDim?', 'T and N are only known at run time; fixed bounds must be constants', ['ReDim makes the array two-dimensional', 'Dim cannot declare Double arrays', 'ReDim fills the array with zeros']), 'why'), w: 0.5 },
   ], 3, 3);
   const sol = p_(`ReDim sizes the array to ${T} × ${n}: ${T * n} draws, each Rnd() × (b − a) + a. With u = ${vb(u)}: ${vb(u)} × ${vb(b - a)} + (${vb(a)}) = ${vb(+(u * (b - a) + a).toFixed(6))}.`) +
     p_(`A ${T} × ${n} result fills ${T} rows and ${n} columns from ${addr(r0, c0)} to ${addr(r0 + T - 1, c0 + n - 1)}. Dim my_array(1 To T, 1 To N) would not compile, because the bounds of a fixed array must be constants.`);
-  return { ...Q('L7.uniform', 7, p_('UniformArray from the class workbook:') + code(lines), parts), solution: sol };
+  const k = calc(), w = b - a;
+  k.r(`**Size:** \`ReDim my_array(1 To ${T}, 1 To ${n})\` gives ${T} rows and ${n} columns, so $${T} \\times ${n} = ${T * n}$ draws.`, 'cnt');
+  k.r(`**my_array(1, 1):** $u \\times (b - a) + a = ${tn(u, 2)} \\times (${tn(b, 4)} - ${tq(a, 4)}) + ${tq(a, 4)} = ${tn(u, 2)} \\times ${tn(w, 4)} + ${tq(a, 4)} = ${tq(u * w, 6)} + ${tq(a, 4)} = ${tn(u * w + a, 6)}$.`, 'el', u * w + a);
+  k.r(`**Block:** it starts at ${addr(r0, c0)}. ${T} rows end in row $${r0} + ${T} - 1 = ${r0 + T - 1}$, ${n} columns end in column $${c0} + ${n} - 1 = ${c0 + n - 1}$, the letter ${colL(c0 + n - 1)}. The bottom-right cell is ${addr(r0 + T - 1, c0 + n - 1)}.`, 'br');
+  k.r('**Why ReDim:** T and N are only known when the function runs, and a fixed array needs constant bounds. So the array is declared without bounds (`Dim my_array()`) and sized with `ReDim` once T and N are known.', 'why');
+  return { ...withCalc(Q('L7.uniform', 7, p_('UniformArray from the class workbook:') + code(lines), parts), k.steps), solution: sol };
 }
 
 const SYNTAX: { q: string; right: string; wrong: string[]; sol: string }[] = [
@@ -708,21 +927,32 @@ export function L8_sharpe(): Question {
     const sr = (mm: number, ss: number) => Math.sqrt(252) * (mm - rf / 252) / ss;
     const html = p_(`Two funds have these daily statistics over two years; the annual risk-free rate is ${P(rf, 1)} (rf = ${vb(rf)}). The function from class is:`) + code(SHARPE_CODE) +
       table(['Fund', 'Average daily return', 'StDev_S of daily returns'], [['Fund 1', vb(m), vb(s)], ['Fund 2', vb(m2), vb(s2)]]);
-    const parts: Part[] = [Nd('sharpe_ratio of fund 1', sr(m, s), 1e-3), Nd('sharpe_ratio of fund 2', sr(m2, s2), 1e-3), C('Fund with the higher Sharpe ratio', ['Fund 1', 'Fund 2'], sr(m, s) >= sr(m2, s2) ? 0 : 1)];
+    const parts: Part[] = [K(Nd('sharpe_ratio of fund 1', sr(m, s), 1e-3), 's1'), K(Nd('sharpe_ratio of fund 2', sr(m2, s2), 1e-3), 's2'), K(C('Fund with the higher Sharpe ratio', ['Fund 1', 'Fund 2'], sr(m, s) >= sr(m2, s2) ? 0 : 1), 'best')];
     const sol = p_(`rf_d = ${vb(rf)} / 252 = ${f6(rf / 252)}. Fund 1: √252 × (${vb(m)} − ${f6(rf / 252)}) / ${vb(s)} = ${f4(sr(m, s))}. Fund 2: √252 × (${vb(m2)} − ${f6(rf / 252)}) / ${vb(s2)} = ${f4(sr(m2, s2))}.`);
-    return { ...Q('L8.sharpe', 8, html, parts), solution: sol };
+    const k = calc(), rd = rf / 252, q = Math.sqrt(252);
+    k.s(`**Daily risk-free rate:** $rf_d = \\frac{rf}{252} = \\frac{${tn(rf, 3)}}{252} = ${tn(rd, 8)}$.`);
+    k.s(`**Annualisation factor:** $\\sqrt{252} = ${tn(q, 6)}$.`);
+    const fund = (nm: string, mm: number, ss: number, key: string) => k.r(`**${nm}:** $\\sqrt{252} \\times \\frac{\\text{avg} - rf_d}{\\text{std}} = ${tn(q, 6)} \\times \\frac{${tn(mm, 4)} - ${tn(rd, 8)}}{${tn(ss, 3)}} = ${tn(q, 6)} \\times \\frac{${tn(mm - rd, 8)}}{${tn(ss, 3)}} = ${tn(q, 6)} \\times ${tn((mm - rd) / ss, 6)} = ${tn(sr(mm, ss), 6)}$.`, key, sr(mm, ss));
+    fund('Fund 1', m, s, 's1');
+    fund('Fund 2', m2, s2, 's2');
+    k.r(`**Comparison:** Fund 1 has ${tn(sr(m, s), 4)} and Fund 2 has ${tn(sr(m2, s2), 4)}, so ${sr(m, s) >= sr(m2, s2) ? 'Fund 1' : 'Fund 2'} has the higher Sharpe ratio.`, 'best');
+    return { ...withCalc(Q('L8.sharpe', 8, html, parts), k.steps), solution: sol };
   }
   const r = dailySample(rint(6, 8), 2);
   const m = mean(r), s = stdevS(r), sr = Math.sqrt(252) * (m - rf / 252) / s;
   const html = p_(`A fund’s daily returns are in A2:A${r.length + 1}; H2 holds the annual risk-free rate ${vb(rf)}. Cell C2 contains =sharpe_ratio(A2:A${r.length + 1}, H2), using:`) + code(SHARPE_CODE) + sheet([1], r.map((x, i) => [i + 2, [x]]));
   const parts = chooseParts([
-    { part: Nd('avg_return', m, 1e-6), w: 0.6 },
-    { part: Nd('std_return', s, 1e-6), w: 0.6 },
-    { part: Nd('Value shown in C2', sr, 1e-3), must: true },
+    { part: K(Nd('avg_return', m, 1e-6), 'avg'), w: 0.6 },
+    { part: K(Nd('std_return', s, 1e-6), 'std'), w: 0.6 },
+    { part: K(Nd('Value shown in C2', sr, 1e-3), 'c2'), must: true },
   ], 2, 3);
   const sol = p_(`avg_return = ${f6(m)}, std_return (n − 1 = ${r.length - 1}) = ${f6(s)}, rf_d = ${vb(rf)} / 252 = ${f6(rf / 252)}.`) +
     p_(`Sharpe = √252 × (${f6(m)} − ${f6(rf / 252)}) / ${f6(s)} = ${f4(sr)}.`);
-  return { ...Q('L8.sharpe', 8, html, parts), solution: sol };
+  const k = calc(), rd = rf / 252, q = Math.sqrt(252);
+  stdCalc(k, r, 'the returns', { mean: 'avg', sd: 'std' }, 3, 8, 10);
+  k.s(`**Daily risk-free rate:** $rf_d = \\frac{rf}{252} = \\frac{${tn(rf, 3)}}{252} = ${tn(rd, 8)}$.`);
+  k.r(`**Sharpe ratio in C2:** $\\sqrt{252} \\times \\frac{\\text{avg} - rf_d}{\\text{std}} = ${tn(q, 6)} \\times \\frac{${tn(m, 8)} - ${tn(rd, 8)}}{${tn(s, 8)}} = ${tn(q, 6)} \\times \\frac{${tn(m - rd, 8)}}{${tn(s, 8)}} = ${tn(q, 6)} \\times ${tn((m - rd) / s, 6)} = ${tn(sr, 6)}$.`, 'c2', sr);
+  return { ...withCalc(Q('L8.sharpe', 8, html, parts), k.steps), solution: sol };
 }
 
 /** Sortino ratio: excess return over the standard deviation of the negative returns. */
@@ -733,14 +963,21 @@ export function L8_sortino(): Question {
   const html = p_(`sortino_ratio(returns, rf) follows the plan from class: average return, tdays = 252, rf_d = rf / tdays, keep only the negative returns, take StDev_S of those (the downside volatility), then Sqr(tdays) × (average − rf_d) / downside volatility. A fund’s daily returns (rf = ${vb(rf)}):`) +
     sheet([1], r.map((x, i) => [i + 2, [x]]));
   const parts = chooseParts([
-    { part: Nd('Average daily return', m, 1e-6), w: 0.4 },
-    { part: Nd('Downside volatility (StDev_S of the negative returns)', dd, 1e-6), must: true },
-    { part: Nd('Sortino ratio', so, 1e-3), must: true },
-    { part: Nd('Sharpe ratio of the same fund (StDev_S of all returns)', sr, 1e-3), w: 0.4 },
+    { part: K(Nd('Average daily return', m, 1e-6), 'avg'), w: 0.4 },
+    { part: K(Nd('Downside volatility (StDev_S of the negative returns)', dd, 1e-6), 'dd'), must: true },
+    { part: K(Nd('Sortino ratio', so, 1e-3), 'so'), must: true },
+    { part: K(Nd('Sharpe ratio of the same fund (StDev_S of all returns)', sr, 1e-3), 'sr'), w: 0.4 },
   ], 2, 3);
   const sol = p_(`Negative returns: ${neg.map(vb).join(', ')} → StDev_S (n − 1 = ${neg.length - 1}) = ${f6(dd)}. Average of all ${r.length} returns = ${f6(m)}, rf_d = ${f6(rf / 252)}.`) +
     p_(`Sortino = √252 × (${f6(m)} − ${f6(rf / 252)}) / ${f6(dd)} = ${f4(so)}; Sharpe with the total StDev_S ${f6(s)} = ${f4(sr)}.`);
-  return { ...Q('L8.sortino', 8, html, parts), solution: sol };
+  const k = calc(), rd = rf / 252, q = Math.sqrt(252);
+  const A = stdCalc(k, r, 'all returns', { mean: 'avg' }, 3, 8, 10);
+  k.s(`**Negative returns:** keeping only the returns below 0 leaves ${neg.map(vb).join(', ')} (${neg.length} of ${r.length}).`);
+  stdCalc(k, neg, 'the negative returns', { sd: 'dd' }, 3, 8, 10);
+  k.s(`**Daily risk-free rate:** $rf_d = \\frac{${tn(rf, 3)}}{252} = ${tn(rd, 8)}$.`);
+  k.r(`**Sortino ratio:** $\\sqrt{252} \\times \\frac{\\bar{x} - rf_d}{\\text{downside}} = ${tn(q, 6)} \\times \\frac{${tn(m, 8)} - ${tn(rd, 8)}}{${tn(dd, 8)}} = ${tn(q, 6)} \\times \\frac{${tn(m - rd, 8)}}{${tn(dd, 8)}} = ${tn(q, 6)} \\times ${tn((m - rd) / dd, 6)} = ${tn(so, 6)}$.`, 'so', so);
+  k.r(`**Sharpe ratio:** same formula with the StDev_S of all returns, ${tn(A.sd, 8)}: $${tn(q, 6)} \\times \\frac{${tn(m - rd, 8)}}{${tn(s, 8)}} = ${tn(q, 6)} \\times ${tn((m - rd) / s, 6)} = ${tn(sr, 6)}$.`, 'sr', sr);
+  return { ...withCalc(Q('L8.sortino', 8, html, parts), k.steps), solution: sol };
 }
 
 /** Sharpe ratios with skewness and kurtosis: what the standard deviation misses. */
@@ -759,9 +996,15 @@ export function L8_compare(): Question {
   const [ra, rb] = rows;
   const sa = shp(ra[1], ra[2]), sb = shp(rb[1], rb[2]);
   const tail = ra[3] < rb[3] ? 0 : 1;
-  const parts: Part[] = [Nd('Sharpe ratio of A', sa, 1e-3), Nd('Sharpe ratio of B', sb, 1e-3), C('Portfolio with the fatter left tail', ['A', 'B'], tail)];
+  const parts: Part[] = [K(Nd('Sharpe ratio of A', sa, 1e-3), 'sa'), K(Nd('Sharpe ratio of B', sb, 1e-3), 'sb'), K(C('Portfolio with the fatter left tail', ['A', 'B'], tail), 'tail')];
   const sol = p_(`Sharpe = (mean − r<sub>f</sub>) / std: A (${P(ra[1])} − ${P(rf, 0)}) / ${P(ra[2])} = ${f4(sa)}; B (${P(rb[1])} − ${P(rf, 0)}) / ${P(rb[2])} = ${f4(sb)}.`) +
     p_(`Portfolio ${rows[tail][0]} has strongly negative skewness (${f2(rows[tail][3])}) and very high kurtosis (${f2(rows[tail][4])}): rare large losses. Its lower standard deviation flatters the Sharpe ratio, which ignores the shape of the distribution; the Sortino ratio looks at downside volatility instead.`);
-  return { ...Q('L8.compare', 8, html, parts), solution: sol };
+  const k = calc();
+  const one = (nm: string, row: [string, number, number, number, number], key: string, val: number) =>
+    k.r(`**Portfolio ${nm}:** $\\frac{\\mu - r_f}{\\sigma} = \\frac{${tn(row[1], 4)} - ${tn(rf, 2)}}{${tn(row[2], 4)}} = \\frac{${tn(row[1] - rf, 4)}}{${tn(row[2], 4)}} = ${tn(val, 6)}$.`, key, val);
+  one('A', ra, 'sa', sa);
+  one('B', rb, 'sb', sb);
+  k.r(`**Fatter left tail:** a more negative skewness and a larger kurtosis mean more probability in the left tail. Skewness is ${f2(ra[3])} for ${ra[0]} and ${f2(rb[3])} for ${rb[0]}; kurtosis is ${f2(ra[4])} and ${f2(rb[4])}. So portfolio ${rows[tail][0]} has the fatter left tail.`, 'tail');
+  return { ...withCalc(Q('L8.compare', 8, html, parts), k.steps), solution: sol };
 }
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Instrument_Sans, Schibsted_Grotesk } from 'next/font/google';
 import type { ReactNode } from 'react';
 import Logo from '@/components/Logo';
+import 'katex/dist/katex.min.css';
 import './globals.css';
 
 const sans = Instrument_Sans({ subsets: ['latin'], variable: '--font-sans', style: ['normal', 'italic'], display: 'swap' });
