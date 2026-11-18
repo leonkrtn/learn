@@ -26,5 +26,34 @@ export function weighted<T>(items: T[], w: (x: T) => number, rnd = Math.random):
   return items[items.length - 1];
 }
 
+export function shuffle<T>(a: T[], rnd = Math.random): T[] {
+  const b = a.slice();
+  for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
+  return b;
+}
+
+/** Shuffle bag: every round holds each key exactly once; no repeat across the round boundary. */
+export class CycleBag {
+  private bag: string[] = [];
+  private last: string | null = null;
+  round = 0;
+  pos = 0;
+  constructor(private keys: string[], private rnd = Math.random) {}
+  get size() { return this.keys.length; }
+  next(): string {
+    if (!this.bag.length) {
+      let b = shuffle(this.keys, this.rnd);
+      if (b.length > 1 && b[0] === this.last) [b[0], b[1]] = [b[1], b[0]];
+      this.bag = b;
+      this.round++;
+      this.pos = 0;
+    }
+    const k = this.bag.shift()!;
+    this.pos++;
+    this.last = k;
+    return k;
+  }
+}
+
 /** New EMA of the error rate after one graded question. */
 export const nextEma = (prev: number, total: number, correct: number) => 0.6 * (prev || 0) + 0.4 * ((total - correct) / Math.max(1, total));

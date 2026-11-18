@@ -14,7 +14,7 @@ export default async function TheoryPage({ params }: { params: Promise<{ slug: s
     <div className="page">
       <div className="pagehead">
         <h1>Lecture {p.topic} · {mod.topics.find(t => t.id === p.topic)?.name}</h1>
-        <span className="aside"><Link href={`/s/${slug}?topic=${p.topic}`}>Practise this lecture</Link></span>
+        <span className="aside"><Link href={`/s/${slug}/cycle?topic=${p.topic}`}>Practise this lecture</Link></span>
       </div>
       <article className="panel doc">
         <h2 className="doctitle">{p.title}</h2>

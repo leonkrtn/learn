@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 const P: Record<string, ReactNode> = {
   home: <><path d="M3.5 10.5 12 4l8.5 6.5" /><path d="M5.5 9v10.5h13V9" /><path d="M10 19.5v-5h4v5" /></>,
   practice: <><circle cx="12" cy="12" r="8.5" /><path d="m10 8.5 5.5 3.5-5.5 3.5z" /></>,
+  cycle: <><path d="M19.5 12a7.5 7.5 0 0 1-13 5.1" /><path d="M4.5 12a7.5 7.5 0 0 1 13-5.1" /><path d="M17.5 3.5v3.4h-3.4" /><path d="M6.5 20.5v-3.4h3.4" /></>,
   ps: <><path d="M10 6.5h10M10 12h10M10 17.5h10" /><path d="m3.5 6.5 1.5 1.5 2.5-3M3.5 12l1.5 1.5 2.5-3M3.5 17.5l1.5 1.5 2.5-3" /></>,
   mock: <><rect x="5" y="3.5" width="14" height="17" rx="2.5" /><path d="M9 3.5V5h6V3.5" /><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4" /></>,
   cards: <><rect x="3.5" y="7" width="13" height="13" rx="2.5" /><path d="M7.5 7V5.5A2 2 0 0 1 9.5 3.5h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H16.5" /></>,

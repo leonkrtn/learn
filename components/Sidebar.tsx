@@ -34,6 +34,7 @@ export default function Sidebar() {
       <nav>
         <div className="group">Practice</div>
         {item('', 'Practice', 'practice', true)}
+        {item('/cycle', 'Cycle by lecture', 'cycle')}
         {mod.problemSets && item('/ps', 'Problem sets', 'ps')}
         {mod.mock && item('/mock', 'Mock exam', 'mock')}
         <div className="group">Learn</div>

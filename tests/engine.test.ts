@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gradeQuestion, isOk, parseNum } from '../lib/engine/grade';
-import { pickAdaptive } from '../lib/engine/select';
+import { CycleBag, pickAdaptive } from '../lib/engine/select';
 import { SUBJECTS } from '../subjects';
 import { allTypes } from '../lib/subject';
 import { canRepeat, sameWithNewNumbers } from '../lib/engine/repeat';
@@ -221,6 +221,20 @@ test('PIF mock exam: 22 questions, 100 marks in 120 minutes', () => {
     assert.deepEqual(ex.parts.map(p => p.qs.length), [12, 10, 4]);
     assert.deepEqual(ex.parts.map(p => p.qs.reduce((a, q) => a + (q.pts || 0), 0)), [24, 40, 36]);
     assert.deepEqual(ex.parts.map(p => p.pts), [24, 40, 36]);
+  }
+});
+
+test('cycle mode: each round contains every type once, no repeat at the boundary', () => {
+  for (const mod of Object.values(SUBJECTS)) for (const topic of mod.topics) {
+    const keys = mod.types.filter(t => t.topic === topic.id).map(t => t.key);
+    const bag = new CycleBag(keys);
+    let prev = '';
+    for (let r = 0; r < 30; r++) {
+      const round = keys.map(() => bag.next());
+      assert.deepEqual([...round].sort(), [...keys].sort());
+      assert.notEqual(round[0], prev);
+      prev = round[round.length - 1];
+    }
   }
 });
 
