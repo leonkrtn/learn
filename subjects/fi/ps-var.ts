@@ -438,19 +438,32 @@ export function PS4_tbSteps(): Question {
     const k = rint(0, 2), names = ['Stock 1', 'Stock 2', 'Stock 3'];
     const html = p_(`Your analysts cover three stocks. E[R<sub>M</sub>] = ${pp(mrp, 1)} and σ<sub>M</sub> = ${pp(sM, 0)}. ${NOTE}`) +
       table(['', 'α', 'β', 'σ(e)'], s.map((x, i) => [names[i], pp(x.a, 1), fmtNum(x.b), pp(x.se, 0)]));
+    const cc = calc(), wk0 = w[k], ir2 = aA * aA / veA;
+    s.forEach((x, i) => cc.s(`**Unscaled weight of ${names[i]}:** $\\frac{\\alpha}{\\sigma^2(e)} = \\frac{${tq(x.a, 3)}}{${tn(x.se, 2)}^2} = \\frac{${tq(x.a, 3)}}{${tn(x.se * x.se, 4)}} = ${tq(u[i], 4)}$.`));
+    cc.r(`**Weight of ${names[k]}:** $w = \\frac{u_k}{\\sum u} = \\frac{${tq(u[k], 4)}}{${tn(sum, 4)}} = ${tn(wk0, 6)}$ (all weights: ${w.map(x => tn(x, 4)).join(', ')}).`, 'wk', wk0);
+    cc.r(`**Alpha of the active portfolio:** $\\alpha_{act} = \\sum w_i\\alpha_i = ${w.map((x, i) => `${tq(x, 4)} \\times ${tq(s[i].a, 3)}`).join(' + ')} = ${tn(aA, 6)}$.`, 'aA', aA * 100);
+    cc.r(`**Beta of the active portfolio:** $\\beta_{act} = \\sum w_i\\beta_i = ${w.map((x, i) => `${tq(x, 4)} \\times ${tn(s[i].b, 2)}`).join(' + ')} = ${tn(bA, 6)}$.`, 'bA', bA);
+    cc.r(`**Residual variance:** $\\sigma^2(e_{act}) = \\sum w_i^2\\sigma^2(e_i) = ${w.map((x, i) => `${tq(x, 4)}^2 \\times ${tn(s[i].se * s[i].se, 4)}`).join(' + ')} = ${tn(veA, 6)}$.`, 'veA', veA);
+    cc.s(`**Initial weight:** $w^0 = \\frac{\\alpha_{act}/\\sigma^2(e_{act})}{MRP/\\sigma_M^2} = \\frac{${tn(aA, 6)}/${tn(veA, 6)}}{${tn(mrp, 3)}/${tn(sM * sM, 4)}} = \\frac{${tn(aA / veA, 6)}}{${tn(mrp / (sM * sM), 6)}} = ${tn(w0, 6)}$.`);
+    cc.r(`**Weight in the risky portfolio:** $w^* = \\frac{w^0}{1 + (1 - \\beta_{act})w^0} = \\frac{${tn(w0, 6)}}{1 + (1 - ${tn(bA, 6)}) \\times ${tn(w0, 6)}} = \\frac{${tn(w0, 6)}}{${tn(1 + (1 - bA) * w0, 6)}} = ${tn(wA, 6)}$ (index: ${tn(1 - wA, 6)}).`, 'wopt', wA);
+    cc.r(`**Share of ${names[k]}:** $w_k \\times w^* = ${tn(wk0, 6)} \\times ${tn(wA, 6)} = ${tn(wk0 * wA, 6)}$.`, 'share', wk0 * wA);
+    cc.s(`**Beta of the risky portfolio:** $\\beta_P = 1 - w^* + w^*\\beta_{act} = 1 - ${tn(wA, 6)} + ${tn(wA, 6)} \\times ${tn(bA, 6)} = ${tn(bP, 6)}$.`);
+    cc.r(`**Risk premium of the risky portfolio:** $E[R_P] = \\beta_P \\times MRP + w^*\\alpha_{act} = ${tn(bP, 6)} \\times ${tn(mrp, 3)} + ${tn(wA, 6)} \\times ${tn(aA, 6)} = ${tn(bP * mrp, 6)} + ${tn(wA * aA, 6)} = ${tn(eP, 6)}$, i.e. $${tp(eP, 4)}$.`, 'eP', eP * 100);
+    cc.r(`**Standard deviation:** $\\sigma_P = \\sqrt{\\beta_P^2\\sigma_M^2 + w^{*2}\\sigma^2(e_{act})} = \\sqrt{${tn(bP * bP * sM * sM, 6)} + ${tn(wA * wA * veA, 6)}} = ${tn(sdP, 6)}$, i.e. $${tp(sdP, 4)}$.`, 'sdP', sdP * 100);
+    cc.r(`**M²:** $SR_P = \\frac{${tn(eP, 6)}}{${tn(sdP, 6)}} = ${tn(srP, 6)}$ and $SR_M = \\frac{${tn(mrp, 3)}}{${tn(sM, 2)}} = ${tn(srM, 6)}$, so $M^2 = (SR_P - SR_M)\\sigma_M = (${tn(srP, 6)} - ${tn(srM, 6)}) \\times ${tn(sM, 2)} = ${tn(m2, 6)}$, i.e. $${tp(m2, 4)}$.`, 'm2', m2 * 100);
     const items: Item[] = [
-      { part: N(`What is the weight of ${names[k]} in the active portfolio?`, w[k], 'n'), w: 0.5 },
-      { part: [N('What is the alpha of the active portfolio?', aA * 100, 'pct'), N('… its beta?', bA, 'n'), N('… and its residual variance? (Decimal.)', veA, 'n', { abs: 0.0002 })], w: 0.5 },
-      { part: N('What weight w* does the active portfolio get in the optimal risky portfolio?', wA, 'n'), must: true },
-      { part: N(`What share of the optimal risky portfolio is invested in ${names[k]}?`, w[k] * wA, 'n'), w: 0.5 },
-      { part: [N('What is the risk premium of the optimal risky portfolio?', eP * 100, 'pct'), N('… and its standard deviation?', sdP * 100, 'pct')], w: 0.4 },
-      { part: N('What is the M² of the optimal risky portfolio relative to the market?', m2 * 100, 'pct'), w: 0.4 },
+      { part: N(`What is the weight of ${names[k]} in the active portfolio?`, w[k], 'n', { key: 'wk' }), w: 0.5 },
+      { part: [N('What is the alpha of the active portfolio?', aA * 100, 'pct', { key: 'aA' }), N('… its beta?', bA, 'n', { key: 'bA' }), N('… and its residual variance? (Decimal.)', veA, 'n', { abs: 0.0002, key: 'veA' })], w: 0.5 },
+      { part: N('What weight w* does the active portfolio get in the optimal risky portfolio?', wA, 'n', { key: 'wopt' }), must: true },
+      { part: N(`What share of the optimal risky portfolio is invested in ${names[k]}?`, w[k] * wA, 'n', { key: 'share' }), w: 0.5 },
+      { part: [N('What is the risk premium of the optimal risky portfolio?', eP * 100, 'pct', { key: 'eP' }), N('… and its standard deviation?', sdP * 100, 'pct', { key: 'sdP' })], w: 0.4 },
+      { part: N('What is the M² of the optimal risky portfolio relative to the market?', m2 * 100, 'pct', { key: 'm2' }), w: 0.4 },
     ];
     const sol = p_(`1–2) α/σ²(e): ${u.map(x => fmtNum(x, 3)).join(', ')}, scaled to sum to one: ${w.map(f4).join(', ')}.`) +
       p_(`3–5) α<sub>A</sub> = Σw<sub>i</sub>α<sub>i</sub> = ${pp(aA)}, β<sub>A</sub> = ${f4(bA)}, σ²(e<sub>A</sub>) = Σw²<sub>i</sub>σ²(e<sub>i</sub>) = ${fmtNum(veA, 5)}.`) +
       p_(`6–8) w⁰ = (${fmtNum(aA, 4)}/${fmtNum(veA, 5)}) / (${fmtNum(mrp, 3)}/${fmtNum(sM * sM, 4)}) = ${f4(w0)}; w* = w⁰/(1 + (1 − β<sub>A</sub>)w⁰) = ${f4(wA)}; index ${f4(1 - wA)}. 9) ${names[k]}: ${f4(w[k])} × ${f4(wA)} = ${f4(w[k] * wA)}.`) +
       p_(`10–13) β<sub>P</sub> = ${f4(bP)}, E[R<sub>P</sub>] = β<sub>P</sub>E[R<sub>M</sub>] + w*α<sub>A</sub> = ${pp(eP)}, σ<sub>P</sub> = √(β²<sub>P</sub>σ²<sub>M</sub> + w*²σ²(e<sub>A</sub>)) = ${pp(sdP)}, SR<sub>P</sub> = ${f4(srP)} against ${f4(srM)}; M² = (SR<sub>P</sub> − SR<sub>M</sub>)σ<sub>M</sub> = ${pp(m2)}.`);
-    return { ...Q('PS4.tbSteps', '4', html, chooseParts(items, 2, 4)), solution: sol };
+    return { ...withCalc(Q('PS4.tbSteps', '4', html, chooseParts(items, 2, 4)), cc.steps), solution: sol };
   }
   throw new Error('PS4_tbSteps: no valid draw');
 }
@@ -462,8 +475,12 @@ export function PS4_kkw(): Question {
     const at = r2 * a, w0 = (at / (se * se)) / (mrp / (sM * sM)), w = w0 / (1 + (1 - b) * w0), w0r = (a / (se * se)) / (mrp / (sM * sM)), wr = w0r / (1 + (1 - b) * w0r);
     if (!isFinite(w) || w <= 0 || !isFinite(wr) || wr <= 0) continue;
     const html = p_(`An analyst forecasts an alpha of ${pp(a, 1)} for an active portfolio with a beta of ${fmtNum(b)} and a residual standard deviation of ${pp(se, 0)}. Regressing past realised abnormal returns on her forecasts gives an R² of ${fmtNum(r2)}. E[R<sub>M</sub>] = ${pp(mrp, 1)} and σ<sub>M</sub> = ${pp(sM, 0)}. Using the adjusted alpha, what weight does Treynor-Black give the active portfolio?`);
+    const cc = calc();
+    cc.s(`**Adjusted alpha:** $\\tilde\\alpha = R^2 \\alpha = ${tn(r2, 2)} \\times ${tn(a, 4)} = ${tn(at, 6)}$.`);
+    cc.s(`**Initial weight:** $w^0 = \\frac{\\tilde\\alpha/\\sigma^2(e)}{MRP/\\sigma_M^2} = \\frac{${tn(at, 6)}/${tn(se * se, 4)}}{${tn(mrp, 3)}/${tn(sM * sM, 4)}} = \\frac{${tn(at / (se * se), 6)}}{${tn(mrp / (sM * sM), 6)}} = ${tn(w0, 6)}$.`);
+    cc.r(`**Optimal weight:** $w^* = \\frac{w^0}{1 + (1 - \\beta)w^0} = \\frac{${tn(w0, 6)}}{1 + (1 - ${tn(b, 2)}) \\times ${tn(w0, 6)}} = \\frac{${tn(w0, 6)}}{${tn(1 + (1 - b) * w0, 6)}} = ${tn(w, 6)}$.`, 'ans', w);
     return mcNum('PS4.kkw', '4', html, w, [wr, wr * r2, w0, w0r], x => fmtNum(x, 3),
-      { sol: p_(`Adjusted alpha α̃ = R²α = ${fmtNum(r2)} × ${pp(a, 1)} = ${pp(at)}. w⁰ = (${fmtNum(at, 4)}/${fmtNum(se * se, 4)}) / (${fmtNum(mrp, 3)}/${fmtNum(sM * sM, 4)}) = ${f4(w0)}; w* = ${f4(w)}, against ${f4(wr)} with the raw forecast. Noisy forecasts get much smaller positions.`), closest: true });
+      { calc: cc.steps, sol: p_(`Adjusted alpha α̃ = R²α = ${fmtNum(r2)} × ${pp(a, 1)} = ${pp(at)}. w⁰ = (${fmtNum(at, 4)}/${fmtNum(se * se, 4)}) / (${fmtNum(mrp, 3)}/${fmtNum(sM * sM, 4)}) = ${f4(w0)}; w* = ${f4(w)}, against ${f4(wr)} with the raw forecast. Noisy forecasts get much smaller positions.`), closest: true });
   }
 }
 
@@ -482,8 +499,16 @@ export function PS4_blPosterior(): Question {
     p_(`R* = R<sub>E</sub> + (D/σ²<sub>D</sub>)Σ<sub>F</sub>P: bonds ${pp(eB, 1)} + ${fmtNum(D / vD, 2)} × (${fmtNum(vB, 5)} − ${fmtNum(cBS, 5)}) = ${pp(rB)}; stocks ${pp(eS, 1)} + ${fmtNum(D / vD, 2)} × (${fmtNum(cBS, 5)} − ${fmtNum(vS, 5)}) = ${pp(rS)}.`);
   const ans = which ? rS : rB, other = which ? rB : rS, base = which ? eS : eB;
   const vSel = which ? cBS - vS : vB - cBS, vAlt = given ? vQE : sEps * sEps + vQE;
+  const cc = calc(), fac = D / vD;
+  cc.s(`**Baseline view:** $Q_E = E[R_B] - E[R_S] = ${tn(eB, 4)} - ${tn(eS, 4)} = ${tn(qE, 4)}$.`);
+  cc.s(`**Variance of the baseline view:** $\\sigma^2_{Q_E} = var_B + var_S - 2cov = ${tn(vB, 5)} + ${tn(vS, 5)} - 2 \\times ${tn(cBS, 5)} = ${tn(vQE, 6)}$.`);
+  cc.s(given ? `**Variance of the difference:** $\\sigma_D^2 = \\sigma_\\varepsilon^2 + \\sigma^2_{Q_E} = ${tn(sEps, 3)}^2 + ${tn(vQE, 6)} = ${tn(sEps * sEps, 6)} + ${tn(vQE, 6)} = ${tn(vD, 6)}$.`
+    : `**Variance of the difference:** the view's variance is not given, so it is set equal to $\\sigma^2_{Q_E}$: $\\sigma_D^2 = 2 \\times ${tn(vQE, 6)} = ${tn(vD, 6)}$.`);
+  cc.s(`**Revision:** $D = Q - Q_E = ${tn(Qv, 4)} - ${tq(qE, 4)} = ${tn(D, 4)}$, so $\\frac{D}{\\sigma_D^2} = \\frac{${tq(D, 4)}}{${tn(vD, 6)}} = ${tn(fac, 4)}$.`);
+  cc.r(which ? `**Revised excess return of stocks:** $E[R_S] + \\frac{D}{\\sigma_D^2}(cov - var_S) = ${tn(eS, 4)} + ${tq(fac, 4)} \\times (${tn(cBS, 5)} - ${tn(vS, 5)}) = ${tn(eS, 4)} + ${tq(fac, 4)} \\times ${tq(cBS - vS, 5)} = ${tn(rS, 6)}$, i.e. $${tp(rS, 4)}$.`
+    : `**Revised excess return of bonds:** $E[R_B] + \\frac{D}{\\sigma_D^2}(var_B - cov) = ${tn(eB, 4)} + ${tq(fac, 4)} \\times (${tn(vB, 5)} - ${tn(cBS, 5)}) = ${tn(eB, 4)} + ${tq(fac, 4)} \\times ${tq(vB - cBS, 5)} = ${tn(rB, 6)}$, i.e. $${tp(rB, 4)}$.`, 'ans', ans);
   return mcNum('PS4.blPosterior', '4', html + p_(`What is the revised expected excess return of ${which ? 'stocks' : 'bonds'}?`), ans,
-    [other, base, base + D, base - D / vD * vSel, base + D / vAlt * vSel], x => pp(x), { sol, step: 0.002 });
+    [other, base, base + D, base - D / vD * vSel, base + D / vAlt * vSel], x => pp(x), { sol, step: 0.002, calc: cc.steps });
 }
 
 /** Value of active management, solved for a different unknown. */
@@ -491,20 +516,29 @@ export function PS4_feeInverse(): Question {
   const A = pick([2, 3, 4, 5]), k = rint(0, 2);
   if (k === 0) {
     const ir = rstep(0.01, 0.05, 0.005), f = rstep(0.002, 0.02, 0.001), n = 2 * A * f / (ir * ir);
+    const cc = calc();
+    cc.s(`**Squared information ratio:** $IR^2 = ${tn(ir, 3)}^2 = ${tn(ir * ir, 6)}$.`);
+    cc.r(`**Number of stocks:** $f = \\frac{N \\times IR^2}{2A}$ gives $N = \\frac{2Af}{IR^2} = \\frac{2 \\times ${A} \\times ${tn(f, 3)}}{${tn(ir * ir, 6)}} = \\frac{${tn(2 * A * f, 6)}}{${tn(ir * ir, 6)}} = ${tn(n, 2)}$.`, 'ans', n);
     return mcNum('PS4.feeInverse', '4', p_(`Your analysts achieve an information ratio of ${fmtNum(ir, 3)} per stock. How many stocks must they cover for a mean-variance investor with A = ${A} to be willing to pay a fee of ${pp(f, 1)}?`), n,
       [A * f / (ir * ir), 2 * A * f / ir, f / (ir * ir), 2 * f / (A * ir * ir)], x => fmtNum(x, 0),
-      { sol: p_(`f = N × IR²/(2A) ⇒ N = 2Af/IR² = 2 × ${A} × ${fmtNum(f, 3)} / ${fmtNum(ir, 3)}² = ${fmtNum(n, 1)} stocks. Fees scale with N: economies of scale in security analysis.`), closest: true });
+      { calc: cc.steps, sol: p_(`f = N × IR²/(2A) ⇒ N = 2Af/IR² = 2 × ${A} × ${fmtNum(f, 3)} / ${fmtNum(ir, 3)}² = ${fmtNum(n, 1)} stocks. Fees scale with N: economies of scale in security analysis.`), closest: true });
   }
   if (k === 1) {
     const n = pick([50, 100, 200, 500]), f = rstep(0.002, 0.02, 0.001), ir = Math.sqrt(2 * A * f / n);
+    const cc = calc();
+    cc.s(`**Squared information ratio:** $IR^2 = \\frac{2Af}{N} = \\frac{2 \\times ${A} \\times ${tn(f, 3)}}{${n}} = ${tn(ir * ir, 6)}$.`);
+    cc.r(`**Information ratio:** $IR = \\sqrt{${tn(ir * ir, 6)}} = ${tn(ir, 6)}$.`, 'ans', ir);
     return mcNum('PS4.feeInverse', '4', p_(`A fund covering ${n} stocks charges an active fee of ${pp(f, 1)}, and a mean-variance investor with A = ${A} is exactly indifferent. What information ratio per stock does this imply?`), ir,
       [2 * A * f / n, Math.sqrt(A * f / n), Math.sqrt(2 * f / (A * n)), Math.sqrt(2 * A * f)], x => fmtNum(x, 4),
-      { sol: p_(`IR = √(2Af/N) = √(2 × ${A} × ${fmtNum(f, 3)} / ${n}) = ${fmtNum(ir, 4)}.`) });
+      { calc: cc.steps, sol: p_(`IR = √(2Af/N) = √(2 × ${A} × ${fmtNum(f, 3)} / ${n}) = ${fmtNum(ir, 4)}.`) });
   }
   const srP = rstep(0.4, 0.9, 0.05), srM = rstep(0.25, srP - 0.05, 0.05), f = (srP * srP - srM * srM) / (2 * A);
+  const cc = calc();
+  cc.s(`**Gain in the squared Sharpe ratio:** $SR_P^2 - SR_M^2 = ${tn(srP, 2)}^2 - ${tn(srM, 2)}^2 = ${tn(srP * srP, 4)} - ${tn(srM * srM, 4)} = ${tn(srP * srP - srM * srM, 4)}$.`);
+  cc.r(`**Fee:** $f = \\frac{SR_P^2 - SR_M^2}{2A} = \\frac{${tn(srP * srP - srM * srM, 4)}}{${2 * A}} = ${tn(f, 6)}$, i.e. $${tp(f, 4)}$.`, 'ans', f);
   return mcNum('PS4.feeInverse', '4', p_(`Combining an active portfolio optimally with the index raises the Sharpe ratio from ${fmtNum(srM)} to ${fmtNum(srP)}. What fee would a mean-variance investor with A = ${A} pay for it?`), f,
     [(srP - srM) / (2 * A), (srP - srM) ** 2 / (2 * A), (srP * srP - srM * srM) / A, srP * srP / (2 * A)], x => pp(x),
-    { sol: p_(`The gain in SR² is the squared information ratio: ${fmtNum(srP)}² − ${fmtNum(srM)}² = ${f4(srP * srP - srM * srM)}. f = ΣIR²/(2A) = ${f4(srP * srP - srM * srM)} / ${2 * A} = ${pp(f)}.`) });
+    { calc: cc.steps, sol: p_(`The gain in SR² is the squared information ratio: ${fmtNum(srP)}² − ${fmtNum(srM)}² = ${f4(srP * srP - srM * srM)}. f = ΣIR²/(2A) = ${f4(srP * srP - srM * srM)} / ${2 * A} = ${pp(f)}.`) });
 }
 
 // =====================================================================
@@ -518,8 +552,12 @@ export function PS6_grossNeeded(): Question {
     const r = (net + mg - inc * h) / (1 - inc);
     if (r <= h) continue;
     const html = p_(`A hedge fund charges ${P(mg, 1)} of assets and an incentive fee of ${P(inc, 0)} of the gross return above a hurdle of ${P(h, 0)}. What gross return must it earn for investors to get ${pp(net, 1)} after fees?`);
+    const cc = calc();
+    cc.s(`**Equation:** net $= r - m - c(r - h)$, so $r = \\frac{\\text{net} + m - c \\times h}{1 - c}$.`);
+    cc.s(`**Numerator:** $${tn(net, 4)} + ${tn(mg, 3)} - ${tn(inc, 2)} \\times ${tn(h, 2)} = ${tn(net + mg - inc * h, 6)}$.`);
+    cc.r(`**Gross return:** $r = \\frac{${tn(net + mg - inc * h, 6)}}{1 - ${tn(inc, 2)}} = \\frac{${tn(net + mg - inc * h, 6)}}{${tn(1 - inc, 2)}} = ${tn(r, 6)}$, i.e. $${tp(r, 4)}$.`, 'ans', r);
     return mcNum('PS6.grossNeeded', '6', html, r, [net + mg + inc * net, (net + mg) / (1 - inc), net / (1 - inc) + mg, net + mg + inc * (net - h)], x => pp(x),
-      { sol: p_(`Net = r − ${fmtNum(mg, 3)} − ${fmtNum(inc)}(r − ${fmtNum(h)}) ⇒ r = (net + ${fmtNum(mg, 3)} − ${fmtNum(inc)} × ${fmtNum(h)}) / (1 − ${fmtNum(inc)}) = ${pp(r)}. Check: fees ${pp(mg, 1)} + ${fmtNum(inc)} × ${pp(r - h)} = ${pp(r - net)}.`), step: 0.005 });
+      { calc: cc.steps, sol: p_(`Net = r − ${fmtNum(mg, 3)} − ${fmtNum(inc)}(r − ${fmtNum(h)}) ⇒ r = (net + ${fmtNum(mg, 3)} − ${fmtNum(inc)} × ${fmtNum(h)}) / (1 − ${fmtNum(inc)}) = ${pp(r)}. Check: fees ${pp(mg, 1)} + ${fmtNum(inc)} × ${pp(r - h)} = ${pp(r - net)}.`), step: 0.005 });
   }
 }
 
@@ -528,13 +566,17 @@ export function PS6_parity(): Question {
   const S0 = rstep(2000, 5500, 50), rf = rstep(0.01, 0.06, 0.005), fair = S0 * (1 + rf), dev = pick([-1, 1]) * rstep(10, 60, 5), F0 = Math.round(fair + dev), n = rint(1, 10);
   const prof = Math.abs(F0 - fair) * 250 * n;
   const html = p_(`The S&P 500 stands at ${fmtNum(S0)}, pays no dividends, and the one-year risk-free rate is ${pp(rf, 1)}. A one-year futures contract (multiplier 250) trades at ${fmtNum(F0)}.`);
+  const cc = calc();
+  cc.r(`**Fair futures price:** $F_0 = S_0(1 + r_f) = ${tn(S0, 0)} \\times ${tn(1 + rf, 3)} = ${tn(fair, 2)}$.`, 'fair', fair);
+  cc.r(`**Strategy:** the quote ${tn(F0, 0)} is ${F0 > fair ? 'above' : 'below'} the fair price ${tn(fair, 2)}, so ${F0 > fair ? 'borrow, buy the index and sell futures' : 'short the index, lend the proceeds and buy futures'}.`, 'how');
+  cc.r(`**Riskless profit:** $|F_0 - F^{fair}| \\times 250 \\times ${n} = |${tn(F0, 0)} - ${tn(fair, 2)}| \\times 250 \\times ${n} = ${tn(Math.abs(F0 - fair), 2)} \\times ${tn(250 * n, 0)} = ${tn(prof, 2)}$ (USD).`, 'profit', prof);
   const items: Item[] = [
-    { part: N('What should the futures price be?', fair, 'n'), w: 0.6 },
-    { part: C('How do you exploit the gap?', ['Borrow, buy the index and sell futures', 'Short the index, lend the proceeds and buy futures', 'There is no arbitrage'], F0 > fair ? 0 : 1), must: true },
-    { part: N(`What riskless profit (in $) do you lock in with ${n} contract${n > 1 ? 's' : ''}?`, prof, 'usd'), w: 0.7 },
+    { part: N('What should the futures price be?', fair, 'n', { key: 'fair' }), w: 0.6 },
+    { part: C('How do you exploit the gap?', ['Borrow, buy the index and sell futures', 'Short the index, lend the proceeds and buy futures', 'There is no arbitrage'], F0 > fair ? 0 : 1, 'how'), must: true },
+    { part: N(`What riskless profit (in $) do you lock in with ${n} contract${n > 1 ? 's' : ''}?`, prof, 'usd', { key: 'profit' }), w: 0.7 },
   ];
   const sol = p_(`Parity: F<sub>0</sub> = S<sub>0</sub>(1 + r<sub>f</sub>) = ${fmtNum(S0)} × ${fmtNum(1 + rf, 3)} = ${fmtNum(fair, 2)}. The quote is ${F0 > fair ? 'too high: borrow S<sub>0</sub>, buy the index and agree to sell it at F<sub>0</sub>' : 'too low: short the index, lend the proceeds and agree to buy it back at F<sub>0</sub>'}. Profit ${fmtNum(Math.abs(F0 - fair), 2)} index points × 250 × ${n} = ${money(prof)}.`);
-  return { ...Q('PS6.parity', '6', html, chooseParts(items, 2, 3)), solution: sol };
+  return { ...withCalc(Q('PS6.parity', '6', html, chooseParts(items, 2, 3)), cc.steps), solution: sol };
 }
 
 /** High-water mark: how far a fund must climb before it earns incentive fees again. */
@@ -543,12 +585,20 @@ export function PS6_hwmRecover(): Question {
   const g1 = 100 * (1 + r1), f1 = inc * (g1 - 100), v1 = g1 - f1, v2 = v1 * (1 + r2), need = v1 / v2 - 1;
   const r3 = need + rstep(0.03, 0.2, 0.01), g3 = v2 * (1 + r3), f3v = inc * (g3 - v1);
   const html = p_(`You invest $100 in a hedge fund with a ${P(inc, 0)} incentive fee and a high-water mark; ignore management fees. It earns ${pp(r1, 0)} gross in year 1 and ${pp(r2, 0)} in year 2.`);
-  if (chance(0.5)) return mcNum('PS6.hwmRecover', '6', html + p_('What gross return does the fund need in year 3 before it can charge an incentive fee again?'), need,
+  const cc = calc(), first = chance(0.5);
+  cc.s(`**Year 1:** value before fees $100 \\times ${tn(1 + r1, 2)} = ${tn(g1, 4)}$ (USD); fee $${tn(inc, 2)} \\times (${tn(g1, 4)} - 100) = ${tn(f1, 4)}$; value after fees $${tn(v1, 4)}$, the new high-water mark.`);
+  cc.s(`**Year 2:** $${tn(v1, 4)} \\times ${tn(1 + r2, 2)} = ${tn(v2, 4)}$ (USD), no fee.`);
+  if (first) cc.r(`**Return needed:** to reach the mark again, $\\frac{${tn(v1, 4)}}{${tn(v2, 4)}} - 1 = ${tn(v1 / v2, 6)} - 1 = ${tn(need, 6)}$, i.e. $${tp(need, 4)}$.`, 'ans', need);
+  else {
+    cc.s(`**Year 3:** $${tn(v2, 4)} \\times ${tn(1 + r3, 2)} = ${tn(g3, 4)}$ (USD) before fees.`);
+    cc.r(`**Incentive fee:** only the gain above the mark counts, $${tn(inc, 2)} \\times (${tn(g3, 4)} - ${tn(v1, 4)}) = ${tn(inc, 2)} \\times ${tn(g3 - v1, 4)} = ${tn(f3v, 4)}$ (USD).`, 'ans', f3v);
+  }
+  if (first) return mcNum('PS6.hwmRecover', '6', html + p_('What gross return does the fund need in year 3 before it can charge an incentive fee again?'), need,
     [-r2, -r2 / (1 + r2), 100 / v2 - 1, g1 / v2 - 1], x => pp(x),
-    { sol: p_(`Year 1: ${money(g1)} − fee ${money(f1)} = ${money(v1)}, the high-water mark. Year 2: ${money(v2)}. To get back to ${money(v1)} the fund needs ${money(v1)}/${money(v2)} − 1 = ${pp(need)}, more than the ${pp(-r2, 0)} it lost. Funds deep below their high-water mark have an incentive to close.`) });
+    { calc: cc.steps, sol: p_(`Year 1: ${money(g1)} − fee ${money(f1)} = ${money(v1)}, the high-water mark. Year 2: ${money(v2)}. To get back to ${money(v1)} the fund needs ${money(v1)}/${money(v2)} − 1 = ${pp(need)}, more than the ${pp(-r2, 0)} it lost. Funds deep below their high-water mark have an incentive to close.`) });
   return mcNum('PS6.hwmRecover', '6', html + p_(`In year 3 it earns ${pp(r3, 0)} gross. What incentive fee is paid in year 3?`), f3v,
     [inc * (g3 - v2), inc * (g3 - 100), inc * r3 * 100, inc * (g3 - g1)], money,
-    { sol: p_(`High-water mark after year 1: ${money(v1)}. Year 3: ${money(v2)} × ${fmtNum(1 + r3, 2)} = ${money(g3)}; only the gain above the mark is charged: ${fmtNum(inc)} × (${money(g3)} − ${money(v1)}) = ${money(f3v)}.`), step: 1 });
+    { calc: cc.steps, sol: p_(`High-water mark after year 1: ${money(v1)}. Year 3: ${money(v2)} × ${fmtNum(1 + r3, 2)} = ${money(g3)}; only the gain above the mark is charged: ${fmtNum(inc)} × (${money(g3)} − ${money(v1)}) = ${money(f3v)}.`), step: 1 });
 }
 
 /** Portable alpha read backwards: the beta implied by a hedge, or the hedged return. */
@@ -556,12 +606,18 @@ export function PS6_hedgeInverse(): Question {
   for (;;) {
     const S0 = rstep(1500, 5000, 100), n = rint(3, 20), V = rstep(1, 20, 0.5) * 1e6, b = n * 250 * S0 / V;
     if (b < 0.3 || b > 2.5) continue;
-    if (chance(0.5)) return mcNum('PS6.hedgeInverse', '6', p_(`You run a ${money(V)} portfolio and fully hedged its market exposure by selling ${n} S&P 500 futures (multiplier 250) at an index level of ${fmtNum(S0)}. What beta did you assume for the portfolio?`), b,
+    const cc = calc(), first = chance(0.5);
+    if (first) {
+      cc.s(`**Value of one contract:** $S_0 \\times 250 = ${tn(S0, 0)} \\times 250 = ${tn(S0 * 250, 0)}$ (USD).`);
+      cc.r(`**Beta:** $\\beta = \\frac{N \\times S_0 \\times 250}{V} = \\frac{${n} \\times ${tn(S0 * 250, 0)}}{${tn(V, 0)}} = \\frac{${tn(n * S0 * 250, 0)}}{${tn(V, 0)}} = ${tn(b, 6)}$.`, 'ans', b);
+    }
+    if (first) return mcNum('PS6.hedgeInverse', '6', p_(`You run a ${money(V)} portfolio and fully hedged its market exposure by selling ${n} S&P 500 futures (multiplier 250) at an index level of ${fmtNum(S0)}. What beta did you assume for the portfolio?`), b,
       [V / (n * 250 * S0), n * S0 / V, n * 250 * S0 / V * 2, 1], x => fmtNum(x, 3),
-      { sol: p_(`N = Vβ/(S<sub>0</sub> × 250) ⇒ β = N × S<sub>0</sub> × 250 / V = ${n} × ${fmtNum(S0)} × 250 / ${money(V)} = ${f4(b)}.`) });
+      { calc: cc.steps, sol: p_(`N = Vβ/(S<sub>0</sub> × 250) ⇒ β = N × S<sub>0</sub> × 250 / V = ${n} × ${fmtNum(S0)} × 250 / ${money(V)} = ${f4(b)}.`) });
     const a = rstep(0.01, 0.06, 0.005), rf = rstep(0.01, 0.05, 0.005);
+    cc.r(`**Hedged return:** the short futures cancel the beta exposure, leaving $r_f + \\alpha = ${tn(rf, 3)} + ${tn(a, 3)} = ${tn(rf + a, 4)}$, i.e. $${tp(rf + a, 2)}$.`, 'ans', rf + a);
     return mcNum('PS6.hedgeInverse', '6', p_(`A ${money(V)} portfolio with an alpha of ${pp(a, 1)} and a beta of ${fmtNum(b, 2)} is fully hedged with S&P 500 futures. The risk-free rate is ${pp(rf, 1)}. What is the expected return of the hedged position?`), rf + a,
       [a, rf + a + b * rf, rf + a - b * rf, rf + b * a, a - rf], x => pp(x),
-      { sol: p_(`Unhedged: r<sub>f</sub> + α + β(r<sub>M</sub> − r<sub>f</sub>) + e. The short futures pay β(r<sub>f</sub> − r<sub>M</sub>), so the hedged return is r<sub>f</sub> + α + e with expectation ${pp(rf, 1)} + ${pp(a, 1)} = ${pp(rf + a)}: a pure play on alpha.`) });
+      { calc: cc.steps, sol: p_(`Unhedged: r<sub>f</sub> + α + β(r<sub>M</sub> − r<sub>f</sub>) + e. The short futures pay β(r<sub>f</sub> − r<sub>M</sub>), so the hedged return is r<sub>f</sub> + α + e with expectation ${pp(rf, 1)} + ${pp(a, 1)} = ${pp(rf + a)}: a pure play on alpha.`) });
   }
 }
