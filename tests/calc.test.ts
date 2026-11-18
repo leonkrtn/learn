@@ -17,10 +17,13 @@ const BANKS = { fd: FD, fi: FI, fv: FV, fvcs: FVCS, ifd: IFD, pif: PIF } as cons
 const RUNS = Number(process.env.CALC_RUNS || 40);
 
 test('tn and tp format numbers for formulas', () => {
-  assert.equal(tn(1234567.891, 2), '1{,}234{,}567.89');
-  assert.equal(tn(-0.004, 2), '0.00');
-  assert.equal(tn(-12.5, 1), '-12.5');
-  assert.equal(tp(0.12345, 2), '12.35\\%');
+  assert.equal(tn(1234567.891, 4), '1{,}234{,}567.89');
+  assert.equal(tn(1.277289, 6), '1.28');
+  assert.equal(tn(-12.5, 1), '-12.50');
+  assert.equal(tn(0.085, 4), '0.085');
+  assert.equal(tn(0.00079365, 6), '0.00079');
+  assert.equal(tn(35, 0), '35');
+  assert.equal(tp(0.12345, 4), '12.35\\%');
 });
 
 test('calcView groups the steps of earlier parts and ends at the part’s result', () => {

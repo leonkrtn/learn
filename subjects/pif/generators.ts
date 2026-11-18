@@ -734,17 +734,25 @@ export function L6_stats(): Question {
   const html = p_(`Sheet1 holds ${n} simulated returns for two assets:`) + sheet([1, 2], x.map((v, i) => [i + 1, [v, y[i]]])) +
     code(['    Set col1 = ws.Range(ws.Cells(1, 1), ws.Cells(' + n + ', 1))', '    Set col2 = ws.Range(ws.Cells(1, 2), ws.Cells(' + n + ', 2))']) + p_('What do these WorksheetFunction calls return?');
   const parts = chooseParts([
-    { part: Nd('Average(col1)', mx, 1e-5), w: 0.6 },
-    { part: Nd('StDev_S(col1)', sx, 1e-5), w: 0.7 },
-    { part: Nd('Covariance_S(col1, col2)', cv, 5e-5), w: 0.8 },
-    { part: Nd('Covariance_S(col1, col1)', sx * sx, 5e-5), w: 0.4 },
-    { part: N('Correlation of the two assets', rho, 'n', { abs: 0.005 }), w: 0.5 },
-    { part: Nd('Sharpe ratio of asset 2, Average(col2) / StDev_S(col2) (r_f = 0)', mean(y) / sy, 0.002), w: 0.4 },
+    { part: K(Nd('Average(col1)', mx, 1e-5), 'avg'), w: 0.6 },
+    { part: K(Nd('StDev_S(col1)', sx, 1e-5), 'sd'), w: 0.7 },
+    { part: K(Nd('Covariance_S(col1, col2)', cv, 5e-5), 'cov'), w: 0.8 },
+    { part: K(Nd('Covariance_S(col1, col1)', sx * sx, 5e-5), 'var'), w: 0.4 },
+    { part: K(N('Correlation of the two assets', rho, 'n', { abs: 0.005 }), 'corr'), w: 0.5 },
+    { part: K(Nd('Sharpe ratio of asset 2, Average(col2) / StDev_S(col2) (r_f = 0)', mean(y) / sy, 0.002), 'shp'), w: 0.4 },
   ], 3, 4);
   const sol = p_(`Mean of asset 1 = ${f6(mx)}; StDev_S divides by n − 1 = ${n - 1}: s<sub>1</sub> = ${f6(sx)}, s<sub>2</sub> = ${f6(sy)}.`) +
     p_(`Covariance_S = Σ(x − x̄)(y − ȳ) / (n − 1) = ${f6(cv)}. With the same column twice it gives the variance, ${f6(sx * sx)} = s<sub>1</sub>². Correlation = ${f6(cv)} / (${f4(sx)} × ${f4(sy)}) = ${f4(rho)}.`) +
     p_(`Sharpe of asset 2 = ${f6(mean(y))} / ${f6(sy)} = ${f4(mean(y) / sy)}.`);
-  return { ...Q('L6.stats', 6, html, parts), solution: sol };
+  const k = calc();
+  const X = stdCalc(k, x, 'col1', { mean: 'avg', vr: 'var', sd: 'sd' });
+  const Y = stdCalc(k, y, 'col2');
+  const prods = X.dev.map((d, i) => d * Y.dev[i]), sp = prods.reduce((s, z) => s + z, 0);
+  k.s('**Products of matching deviations:** ' + prods.map((z, i) => `$(${tn(X.dev[i], 6)}) \\times (${tn(Y.dev[i], 6)}) = ${tn(z, 8)}$`).join(', ') + '.');
+  k.r(`**Covariance_S(col1, col2):** $\\frac{\\sum (x - \\bar{x})(y - \\bar{y})}{n - 1} = \\frac{${tn(sp, 8)}}{${n - 1}} = ${tn(cv, 8)}$.`, 'cov', cv);
+  k.r(`**Correlation:** $\\rho = \\frac{Cov}{s_1 s_2} = \\frac{${tn(cv, 8)}}{${tn(sx, 6)} \\times ${tn(sy, 6)}} = \\frac{${tn(cv, 8)}}{${tn(sx * sy, 8)}} = ${tn(rho, 6)}$.`, 'corr', rho);
+  k.r(`**Sharpe ratio of asset 2:** $\\frac{\\bar{y}}{s_2} = \\frac{${tn(Y.m, 6)}}{${tn(sy, 6)}} = ${tn(mean(y) / sy, 6)}$.`, 'shp', mean(y) / sy);
+  return { ...withCalc(Q('L6.stats', 6, html, parts), k.steps), solution: sol };
 }
 
 /** The covariance matrix: symmetry, diagonal, correlation and where Covar_Matrix writes each entry. */
@@ -763,14 +771,19 @@ export function L6_matrix(): Question {
   const p = rint(0, k - 1), q = rint(0, k - 1);
   const rho = M[lo][hi] / Math.sqrt(M[lo][lo] * M[hi][hi]);
   const parts = chooseParts([
-    { part: Nd('The missing covariance', M[hi][lo], 5e-5), must: true },
-    { part: Nd(`Standard deviation of asset ${a + 1}`, Math.sqrt(M[a][a]), 1e-4), w: 0.6 },
-    { part: N(`Correlation of assets ${lo + 1} and ${hi + 1}`, rho, 'n', { abs: 0.005 }), w: 0.7 },
-    { part: CT(`Cell that holds Cov(${p + 1}, ${q + 1})`, addr(r0 + p + 1, c0 + q + 1), [addr(r0 + q + 1, c0 + p + 1 + (p === q ? 1 : 0)), addr(r0 + p, c0 + q + 1), addr(p + 1, c0 + q + 1), addr(r0 + p + 1, c0 + q + 2)]), w: 0.6 },
+    { part: K(Nd('The missing covariance', M[hi][lo], 5e-5), 'miss'), must: true },
+    { part: K(Nd(`Standard deviation of asset ${a + 1}`, Math.sqrt(M[a][a]), 1e-4), 'sd'), w: 0.6 },
+    { part: K(N(`Correlation of assets ${lo + 1} and ${hi + 1}`, rho, 'n', { abs: 0.005 }), 'corr'), w: 0.7 },
+    { part: K(CT(`Cell that holds Cov(${p + 1}, ${q + 1})`, addr(r0 + p + 1, c0 + q + 1), [addr(r0 + q + 1, c0 + p + 1 + (p === q ? 1 : 0)), addr(r0 + p, c0 + q + 1), addr(p + 1, c0 + q + 1), addr(r0 + p + 1, c0 + q + 2)]), 'cell'), w: 0.6 },
   ], 3, 3);
   const sol = p_(`The matrix is symmetric, Cov(${hi + 1}, ${lo + 1}) = Cov(${lo + 1}, ${hi + 1}) = ${f4(M[lo][hi])}. The diagonal holds variances, so σ<sub>${a + 1}</sub> = √${f4(M[a][a])} = ${f4(Math.sqrt(M[a][a]))}.`) +
     p_(`ρ = ${f4(M[lo][hi])} / (√${f4(M[lo][lo])} × √${f4(M[hi][hi])}) = ${f4(rho)}. Entry (i, j) goes to row ${r0} + i, column ${c0 ? c0 + ' + ' : ''}j: Cov(${p + 1}, ${q + 1}) → ${addr(r0 + p + 1, c0 + q + 1)}.`);
-  return { ...Q('L6.matrix', 6, html, parts), solution: sol };
+  const kc = calc(), s1 = Math.sqrt(M[lo][lo]), s2 = Math.sqrt(M[hi][hi]);
+  kc.r(`**Missing entry:** the matrix is symmetric, so Cov(${hi + 1}, ${lo + 1}) = Cov(${lo + 1}, ${hi + 1}), the entry in row ${lo + 1}, column ${hi + 1}: ${tn(M[lo][hi], 4)}.`, 'miss', M[hi][lo]);
+  kc.r(`**Standard deviation of asset ${a + 1}:** the diagonal entry is the variance ${tn(M[a][a], 4)}, so $\\sigma = \\sqrt{${tn(M[a][a], 4)}} = ${tn(Math.sqrt(M[a][a]), 6)}$.`, 'sd', Math.sqrt(M[a][a]));
+  kc.r(`**Correlation:** $\\rho = \\frac{Cov}{\\sqrt{Var_{${lo + 1}}} \\times \\sqrt{Var_{${hi + 1}}}} = \\frac{${tn(M[lo][hi], 4)}}{\\sqrt{${tn(M[lo][lo], 4)}} \\times \\sqrt{${tn(M[hi][hi], 4)}}} = \\frac{${tn(M[lo][hi], 4)}}{${tn(s1, 6)} \\times ${tn(s2, 6)}} = \\frac{${tn(M[lo][hi], 4)}}{${tn(s1 * s2, 8)}} = ${tn(rho, 6)}$.`, 'corr', rho);
+  kc.r(`**Cell for Cov(${p + 1}, ${q + 1}):** the pass i = ${p + 1}, j = ${q + 1} writes to \`Cells(${r0} + i, ${c0 ? c0 + ' + ' : ''}j)\` = \`Cells(${r0 + p + 1}, ${c0 + q + 1})\`: row ${r0 + p + 1}, column ${c0 + q + 1}, the letter ${colL(c0 + q + 1)}, so ${addr(r0 + p + 1, c0 + q + 1)}.`, 'cell');
+  return { ...withCalc(Q('L6.matrix', 6, html, parts), kc.steps), solution: sol };
 }
 
 /** ws.Range(ws.Cells(r1, c1), ws.Cells(r2, c2)) and the summary table layout. */
@@ -781,13 +794,17 @@ export function L6_range(): Question {
   const block = `${addr(r1, c1)}:${addr(r2, c2)}`, cnt = (r2 - r1 + 1) * (c2 - c1 + 1);
   const jc = c1 + j - 1;
   const parts: Part[] = [
-    CT('Block of the first Range (col.Address without $ signs)', block, [`${addr(c1, r1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2 + 1, c2)}`, `${addr(r1, c1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2, c2 + 1)}`]),
-    CN('Number of cells in it', cnt, [r2 - r1 + 1, (r2 - r1) * (c2 - c1 + 1), (r2 - r1 + 1) * (c2 - c1), r2 * c2]),
-    CT(`Cell that receives the standard deviation of column ${colL(jc)}`, addr(r2 + 3, jc), [addr(r2 + 2, jc), addr(r2 + 3, j), addr(jc, r2 + 3), addr(r2 + 4, jc)]),
+    K(CT('Block of the first Range (col.Address without $ signs)', block, [`${addr(c1, r1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2 + 1, c2)}`, `${addr(r1, c1)}:${addr(c2, r2)}`, `${addr(r1, c1)}:${addr(r2, c2 + 1)}`]), 'blk'),
+    K(CN('Number of cells in it', cnt, [r2 - r1 + 1, (r2 - r1) * (c2 - c1 + 1), (r2 - r1 + 1) * (c2 - c1), r2 * c2]), 'cnt'),
+    K(CT(`Cell that receives the standard deviation of column ${colL(jc)}`, addr(r2 + 3, jc), [addr(r2 + 2, jc), addr(r2 + 3, j), addr(jc, r2 + 3), addr(r2 + 4, jc)]), 'cell'),
   ];
   const sol = p_(`Range(top-left, bottom-right): Cells(${r1}, ${c1}) = ${addr(r1, c1)} and Cells(${r2}, ${c2}) = ${addr(r2, c2)}, so ${block}: ${r2 - r1 + 1} rows × ${c2 - c1 + 1} column${c2 > c1 ? 's' : ''} = ${cnt} cells.`) +
     p_(`In the loop the Set line builds one column per j; the mean goes to row ${r2 + 2}, StDev_S to row ${r2 + 3}: column ${colL(jc)} → ${addr(r2 + 3, jc)}.`);
-  return { ...Q('L6.range', 6, p_('Read the Sub and answer the questions.') + code(lines), parts), solution: sol };
+  const k = calc();
+  k.r(`**Block:** \`Cells(${r1}, ${c1})\` is row ${r1}, column ${c1} = ${addr(r1, c1)} (top left); \`Cells(${r2}, ${c2})\` is row ${r2}, column ${c2} = ${addr(r2, c2)} (bottom right). So the Range is ${block}.`, 'blk');
+  k.r(`**Number of cells:** rows $${r2} - ${r1} + 1 = ${r2 - r1 + 1}$, columns $${c2} - ${c1} + 1 = ${c2 - c1 + 1}$, so $${r2 - r1 + 1} \\times ${c2 - c1 + 1} = ${cnt}$ cells.`, 'cnt');
+  k.r(`**Cell for column ${colL(jc)}:** StDev_S is written to \`Cells(${r2} + 3, j)\` = \`Cells(${r2 + 3}, ${jc})\`: row ${r2 + 3}, column ${jc}, the letter ${colL(jc)}, so ${addr(r2 + 3, jc)} (the average goes one row higher, ${addr(r2 + 2, jc)}).`, 'cell');
+  return { ...withCalc(Q('L6.range', 6, p_('Read the Sub and answer the questions.') + code(lines), parts), k.steps), solution: sol };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -802,29 +819,52 @@ export function L7_trace(): Question {
     const fv = v0 * (1 + r) ** n;
     const lines = ['Function grow(v As Double, r As Double, n As Long) As Double', '    Dim i As Long', '    For i = 1 To n', '        v = v * (1 + r)', '    Next i', '    grow = v', 'End Function', '',
       'Sub Test_Grow()', '    Dim x As Double', '    Dim y As Double', `    x = ${v0}`, `    y = grow(x, ${vb(r)}, ${n})`, '    MsgBox (x & " / " & y)', 'End Sub'];
-    const parts: Part[] = [N(`Value of =grow(${v0}, ${vb(r)}, ${n}) in a cell`, fv, 'n', { abs: 0.005 }), N('Value of x shown by the MsgBox', fv, 'n', { abs: 0.005 }), CN(`Value of =grow(${v0}, ${vb(r)}, 0)`, v0, [0, v0 * (1 + r), 1], f4)];
+    const parts: Part[] = [K(N(`Value of =grow(${v0}, ${vb(r)}, ${n}) in a cell`, fv, 'n', { abs: 0.005 }), 'fv'), K(N('Value of x shown by the MsgBox', fv, 'n', { abs: 0.005 }), 'x'), K(CN(`Value of =grow(${v0}, ${vb(r)}, 0)`, v0, [0, v0 * (1 + r), 1], f4), 'zero')];
     const sol = p_(`grow compounds v for n periods: ${v0} × ${vb(1 + r)}<sup>${n}</sup> = ${f4(fv)}. With n = 0 the loop does not run and v = ${v0} is returned.`) +
       p_(`Arguments are passed ByRef by default. x is a Double variable passed to v As Double, so the loop changes x itself: the MsgBox shows ${f4(fv)} for x as well, not ${v0}.`);
-    return { ...Q('L7.trace', 7, p_('Read the function and the Sub that calls it.') + code(lines), parts), solution: sol };
+    const k = calc(), fac = 1 + r;
+    k.s(`**Setup:** \`grow(x, ${vb(r)}, ${n})\` passes v = ${v0}, r = ${vb(r)} and n = ${n}. The loop runs ${n} times; every pass multiplies v by 1 + r = ${tn(fac, 2)}.`);
+    let vv = v0;
+    for (let i = 1; i <= n; i++) { const nv = vv * fac; k.s(`**Pass i = ${i}:** $v = ${tn(vv, 6)} \\times ${tn(fac, 2)} = ${tn(nv, 6)}$.`); vv = nv; }
+    k.r(`**Function value:** $${tn(v0, 0)} \\times (1 + ${tn(r, 2)})^{${n}} = ${tn(v0, 0)} \\times ${tn(fac ** n, 6)} = ${tn(fv, 6)}$, and \`grow = v\` returns this number.`, 'fv', fv);
+    k.r(`**x after the call:** arguments are passed ByRef by default, so \`v\` is the same variable as \`x\` and the loop changed x itself. The MsgBox shows x = ${tn(fv, 6)}, not the original ${v0}.`, 'x', fv);
+    k.r(`**n = 0:** \`For i = 1 To 0\` does not run, so v is still ${v0} and grow returns ${v0}.`, 'zero');
+    return { ...withCalc(Q('L7.trace', 7, p_('Read the function and the Sub that calls it.') + code(lines), parts), k.steps), solution: sol };
   }
   if (kind === 'pv') {
     const cf = pick([100, 50, 1000, 200]), r = pick([0.04, 0.05, 0.06, 0.08, 0.1]), n = rint(2, 6);
     let pv = 0; for (let t = 1; t <= n; t++) pv += cf / (1 + r) ** t;
     const lines = ['Function pv_sum(cf As Double, r As Double, n As Long) As Double', '    Dim t As Long', '    Dim total As Double', '    For t = 1 To n', '        total = total + cf / (1 + r) ^ t', '    Next t', '    pv_sum = total', 'End Function'];
     let pv1 = 0; for (let t = 1; t <= n - 1; t++) pv1 += cf / (1 + r) ** t;
-    const parts: Part[] = [N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n})`, pv, 'n', { abs: 0.005 }), N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n - 1})`, pv1, 'n', { abs: 0.005 }), CN(`Value of =pv_sum(${cf}, ${vb(r)}, 0)`, 0, [cf, cf / (1 + r), 1], f4)];
+    const parts: Part[] = [K(N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n})`, pv, 'n', { abs: 0.005 }), 'pv'), K(N(`Value of =pv_sum(${cf}, ${vb(r)}, ${n - 1})`, pv1, 'n', { abs: 0.005 }), 'pv1'), K(CN(`Value of =pv_sum(${cf}, ${vb(r)}, 0)`, 0, [cf, cf / (1 + r), 1], f4), 'zero')];
     const sol = p_(`pv_sum adds the discounted cash flows cf / (1 + r)<sup>t</sup> for t = 1 … n: ${f4(pv)} for n = ${n}, ${f4(pv1)} for n = ${n - 1}. total starts at 0 (default of a Double); with n = 0 the loop does not run and 0 is returned.`);
-    return { ...Q('L7.trace', 7, p_('A user-defined function is used in worksheet cells.') + code(lines), parts), solution: sol };
+    const k = calc();
+    let tot = 0;
+    k.s(`**Setup:** \`total\` starts at 0 (the default of a Double); pass t adds cf / (1 + r)^t with cf = ${cf} and r = ${vb(r)}.`);
+    for (let t = 1; t <= n; t++) {
+      const f = (1 + r) ** t, term = cf / f, prev = tot;
+      tot += term;
+      k.s(`**Pass t = ${t}:** $(1 + ${tn(r, 2)})^{${t}} = ${tn(f, 6)}$, so $${tn(cf, 0)} / ${tn(f, 6)} = ${tn(term, 6)}$ and $total = ${tn(prev, 6)} + ${tn(term, 6)} = ${tn(tot, 6)}$.`);
+    }
+    k.r(`**pv_sum with n = ${n}:** after the last pass (t = ${n}) total = ${tn(pv, 6)}, which the function returns.`, 'pv', pv);
+    k.r(`**pv_sum with n = ${n - 1}:** the loop stops after the pass t = ${n - 1}, so the result is the running total of that pass: ${tn(pv1, 6)}.`, 'pv1', pv1);
+    k.r('**n = 0:** the loop does not run, total keeps its start value 0 and the function returns 0.', 'zero');
+    return { ...withCalc(Q('L7.trace', 7, p_('A user-defined function is used in worksheet cells.') + code(lines), parts), k.steps), solution: sol };
   }
   const th = pick([0.01, 0.02, 0.03]);
   const lines = ['Function signal(ret As Double) As String', `    If ret > ${vb(th)} Then`, '        signal = "Buy"', `    ElseIf ret < ${vb(-th)} Then`, '        signal = "Sell"', '    End If', 'End Function'];
   const opts = ['Buy', 'Sell', 'Hold', 'An empty text ""'];
   const rets = shuffle([th + 0.01, -th - 0.01, 0, th, th / 2, -th]).slice(0, 3);
   const res = (r: number) => r > th + 1e-12 ? 0 : r < -th - 1e-12 ? 1 : 3;
-  const parts = rets.map(r => C(`=signal(${vb(r)}) returns`, opts, res(r)));
+  const parts = rets.map((r, i) => C(`=signal(${vb(r)}) returns`, opts, res(r), 'r' + i));
   const sol = p_(`Only two branches assign the function name. When neither condition holds (−${vb(th)} ≤ ret ≤ ${vb(th)}) the name is never assigned and the function returns the default of its type: an empty String. Add Else: signal = "Hold" to fix it.`) +
     p_(rets.map(r => `${vb(r)} → ${['Buy', 'Sell', '', '""'][res(r)]}`).join('; ') + '.');
-  return { ...Q('L7.trace', 7, p_('Read the function.') + code(lines), parts), solution: sol };
+  const k = calc();
+  rets.forEach((r, i) => {
+    const t1 = r > th + 1e-12, t2 = r < -th - 1e-12;
+    k.r(`**ret = ${vb(r)}:** \`ret > ${vb(th)}\` is ${t1 ? 'true, so signal = "Buy"' : 'false, and \`ret < ' + vb(-th) + '\` is ' + (t2 ? 'true, so signal = "Sell"' : 'false too: no branch runs, signal is never assigned and the function returns the default of a String, an empty text')}.`, 'r' + i);
+  });
+  return { ...withCalc(Q('L7.trace', 7, p_('Read the function.') + code(lines), parts), k.steps), solution: sol };
 }
 
 /** UniformArray(T, N, a, b): size, an element for a given draw, where an array result lands. */
@@ -833,14 +873,19 @@ export function L7_uniform(): Question {
   const r0 = rint(1, 5), c0 = rint(1, 4);
   const lines = ['Function UniformArray(T As Long, N As Long, a As Single, b As Single) As Variant', '    Dim my_array() As Double', '    ReDim my_array(1 To T, 1 To N)', '    Dim i As Integer, j As Integer', '    For i = 1 To T', '        For j = 1 To N', '            my_array(i, j) = Rnd() * (b - a) + a', '        Next j', '    Next i', '    UniformArray = my_array', 'End Function'];
   const parts = chooseParts([
-    { part: CN(`Number of draws returned by UniformArray(${T}, ${n}, ${vb(a)}, ${vb(b)})`, T * n, [T + n, T, n, (T - 1) * n]), must: true },
-    { part: Nd(`my_array(1, 1) if the first Rnd() returns ${vb(u)}`, u * (b - a) + a, 1e-6), w: 0.7 },
-    { part: CT(`The result is entered as an array formula starting in ${addr(r0, c0)}. Bottom-right cell of the block`, addr(r0 + T - 1, c0 + n - 1), [addr(r0 + n - 1, c0 + T - 1), addr(r0 + T, c0 + n), addr(T, n), addr(r0 + T - 1, c0 + n)]), w: 0.6 },
-    { part: CT('Why is my_array declared with Dim my_array() and then ReDim?', 'T and N are only known at run time; fixed bounds must be constants', ['ReDim makes the array two-dimensional', 'Dim cannot declare Double arrays', 'ReDim fills the array with zeros']), w: 0.5 },
+    { part: K(CN(`Number of draws returned by UniformArray(${T}, ${n}, ${vb(a)}, ${vb(b)})`, T * n, [T + n, T, n, (T - 1) * n]), 'cnt'), must: true },
+    { part: K(Nd(`my_array(1, 1) if the first Rnd() returns ${vb(u)}`, u * (b - a) + a, 1e-6), 'el'), w: 0.7 },
+    { part: K(CT(`The result is entered as an array formula starting in ${addr(r0, c0)}. Bottom-right cell of the block`, addr(r0 + T - 1, c0 + n - 1), [addr(r0 + n - 1, c0 + T - 1), addr(r0 + T, c0 + n), addr(T, n), addr(r0 + T - 1, c0 + n)]), 'br'), w: 0.6 },
+    { part: K(CT('Why is my_array declared with Dim my_array() and then ReDim?', 'T and N are only known at run time; fixed bounds must be constants', ['ReDim makes the array two-dimensional', 'Dim cannot declare Double arrays', 'ReDim fills the array with zeros']), 'why'), w: 0.5 },
   ], 3, 3);
   const sol = p_(`ReDim sizes the array to ${T} × ${n}: ${T * n} draws, each Rnd() × (b − a) + a. With u = ${vb(u)}: ${vb(u)} × ${vb(b - a)} + (${vb(a)}) = ${vb(+(u * (b - a) + a).toFixed(6))}.`) +
     p_(`A ${T} × ${n} result fills ${T} rows and ${n} columns from ${addr(r0, c0)} to ${addr(r0 + T - 1, c0 + n - 1)}. Dim my_array(1 To T, 1 To N) would not compile, because the bounds of a fixed array must be constants.`);
-  return { ...Q('L7.uniform', 7, p_('UniformArray from the class workbook:') + code(lines), parts), solution: sol };
+  const k = calc(), w = b - a;
+  k.r(`**Size:** \`ReDim my_array(1 To ${T}, 1 To ${n})\` gives ${T} rows and ${n} columns, so $${T} \\times ${n} = ${T * n}$ draws.`, 'cnt');
+  k.r(`**my_array(1, 1):** $u \\times (b - a) + a = ${tn(u, 2)} \\times (${tn(b, 4)} - ${tq(a, 4)}) + ${tq(a, 4)} = ${tn(u, 2)} \\times ${tn(w, 4)} + ${tq(a, 4)} = ${tq(u * w, 6)} + ${tq(a, 4)} = ${tn(u * w + a, 6)}$.`, 'el', u * w + a);
+  k.r(`**Block:** it starts at ${addr(r0, c0)}. ${T} rows end in row $${r0} + ${T} - 1 = ${r0 + T - 1}$, ${n} columns end in column $${c0} + ${n} - 1 = ${c0 + n - 1}$, the letter ${colL(c0 + n - 1)}. The bottom-right cell is ${addr(r0 + T - 1, c0 + n - 1)}.`, 'br');
+  k.r('**Why ReDim:** T and N are only known when the function runs, and a fixed array needs constant bounds. So the array is declared without bounds (`Dim my_array()`) and sized with `ReDim` once T and N are known.', 'why');
+  return { ...withCalc(Q('L7.uniform', 7, p_('UniformArray from the class workbook:') + code(lines), parts), k.steps), solution: sol };
 }
 
 const SYNTAX: { q: string; right: string; wrong: string[]; sol: string }[] = [
@@ -882,21 +927,32 @@ export function L8_sharpe(): Question {
     const sr = (mm: number, ss: number) => Math.sqrt(252) * (mm - rf / 252) / ss;
     const html = p_(`Two funds have these daily statistics over two years; the annual risk-free rate is ${P(rf, 1)} (rf = ${vb(rf)}). The function from class is:`) + code(SHARPE_CODE) +
       table(['Fund', 'Average daily return', 'StDev_S of daily returns'], [['Fund 1', vb(m), vb(s)], ['Fund 2', vb(m2), vb(s2)]]);
-    const parts: Part[] = [Nd('sharpe_ratio of fund 1', sr(m, s), 1e-3), Nd('sharpe_ratio of fund 2', sr(m2, s2), 1e-3), C('Fund with the higher Sharpe ratio', ['Fund 1', 'Fund 2'], sr(m, s) >= sr(m2, s2) ? 0 : 1)];
+    const parts: Part[] = [K(Nd('sharpe_ratio of fund 1', sr(m, s), 1e-3), 's1'), K(Nd('sharpe_ratio of fund 2', sr(m2, s2), 1e-3), 's2'), K(C('Fund with the higher Sharpe ratio', ['Fund 1', 'Fund 2'], sr(m, s) >= sr(m2, s2) ? 0 : 1), 'best')];
     const sol = p_(`rf_d = ${vb(rf)} / 252 = ${f6(rf / 252)}. Fund 1: √252 × (${vb(m)} − ${f6(rf / 252)}) / ${vb(s)} = ${f4(sr(m, s))}. Fund 2: √252 × (${vb(m2)} − ${f6(rf / 252)}) / ${vb(s2)} = ${f4(sr(m2, s2))}.`);
-    return { ...Q('L8.sharpe', 8, html, parts), solution: sol };
+    const k = calc(), rd = rf / 252, q = Math.sqrt(252);
+    k.s(`**Daily risk-free rate:** $rf_d = \\frac{rf}{252} = \\frac{${tn(rf, 3)}}{252} = ${tn(rd, 8)}$.`);
+    k.s(`**Annualisation factor:** $\\sqrt{252} = ${tn(q, 6)}$.`);
+    const fund = (nm: string, mm: number, ss: number, key: string) => k.r(`**${nm}:** $\\sqrt{252} \\times \\frac{\\text{avg} - rf_d}{\\text{std}} = ${tn(q, 6)} \\times \\frac{${tn(mm, 4)} - ${tn(rd, 8)}}{${tn(ss, 3)}} = ${tn(q, 6)} \\times \\frac{${tn(mm - rd, 8)}}{${tn(ss, 3)}} = ${tn(q, 6)} \\times ${tn((mm - rd) / ss, 6)} = ${tn(sr(mm, ss), 6)}$.`, key, sr(mm, ss));
+    fund('Fund 1', m, s, 's1');
+    fund('Fund 2', m2, s2, 's2');
+    k.r(`**Comparison:** Fund 1 has ${tn(sr(m, s), 4)} and Fund 2 has ${tn(sr(m2, s2), 4)}, so ${sr(m, s) >= sr(m2, s2) ? 'Fund 1' : 'Fund 2'} has the higher Sharpe ratio.`, 'best');
+    return { ...withCalc(Q('L8.sharpe', 8, html, parts), k.steps), solution: sol };
   }
   const r = dailySample(rint(6, 8), 2);
   const m = mean(r), s = stdevS(r), sr = Math.sqrt(252) * (m - rf / 252) / s;
   const html = p_(`A fund’s daily returns are in A2:A${r.length + 1}; H2 holds the annual risk-free rate ${vb(rf)}. Cell C2 contains =sharpe_ratio(A2:A${r.length + 1}, H2), using:`) + code(SHARPE_CODE) + sheet([1], r.map((x, i) => [i + 2, [x]]));
   const parts = chooseParts([
-    { part: Nd('avg_return', m, 1e-6), w: 0.6 },
-    { part: Nd('std_return', s, 1e-6), w: 0.6 },
-    { part: Nd('Value shown in C2', sr, 1e-3), must: true },
+    { part: K(Nd('avg_return', m, 1e-6), 'avg'), w: 0.6 },
+    { part: K(Nd('std_return', s, 1e-6), 'std'), w: 0.6 },
+    { part: K(Nd('Value shown in C2', sr, 1e-3), 'c2'), must: true },
   ], 2, 3);
   const sol = p_(`avg_return = ${f6(m)}, std_return (n − 1 = ${r.length - 1}) = ${f6(s)}, rf_d = ${vb(rf)} / 252 = ${f6(rf / 252)}.`) +
     p_(`Sharpe = √252 × (${f6(m)} − ${f6(rf / 252)}) / ${f6(s)} = ${f4(sr)}.`);
-  return { ...Q('L8.sharpe', 8, html, parts), solution: sol };
+  const k = calc(), rd = rf / 252, q = Math.sqrt(252);
+  stdCalc(k, r, 'the returns', { mean: 'avg', sd: 'std' }, 3, 8, 10);
+  k.s(`**Daily risk-free rate:** $rf_d = \\frac{rf}{252} = \\frac{${tn(rf, 3)}}{252} = ${tn(rd, 8)}$.`);
+  k.r(`**Sharpe ratio in C2:** $\\sqrt{252} \\times \\frac{\\text{avg} - rf_d}{\\text{std}} = ${tn(q, 6)} \\times \\frac{${tn(m, 8)} - ${tn(rd, 8)}}{${tn(s, 8)}} = ${tn(q, 6)} \\times \\frac{${tn(m - rd, 8)}}{${tn(s, 8)}} = ${tn(q, 6)} \\times ${tn((m - rd) / s, 6)} = ${tn(sr, 6)}$.`, 'c2', sr);
+  return { ...withCalc(Q('L8.sharpe', 8, html, parts), k.steps), solution: sol };
 }
 
 /** Sortino ratio: excess return over the standard deviation of the negative returns. */
@@ -907,14 +963,21 @@ export function L8_sortino(): Question {
   const html = p_(`sortino_ratio(returns, rf) follows the plan from class: average return, tdays = 252, rf_d = rf / tdays, keep only the negative returns, take StDev_S of those (the downside volatility), then Sqr(tdays) × (average − rf_d) / downside volatility. A fund’s daily returns (rf = ${vb(rf)}):`) +
     sheet([1], r.map((x, i) => [i + 2, [x]]));
   const parts = chooseParts([
-    { part: Nd('Average daily return', m, 1e-6), w: 0.4 },
-    { part: Nd('Downside volatility (StDev_S of the negative returns)', dd, 1e-6), must: true },
-    { part: Nd('Sortino ratio', so, 1e-3), must: true },
-    { part: Nd('Sharpe ratio of the same fund (StDev_S of all returns)', sr, 1e-3), w: 0.4 },
+    { part: K(Nd('Average daily return', m, 1e-6), 'avg'), w: 0.4 },
+    { part: K(Nd('Downside volatility (StDev_S of the negative returns)', dd, 1e-6), 'dd'), must: true },
+    { part: K(Nd('Sortino ratio', so, 1e-3), 'so'), must: true },
+    { part: K(Nd('Sharpe ratio of the same fund (StDev_S of all returns)', sr, 1e-3), 'sr'), w: 0.4 },
   ], 2, 3);
   const sol = p_(`Negative returns: ${neg.map(vb).join(', ')} → StDev_S (n − 1 = ${neg.length - 1}) = ${f6(dd)}. Average of all ${r.length} returns = ${f6(m)}, rf_d = ${f6(rf / 252)}.`) +
     p_(`Sortino = √252 × (${f6(m)} − ${f6(rf / 252)}) / ${f6(dd)} = ${f4(so)}; Sharpe with the total StDev_S ${f6(s)} = ${f4(sr)}.`);
-  return { ...Q('L8.sortino', 8, html, parts), solution: sol };
+  const k = calc(), rd = rf / 252, q = Math.sqrt(252);
+  const A = stdCalc(k, r, 'all returns', { mean: 'avg' }, 3, 8, 10);
+  k.s(`**Negative returns:** keeping only the returns below 0 leaves ${neg.map(vb).join(', ')} (${neg.length} of ${r.length}).`);
+  stdCalc(k, neg, 'the negative returns', { sd: 'dd' }, 3, 8, 10);
+  k.s(`**Daily risk-free rate:** $rf_d = \\frac{${tn(rf, 3)}}{252} = ${tn(rd, 8)}$.`);
+  k.r(`**Sortino ratio:** $\\sqrt{252} \\times \\frac{\\bar{x} - rf_d}{\\text{downside}} = ${tn(q, 6)} \\times \\frac{${tn(m, 8)} - ${tn(rd, 8)}}{${tn(dd, 8)}} = ${tn(q, 6)} \\times \\frac{${tn(m - rd, 8)}}{${tn(dd, 8)}} = ${tn(q, 6)} \\times ${tn((m - rd) / dd, 6)} = ${tn(so, 6)}$.`, 'so', so);
+  k.r(`**Sharpe ratio:** same formula with the StDev_S of all returns, ${tn(A.sd, 8)}: $${tn(q, 6)} \\times \\frac{${tn(m - rd, 8)}}{${tn(s, 8)}} = ${tn(q, 6)} \\times ${tn((m - rd) / s, 6)} = ${tn(sr, 6)}$.`, 'sr', sr);
+  return { ...withCalc(Q('L8.sortino', 8, html, parts), k.steps), solution: sol };
 }
 
 /** Sharpe ratios with skewness and kurtosis: what the standard deviation misses. */
@@ -933,9 +996,15 @@ export function L8_compare(): Question {
   const [ra, rb] = rows;
   const sa = shp(ra[1], ra[2]), sb = shp(rb[1], rb[2]);
   const tail = ra[3] < rb[3] ? 0 : 1;
-  const parts: Part[] = [Nd('Sharpe ratio of A', sa, 1e-3), Nd('Sharpe ratio of B', sb, 1e-3), C('Portfolio with the fatter left tail', ['A', 'B'], tail)];
+  const parts: Part[] = [K(Nd('Sharpe ratio of A', sa, 1e-3), 'sa'), K(Nd('Sharpe ratio of B', sb, 1e-3), 'sb'), K(C('Portfolio with the fatter left tail', ['A', 'B'], tail), 'tail')];
   const sol = p_(`Sharpe = (mean − r<sub>f</sub>) / std: A (${P(ra[1])} − ${P(rf, 0)}) / ${P(ra[2])} = ${f4(sa)}; B (${P(rb[1])} − ${P(rf, 0)}) / ${P(rb[2])} = ${f4(sb)}.`) +
     p_(`Portfolio ${rows[tail][0]} has strongly negative skewness (${f2(rows[tail][3])}) and very high kurtosis (${f2(rows[tail][4])}): rare large losses. Its lower standard deviation flatters the Sharpe ratio, which ignores the shape of the distribution; the Sortino ratio looks at downside volatility instead.`);
-  return { ...Q('L8.compare', 8, html, parts), solution: sol };
+  const k = calc();
+  const one = (nm: string, row: [string, number, number, number, number], key: string, val: number) =>
+    k.r(`**Portfolio ${nm}:** $\\frac{\\mu - r_f}{\\sigma} = \\frac{${tn(row[1], 4)} - ${tn(rf, 2)}}{${tn(row[2], 4)}} = \\frac{${tn(row[1] - rf, 4)}}{${tn(row[2], 4)}} = ${tn(val, 6)}$.`, key, val);
+  one('A', ra, 'sa', sa);
+  one('B', rb, 'sb', sb);
+  k.r(`**Fatter left tail:** a more negative skewness and a larger kurtosis mean more probability in the left tail. Skewness is ${f2(ra[3])} for ${ra[0]} and ${f2(rb[3])} for ${rb[0]}; kurtosis is ${f2(ra[4])} and ${f2(rb[4])}. So portfolio ${rows[tail][0]} has the fatter left tail.`, 'tail');
+  return { ...withCalc(Q('L8.compare', 8, html, parts), k.steps), solution: sol };
 }
 

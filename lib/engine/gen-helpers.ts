@@ -51,9 +51,16 @@ export const K = <T extends Part>(part: T, key: string): T => ({ ...part, key })
 /** A number for a formula: fixed decimals, thousands as {,}, a real minus sign. */
 export function tn(x: number, d = 2): string {
   if (!Number.isFinite(x)) return String(x);
-  const [i, f] = Math.abs(x).toFixed(d).split('.');
+  // Shown values are rounded to two decimals; `d` only matters for whole numbers (d = 0). Small values such as
+  // rates and daily returns keep two significant digits instead of collapsing to 0.00 or 0.09.
+  const a = Math.abs(x);
+  let t: string;
+  if (d === 0) t = a.toFixed(0);
+  else if (a === 0 || a >= 0.1) t = a.toFixed(2);
+  else { t = a.toPrecision(2); if (/e/.test(t)) t = a.toFixed(8); }
+  const [i, f] = t.split('.');
   const s = i.replace(/\B(?=(\d{3})+$)/g, '{,}') + (f ? '.' + f : '');
-  return (x < 0 && +Math.abs(x).toFixed(d) !== 0 ? '-' : '') + s;
+  return (x < 0 && +t !== 0 ? '-' : '') + s;
 }
 /** A fraction as a percentage for a formula: 0.125 → 12.50\%. */
 export const tp = (x: number, d = 2) => tn(x * 100, d) + '\\%';
