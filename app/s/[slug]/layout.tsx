@@ -17,7 +17,7 @@ export default async function SubjectLayout({ children, params }: { children: Re
   const data = await loadSubject(sb, slug);
   return (
     <>
-      <SubjectProvider slug={slug} bank={data.bank} initialSettings={data.settings} initialStats={data.stats} initialDue={data.due}>
+      <SubjectProvider slug={slug} bank={data.bank} initialSettings={data.settings} initialStats={data.stats}>
         <div className="shell">
           <Sidebar />
           <div className="content">

@@ -45,28 +45,39 @@ test('setup.sql applies twice and seeds content', async () => {
   assert.ok(c.rows[0].n >= 50);
 });
 
-test('record_attempt keeps stats and the review schedule per user', async () => {
+test('record_attempt keeps stats per user; study_activity and resets', async () => {
   const db = await boot();
   await as(db, U1, async () => {
     await db.query("select public.record_attempt('fvcs', 'L1.mm2', '1', 'practice', 4, 2, null)");
     await db.query("select public.record_attempt('fvcs', 'L1.mm2', '1', 'practice', 4, 4, null)");
+    await db.query("select public.record_attempt('fi', 'L1.capm', '1', 'practice', 3, 3, null)");
   });
-  const s = await as(db, U1, () => db.query<{ answers: number; correct: number; ema: number }>('select answers, correct, ema from public.type_stats'));
+  const s = await as(db, U1, () => db.query<{ answers: number; correct: number; ema: number }>("select answers, correct, ema from public.type_stats where subject_slug = 'fvcs'"));
   assert.deepEqual([s.rows[0].answers, s.rows[0].correct], [8, 6]);
   assert.ok(Math.abs(s.rows[0].ema - 0.12) < 1e-6);
-  const r = await as(db, U1, () => db.query<{ box: number; later: boolean }>("select box, due_at > now() + interval '20 hours' as later from public.review_items"));
-  assert.equal(r.rows.length, 1);
-  assert.equal(r.rows[0].box, 0, 'same-day correct answer must not advance the box');
-  assert.ok(r.rows[0].later);
-  // Make it due, answer correctly: box moves up.
-  await db.exec("update public.review_items set due_at = now() - interval '1 minute'");
-  await as(db, U1, () => db.query("select public.record_attempt('fvcs', 'L1.mm2', '1', 'review', 3, 3, null)"));
-  const r2 = await db.query<{ box: number }>('select box from public.review_items');
-  assert.equal(r2.rows[0].box, 1);
+  const gone = await db.query<{ t: string | null }>("select to_regclass('public.review_items')::text as t");
+  assert.equal(gone.rows[0].t, null, 'the review queue is dropped');
   const other = await as(db, U2, () => db.query('select * from public.type_stats'));
   assert.equal(other.rows.length, 0, 'RLS hides other users’ rows');
   const daily = await as(db, U1, () => db.query<{ answers: number; correct: number }>("select answers::int, correct::int from public.daily_accuracy('fvcs')"));
-  assert.deepEqual([daily.rows[0].answers, daily.rows[0].correct], [11, 9]);
+  assert.deepEqual([daily.rows[0].answers, daily.rows[0].correct], [8, 6]);
+
+  // Two answers 4 minutes apart, then one after a 30-minute pause: 1 + 4 + 1 minutes; a 25-minute mock counts as 25.
+  await db.exec(`update public.attempts set created_at = date_trunc('day', now()) + interval '9 hours' where subject_slug = 'fvcs' and parts_correct = 2;
+    update public.attempts set created_at = date_trunc('day', now()) + interval '9 hours 4 minutes' where subject_slug = 'fvcs' and parts_correct = 4;
+    update public.attempts set created_at = date_trunc('day', now()) + interval '9 hours 34 minutes' where subject_slug = 'fi';`);
+  await as(db, U1, () => db.query("insert into public.mock_results (subject_slug, score, max_score, parts, minutes) values ('fvcs', 12, 20, '[]', 25)"));
+  const act = await as(db, U1, () => db.query<{ s: string; answers: number; mocks: number; minutes: string }>(
+    "select subject_slug as s, answers::int, mocks::int, minutes::text from public.study_activity(30, 'UTC') order by 1"));
+  assert.deepEqual(act.rows.map(r => [r.s, r.answers, r.mocks, +r.minutes]), [['fi', 3, 0, 1], ['fvcs', 8, 1, 30]]);
+  assert.equal((await as(db, U2, () => db.query('select * from public.study_activity()'))).rows.length, 0);
+
+  await as(db, U1, () => db.query("select public.reset_subject_stats('fvcs')"));
+  const left = await as(db, U1, () => db.query<{ s: string }>('select distinct subject_slug as s from public.attempts union select subject_slug from public.mock_results'));
+  assert.deepEqual(left.rows.map(r => r.s), ['fi']);
+  await as(db, U1, () => db.query('select public.reset_all_stats()'));
+  const none = await as(db, U1, () => db.query('select 1 from public.attempts union all select 1 from public.type_stats'));
+  assert.equal(none.rows.length, 0);
 });
 
 test('decks: official visible to all, own decks private, overview counts', async () => {

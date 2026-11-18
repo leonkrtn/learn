@@ -6,7 +6,7 @@ import { SUBJECTS } from '../subjects';
 import { allTypes } from '../lib/subject';
 import { canRepeat, sameWithNewNumbers } from '../lib/engine/repeat';
 import type { Question } from '../lib/engine/types';
-import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, reviewItems, type QSet } from '../lib/engine/sets';
+import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, type QSet } from '../lib/engine/sets';
 import fvcs from '../subjects/fvcs';
 import { BANK } from '../subjects/fvcs/concepts';
 import { BANK as FV_BANK } from '../subjects/fv/concepts';
@@ -303,6 +303,4 @@ test('question sets: 20 drawn, survive JSON, repeat takes a slot, pool changes i
   assert.equal(back.pos, 1);
   assert.ok(isSeen(back, 4), 'questions after the position stay reachable');
   assert.ok(!isSeen(back, 6));
-  const rev = reviewItems([{ type_key: 'L1.capm', box: 2 }, { type_key: 'L2.apt', box: 0 }, { type_key: 'gone', box: 0 }], mod.types, ctx, SET_SIZE);
-  assert.deepEqual(rev.map(x => x.type), mod.types.some(t => t.key === 'L2.apt') ? ['L2.apt', 'L1.capm'] : ['L1.capm']);
 });

@@ -17,7 +17,6 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = { enabled: null, ps: null, newPerDay: 20 };
 
 export type TypeStat = { answers: number; correct: number; ema: number };
-export type DueItem = { type_key: string; topic: string; due_at: string; box: number };
 
 type Ctx = {
   mod: SubjectModule;
@@ -25,7 +24,6 @@ type Ctx = {
   settings: Settings;
   saveSettings: (s: Settings) => Promise<void>;
   stats: Record<string, TypeStat>;
-  due: DueItem[];
   record: (typeKey: string, topic: string, mode: string, total: number, correct: number, detail?: unknown) => void;
   syncError: string | null;
   /** Lecture of the question on screen, so the cheatsheet drawer can file a new entry under it. */
@@ -41,18 +39,16 @@ export function useSubject(): Ctx {
   return c;
 }
 
-export function SubjectProvider({ slug, bank, initialSettings, initialStats, initialDue, children }: {
+export function SubjectProvider({ slug, bank, initialSettings, initialStats, children }: {
   slug: string;
   bank: ConceptBank;
   initialSettings: Partial<Settings> | null;
   initialStats: Record<string, TypeStat>;
-  initialDue: DueItem[];
   children: ReactNode;
 }) {
   const mod = getSubject(slug)!;
   const [settings, setSettings] = useState<Settings>({ ...DEFAULT_SETTINGS, ...(initialSettings || {}) });
   const [stats, setStats] = useState(initialStats);
-  const [due, setDue] = useState(initialDue);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [focusTopic, setFocusTopic] = useState<string | null>(null);
 
@@ -67,22 +63,12 @@ export function SubjectProvider({ slug, bank, initialSettings, initialStats, ini
       const p = prev[typeKey] || { answers: 0, correct: 0, ema: 0 };
       return { ...prev, [typeKey]: { answers: p.answers + total, correct: p.correct + correct, ema: nextEma(p.ema, total, correct) } };
     });
-    setDue(prev => {
-      const now = Date.now();
-      const item = prev.find(d => d.type_key === typeKey);
-      if (correct < total) {
-        const next = { type_key: typeKey, topic, box: 0, due_at: new Date(now + 864e5).toISOString() };
-        return [...prev.filter(d => d.type_key !== typeKey), next];
-      }
-      if (item && Date.parse(item.due_at) <= now) return prev.filter(d => d.type_key !== typeKey);
-      return prev;
-    });
     supabaseBrowser().rpc('record_attempt', {
       p_subject: slug, p_type: typeKey, p_topic: topic, p_mode: mode, p_total: total, p_correct: correct, p_detail: detail ?? null,
     }).then(({ error }) => setSyncError(error ? 'Your last answer was not saved: ' + error.message : null));
   }, [slug]);
 
-  const value = useMemo(() => ({ mod, bank, settings, saveSettings, stats, due, record, syncError, focusTopic, setFocusTopic }),
-    [mod, bank, settings, saveSettings, stats, due, record, syncError, focusTopic]);
+  const value = useMemo(() => ({ mod, bank, settings, saveSettings, stats, record, syncError, focusTopic, setFocusTopic }),
+    [mod, bank, settings, saveSettings, stats, record, syncError, focusTopic]);
   return <SubjectCtx.Provider value={value}>{children}</SubjectCtx.Provider>;
 }

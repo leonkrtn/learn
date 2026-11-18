@@ -15,8 +15,7 @@ export default function TopBar({ email, crumbs, actions }: { email: string; crum
       <div className="spacer" />
       <div className="right">
         {actions}
-        <span className="avatar" aria-hidden>{initials}</span>
-        <span className="who">{email}</span>
+        <Link className="account" href="/account" title="Account"><span className="avatar" aria-hidden>{initials}</span><span className="who">{email}</span></Link>
         <form action="/auth/signout" method="post"><button className="iconbtn" type="submit" title="Sign out"><Icon name="signout" size={18} /><span>Sign out</span></button></form>
       </div>
     </header>

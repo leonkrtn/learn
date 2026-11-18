@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gradeQuestion } from '@/lib/engine/grade';
 import { canRepeat, sameWithNewNumbers } from '@/lib/engine/repeat';
 import { CycleBag } from '@/lib/engine/select';
-import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, reviewItems, setTally, type QSet, type SetItem } from '@/lib/engine/sets';
+import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, setTally, type QSet, type SetItem } from '@/lib/engine/sets';
 import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Answers, Graded, TypeDef } from '@/lib/engine/types';
@@ -15,7 +15,6 @@ import { useSubject } from './SubjectContext';
 export type RunnerMode =
   | { kind: 'practice' }
   | { kind: 'cycle'; topic: string }
-  | { kind: 'review' }
   | { kind: 'ps'; set?: string };
 
 type Tally = { a: number; c: number };
@@ -31,7 +30,7 @@ const markSeen = (s: QSet): QSet => ({ ...s, items: s.items.map((x, i) => i <= s
 const sameTime = (a: string | null, b: string | null) => !!a && !!b && Date.parse(a) === Date.parse(b);
 
 export default function Runner({ mode }: { mode: RunnerMode }) {
-  const { mod, bank, settings, stats, due, record, setFocusTopic } = useSubject();
+  const { mod, bank, settings, stats, record, setFocusTopic } = useSubject();
   const types = useMemo(() => allTypes(mod), [mod]);
   const enabled = useMemo(() => {
     const on = settings.enabled ? new Set(settings.enabled) : null;
@@ -44,27 +43,20 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
       const on = settings.ps ? new Set(settings.ps) : null;
       return (mod.problemSets || []).filter(p => !mode.set || p.id === mode.set).flatMap(p => p.types).filter(t => !on || on.has(t.key));
     }
-    if (mode.kind === 'review') return types;
     return enabled;
-  }, [mode, mod, enabled, settings.ps, types]);
+  }, [mode, mod, enabled, settings.ps]);
 
-  // Practice, problem sets and review keep a stored set of 20; the lecture cycle runs in memory.
+  // Practice and problem sets keep a stored set of 20; the lecture cycle runs in memory.
   const stored = mode.kind !== 'cycle';
   const scope = mode.kind === 'ps' ? 'ps' + (mode.set ? ':' + mode.set : '') : mode.kind;
-  const poolSig = mode.kind === 'review' ? 'review' : poolKey(pool.map(t => t.key));
+  const poolSig = poolKey(pool.map(t => t.key));
 
   const emaRef = useRef<Record<string, number>>({});
   emaRef.current = Object.fromEntries(Object.entries(stats).map(([k, s]) => [k, s.ema]));
-  const dueRef = useRef(due);
-  dueRef.current = due;
   const bag = useRef<CycleBag | null>(null);
 
   /** Questions for a new set (or the next cycle question), continuing after `after`. */
   const fill = useCallback((n: number, after?: SetItem): SetItem[] => {
-    if (mode.kind === 'review') {
-      const now = Date.now();
-      return reviewItems(dueRef.current.filter(d => Date.parse(d.due_at) <= now && d.type_key !== after?.type), types, { bank }, n);
-    }
     if (mode.kind === 'cycle') {
       if (!pool.length) return [];
       if (!bag.current) bag.current = new CycleBag(pool.map(t => t.key));
@@ -235,9 +227,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     return (
       <div className="page">
         <div className="endbox panel">
-          {mode.kind === 'review'
-            ? <><h2>Nothing to review</h2><p>Question types you get wrong show up here again a day later, then after 3, 7, 16 and 35 days, always with new numbers. Come by whenever it suits you.</p>{tally.a > 0 && <p className="note">Last set: {tally.c} of {tally.a} answers correct.</p>}</>
-            : mode.kind === 'ps'
+          {mode.kind === 'ps'
               ? <><h2>No question types selected</h2><p>Turn on at least one type on the <Link href={`/s/${mod.slug}/ps`}>problem sets page</Link>.</p></>
               : <><h2>No question types selected</h2><p>Turn on at least one type in <Link href={`/s/${mod.slug}/settings`}>Settings</Link>.</p></>}
           {saveErr && <p className="err">{saveErr}</p>}
