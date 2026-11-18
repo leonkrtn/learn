@@ -1,7 +1,7 @@
 // Financial Derivatives: procedural generators for option bounds and parity, trading strategies, the binomial model,
 // Black-Scholes and the lognormal model, structured products, and forwards, futures and swaps.
 // Conventions: continuous compounding (discount factor e^(−rT)), days/365, months/12, 252 trading days a year.
-import { C, N, P, Q, chance, chooseParts, eur, fmtNum, p_, pick, rint, roundTo, rstep, shuffle, table, type Item } from '@/lib/engine/gen-helpers';
+import { C, K, N, P, Q, calc, chance, chooseParts, eur, fmtNum, p_, pick, rint, roundTo, rstep, shuffle, table, tn, tp, tq, withCalc, type Item } from '@/lib/engine/gen-helpers';
 import { mcText } from '@/lib/engine/mc';
 import type { Part, Question } from '@/lib/engine/types';
 
@@ -81,6 +81,33 @@ export function treeTable(t: Tree, label: string, fmtV = e2, dates?: string[], f
 }
 export const nodes = nodeName;
 
+type Calc = ReturnType<typeof calc>;
+/** A result step when the part has a key, otherwise a plain step. */
+const rr = (k: Calc, md: string, key?: string, v?: number) => (key ? k.r(md, key, v) : k.s(md));
+/** Backward-induction formula with a node's numbers: discount × [π V_up + (1 − π) V_down] (formula body, no dollar signs). */
+export const bwd = (disc: number, pi: number, vu: number, vd: number) => {
+  const cont = pi * vu + (1 - pi) * vd;
+  return `${tn(disc, 6)} \\times [${tn(pi, 6)} \\times ${tn(vu, 4)} + ${tn(1 - pi, 6)} \\times ${tn(vd, 4)}] = ${tn(disc, 6)} \\times [${tn(pi * vu, 4)} + ${tn((1 - pi) * vd, 4)}] = ${tn(disc, 6)} \\times ${tn(cont, 4)} = ${tn(disc * cont, 4)}`;
+};
+/** Black-Scholes(-Merton) worked out step by step: σ√T, ln(S/X), drift, d1, d2, N(d), discount factors and the prices.
+ *  `keys` attaches result steps to parts; `only` restricts the price steps to the call or the put; `nScale` scales the N(d2) value (100 for a percent part). */
+export function bsSteps(k: Calc, o: { S: number; X: number; T: number; r: number; sig: number; q?: number; keys?: { d1?: string; d2?: string; Nd2?: string; c?: string; p?: string }; only?: 'c' | 'p'; nScale?: number }) {
+  const { S, X, T, r, sig } = o, q = o.q || 0, b = bs(S, X, T, r, sig, q), sq = sig * Math.sqrt(T), key = o.keys || {};
+  const drift = (r - q + sig * sig / 2) * T, Sq = S * Math.exp(-q * T), eT = Math.exp(-r * T), qs = q ? `${tn(r, 4)} - ${tn(q, 4)} + ` : `${tn(r, 4)} + `;
+  k.s(`**Volatility over the life:** $\\sigma\\sqrt{T} = ${tn(sig, 4)} \\times \\sqrt{${tn(T, 6)}} = ${tn(sig, 4)} \\times ${tn(Math.sqrt(T), 6)} = ${tn(sq, 6)}$.`);
+  k.s(`**Log of S/X:** $\\ln\\frac{S}{X} = \\ln\\frac{${tn(S, 4)}}{${tn(X, 4)}} = \\ln ${tn(S / X, 6)} = ${tn(Math.log(S / X), 6)}$.`);
+  k.s(`**Drift term:** $(r${q ? ' - q' : ''} + \\frac{\\sigma^2}{2})T = (${qs}\\frac{${tn(sig, 4)}^{2}}{2}) \\times ${tn(T, 6)} = (${qs}${tn(sig * sig / 2, 6)}) \\times ${tn(T, 6)} = ${tn(r - q + sig * sig / 2, 6)} \\times ${tn(T, 6)} = ${tn(drift, 6)}$.`);
+  rr(k, `**d1:** $d_1 = \\frac{\\ln(S/X) + (r${q ? ' - q' : ''} + \\sigma^2/2)T}{\\sigma\\sqrt{T}} = \\frac{${tn(Math.log(S / X), 6)} + ${tq(drift, 6)}}{${tn(sq, 6)}} = \\frac{${tn(Math.log(S / X) + drift, 6)}}{${tn(sq, 6)}} = ${tn(b.d1, 4)}$.`, key.d1, b.d1);
+  rr(k, `**d2:** $d_2 = d_1 - \\sigma\\sqrt{T} = ${tn(b.d1, 4)} - ${tn(sq, 6)} = ${tn(b.d2, 4)}$.`, key.d2, b.d2);
+  rr(k, `**Normal probabilities:** $N(d_1) = N(${tn(b.d1, 4)}) = ${tn(b.Nd1, 6)}$ and $N(d_2) = N(${tn(b.d2, 4)}) = ${tn(b.Nd2, 6)}$.`, key.Nd2, b.Nd2 * (o.nScale || 1));
+  if (q) k.s(`**Dividend yield adjustment:** $S e^{-qT} = ${tn(S, 4)} \\times e^{-${tn(q, 4)} \\times ${tn(T, 6)}} = ${tn(S, 4)} \\times ${tn(Math.exp(-q * T), 6)} = ${tn(Sq, 4)}$.`);
+  k.s(`**Discounting the strike:** $e^{-rT} = e^{-${tn(r, 4)} \\times ${tn(T, 6)}} = ${tn(eT, 6)}$, so $Xe^{-rT} = ${tn(X, 4)} \\times ${tn(eT, 6)} = ${tn(b.PVX, 4)}$.`);
+  const sS = q ? 'Se^{-qT}' : 'S';
+  if (o.only !== 'p') rr(k, `**Call value:** $c = ${sS} N(d_1) - Xe^{-rT} N(d_2) = ${tn(Sq, 4)} \\times ${tn(b.Nd1, 6)} - ${tn(b.PVX, 4)} \\times ${tn(b.Nd2, 6)} = ${tn(Sq * b.Nd1, 4)} - ${tn(b.PVX * b.Nd2, 4)} = ${tn(b.c, 4)}$.`, key.c, b.c);
+  if (o.only !== 'c') rr(k, `**Put value:** $N(-d_2) = 1 - ${tn(b.Nd2, 6)} = ${tn(1 - b.Nd2, 6)}$ and $N(-d_1) = 1 - ${tn(b.Nd1, 6)} = ${tn(1 - b.Nd1, 6)}$, so $p = Xe^{-rT} N(-d_2) - ${sS} N(-d_1) = ${tn(b.PVX, 4)} \\times ${tn(1 - b.Nd2, 6)} - ${tn(Sq, 4)} \\times ${tn(1 - b.Nd1, 6)} = ${tn(b.PVX * (1 - b.Nd2), 4)} - ${tn(Sq * (1 - b.Nd1), 4)} = ${tn(b.p, 4)}$.`, key.p, b.p);
+  return b;
+}
+
 const months = (T: number) => { const m = Math.round(T * 12); return m === 12 ? '1 year' : m % 12 === 0 ? m / 12 + ' years' : m === 1 ? '1 month' : m + ' months'; };
 export const mText = months;
 
@@ -118,18 +145,29 @@ export function L1_bounds(): Question {
     d.put ? 'Yes: the put is below its lower bound; buy the put and the share and borrow PV(X)' : 'Yes: the call is below its lower bound; buy the call, short the share and invest PV(X)',
     d.put ? 'Yes: the put is above its upper bound; sell the put and invest the premium' : 'Yes: the call is above its upper bound; sell the call and buy the share'];
   const parts: Part[] = [
-    N(`What is the intrinsic value of the ${k}?`, d.intrinsic, 'eur'),
-    N(`What is its time value?`, d.time, 'eur'),
-    N(`What is the lower bound on the value of the ${k}?`, d.lower, 'eur'),
-    N(`What is the upper bound?`, d.upper, 'eur'),
-    C('Is there an arbitrage opportunity?', opts, d.violate ? 1 : 0),
+    N(`What is the intrinsic value of the ${k}?`, d.intrinsic, 'eur', { key: 'intr' }),
+    N(`What is its time value?`, d.time, 'eur', { key: 'time' }),
+    N(`What is the lower bound on the value of the ${k}?`, d.lower, 'eur', { key: 'lower' }),
+    N(`What is the upper bound?`, d.upper, 'eur', { key: 'upper' }),
+    C('Is there an arbitrage opportunity?', opts, d.violate ? 1 : 0, 'arb'),
   ];
-  if (d.violate) parts.push(N('What is the riskless profit today per option?', d.profit, 'eur'));
+  if (d.violate) parts.push(N('What is the riskless profit today per option?', d.profit, 'eur', { key: 'profit' }));
   const lb = d.put ? `max(PV(X) − S, 0) = max(${f2(d.PVX)} − ${f2(d.S)}, 0)` : `max(S − PV(X), 0) = max(${f2(d.S)} − ${f2(d.PVX)}, 0)`;
   const sol = p_(`PV(X) = ${f2(d.X)} × e<sup>−${f4(d.r)} × ${d.days}/365</sup> = ${f4(d.PVX)}. Intrinsic value: ${d.put ? 'max(X − S, 0)' : 'max(S − X, 0)'} = ${e2(d.intrinsic)}; time value = price − intrinsic value = ${e2(d.time)}${d.put && d.time < 0 ? ' (a European put deep in the money can have a negative time value)' : ''}.`) +
     p_(`Lower bound: ${lb} = ${e2(d.lower)}. Upper bound: ${d.put ? 'PV(X)' : 'S'} = ${e2(d.upper)}.`) +
     p_(d.violate ? `The price ${e2(d.price)} is below the lower bound. ${d.put ? `Buy the put and the share (${e2(d.price + d.S)}) and borrow ${e2(d.PVX)}` : `Buy the call (${e2(d.price)}), short the share (+${e2(d.S)}) and invest ${e2(d.PVX)}`}: you receive ${e2(d.profit)} today, and at maturity the position pays ${d.put ? 'max(X, S<sub>T</sub>) − X ≥ 0' : 'max(S<sub>T</sub>, X) − S<sub>T</sub> ≥ 0'}.` : 'The price lies within the bounds, so the bounds alone show no arbitrage.');
-  return { ...Q('L1.bounds', 1, html, parts), solution: sol };
+  const kk = calc(), eT = Math.exp(-d.r * d.T);
+  kk.s(`**Present value of the strike:** $PV(X) = Xe^{-rT} = ${tn(d.X)} \\times e^{-${tn(d.r, 4)} \\times ${d.days}/365} = ${tn(d.X)} \\times e^{-${tn(d.r * d.T, 6)}} = ${tn(d.X)} \\times ${tn(eT, 6)} = ${tn(d.PVX, 4)}$.`);
+  kk.r(d.put ? `**Intrinsic value:** $\\max(X - S, 0) = \\max(${tn(d.X)} - ${tn(d.S)}, 0) = \\max(${tn(d.X - d.S)}, 0) = ${tn(d.intrinsic)}$.`
+    : `**Intrinsic value:** $\\max(S - X, 0) = \\max(${tn(d.S)} - ${tn(d.X)}, 0) = \\max(${tn(d.S - d.X)}, 0) = ${tn(d.intrinsic)}$.`, 'intr', d.intrinsic);
+  kk.r(`**Time value:** price minus intrinsic value: $${tn(d.price)} - ${tq(d.intrinsic)} = ${tn(d.time)}$.`, 'time', d.time);
+  kk.r(d.put ? `**Lower bound:** $\\max(PV(X) - S, 0) = \\max(${tn(d.PVX, 4)} - ${tn(d.S)}, 0) = \\max(${tn(d.PVX - d.S, 4)}, 0) = ${tn(d.lower, 4)}$.`
+    : `**Lower bound:** $\\max(S - PV(X), 0) = \\max(${tn(d.S)} - ${tn(d.PVX, 4)}, 0) = \\max(${tn(d.S - d.PVX, 4)}, 0) = ${tn(d.lower, 4)}$.`, 'lower', d.lower);
+  kk.r(d.put ? `**Upper bound:** a European put can never be worth more than the present value of the strike, $PV(X) = ${tn(d.PVX, 4)}$.` : `**Upper bound:** a call can never be worth more than the share, $S = ${tn(d.S)}$.`, 'upper', d.upper);
+  kk.r(d.violate ? `**Arbitrage check:** the price ${tn(d.price)} is below the lower bound ${tn(d.lower, 4)}, so there is an arbitrage opportunity.`
+    : `**Arbitrage check:** ${tn(d.lower, 4)} ≤ ${tn(d.price)} ≤ ${tn(d.upper, 4)}, so the price lies between the bounds and there is no arbitrage.`, 'arb');
+  if (d.violate) kk.r(`**Riskless profit:** lower bound minus price: $${tn(d.lower, 4)} - ${tn(d.price)} = ${tn(d.profit, 4)}$.`, 'profit', d.profit);
+  return { ...withCalc(Q('L1.bounds', 1, html, parts), kk.steps), solution: sol };
 }
 
 export function parityDraw() {
@@ -155,15 +193,24 @@ export function L1_parity(): Question {
     `The call is too expensive relative to the put: sell the call, buy the put and the share, borrow PV(X)${d.D ? ' + PV(D)' : ''}`,
     `The call is too cheap relative to the put: buy the call, sell the put, short the share, invest PV(X)${d.D ? ' + PV(D)' : ''}`];
   const parts: Part[] = [
-    N('What is the present value of the strike?', d.PVX, 'eur'),
-    ...(d.D ? [N('What is the present value of the dividend?', d.PVD, 'eur')] : []),
-    N(`What should c − p be according to put-call parity?`, d.theo, 'eur'),
-    C('What do the quotes imply?', opts, !d.wrong ? 0 : d.gap > 0 ? 1 : 2),
+    N('What is the present value of the strike?', d.PVX, 'eur', { key: 'pvx' }),
+    ...(d.D ? [N('What is the present value of the dividend?', d.PVD, 'eur', { key: 'pvd' })] : []),
+    N(`What should c − p be according to put-call parity?`, d.theo, 'eur', { key: 'theo' }),
+    C('What do the quotes imply?', opts, !d.wrong ? 0 : d.gap > 0 ? 1 : 2, 'arb'),
   ];
-  if (d.wrong) parts.push(N('What is the riskless profit today per pair of options?', Math.abs(d.gap), 'eur'));
+  if (d.wrong) parts.push(N('What is the riskless profit today per pair of options?', Math.abs(d.gap), 'eur', { key: 'profit' }));
   const sol = p_(`Parity: c − p = S − ${d.D ? 'PV(D) − ' : ''}PV(X). PV(X) = ${f2(d.X)}e<sup>−${f4(d.r)} × ${f4(d.T)}</sup> = ${f4(d.PVX)}${d.D ? `; PV(D) = ${f2(d.D)}e<sup>−${f4(d.r)} × ${f4(d.tD)}</sup> = ${f4(d.PVD)}` : ''}. So c − p should be ${f2(d.S)} − ${d.D ? f4(d.PVD) + ' − ' : ''}${f4(d.PVX)} = ${f4(d.theo)}.`) +
     p_(`Market: ${f2(d.c)} − ${f2(d.p)} = ${f2(d.mkt)}. ${!d.wrong ? 'The difference is only rounding: no arbitrage.' : d.gap > 0 ? `The call is too expensive by ${f4(d.gap)}: sell the call, buy the put and the share, and borrow the present value of what the share will pay off at maturity (X) ${d.D ? 'and of the dividend ' : ''}— a synthetic short call against a real long one. Cash today ${f4(d.gap)}, nothing owed at maturity.` : `The call is too cheap by ${f4(-d.gap)}: buy the call, sell the put, short the share and invest PV(X)${d.D ? ' + PV(D) (to pay the dividend you owe as short seller)' : ''}. Cash today ${f4(-d.gap)}, and at maturity the long call and short put buy the share back for X.`}`);
-  return { ...Q('L1.parity', 1, html, parts), solution: sol };
+  const kk = calc();
+  kk.r(`**Present value of the strike:** $PV(X) = ${tn(d.X)} \\times e^{-${tn(d.r, 4)} \\times ${tn(d.T, 6)}} = ${tn(d.X)} \\times e^{-${tn(d.r * d.T, 6)}} = ${tn(d.X)} \\times ${tn(Math.exp(-d.r * d.T), 6)} = ${tn(d.PVX, 4)}$.`, 'pvx', d.PVX);
+  if (d.D) kk.r(`**Present value of the dividend:** $PV(D) = ${tn(d.D)} \\times e^{-${tn(d.r, 4)} \\times ${tn(d.tD, 6)}} = ${tn(d.D)} \\times e^{-${tn(d.r * d.tD, 6)}} = ${tn(d.D)} \\times ${tn(Math.exp(-d.r * d.tD), 6)} = ${tn(d.PVD, 4)}$.`, 'pvd', d.PVD);
+  kk.r(`**Parity value:** $c - p = S - ${d.D ? 'PV(D) - ' : ''}PV(X) = ${tn(d.S)} - ${d.D ? tn(d.PVD, 4) + ' - ' : ''}${tn(d.PVX, 4)} = ${tn(d.theo, 4)}$.`, 'theo', d.theo);
+  kk.s(`**Market quotes:** $c - p = ${tn(d.c)} - ${tn(d.p)} = ${tn(d.mkt)}$, so the market minus parity is $${tn(d.mkt)} - ${tq(d.theo, 4)} = ${tn(d.gap, 4)}$.`);
+  kk.r(!d.wrong ? `**Verdict:** the difference ${tn(d.gap, 4)} is only rounding, so parity holds and there is no arbitrage.`
+    : d.gap > 0 ? `**Verdict:** the market difference ${tn(d.mkt)} is above the parity value ${tn(d.theo, 4)}, so the call is too expensive relative to the put: sell the call, buy the put and the share, borrow the present values.`
+    : `**Verdict:** the market difference ${tn(d.mkt)} is below the parity value ${tn(d.theo, 4)}, so the call is too cheap relative to the put: buy the call, sell the put, short the share, invest the present values.`, 'arb');
+  if (d.wrong) kk.r(`**Riskless profit:** $|${tn(d.gap, 4)}| = ${tn(Math.abs(d.gap), 4)}$ per pair of options.`, 'profit', Math.abs(d.gap));
+  return { ...withCalc(Q('L1.parity', 1, html, parts), kk.steps), solution: sol };
 }
 
 export function putIntervalDraw() {
@@ -183,13 +230,17 @@ export function L1_putInterval(): Question {
   const d = putIntervalDraw();
   const html = p_(`European calls with strike ${e2(d.X)} and ${months(d.T)} to maturity on a share that pays no income are quoted at ${e2(d.bid)} bid and ${e2(d.ask)} ask. The share trades at ${e2(d.S)} and the risk-free rate is ${pp(d.r)}. ${CONT} Ignore the bid-ask spread on the share.`);
   const parts: Part[] = [
-    N('What is the lowest ask price of the European put (same strike and maturity) that rules out arbitrage?', d.lo, 'eur'),
-    N('What is the highest bid price of the put that rules out arbitrage?', d.hi, 'eur'),
+    N('What is the lowest ask price of the European put (same strike and maturity) that rules out arbitrage?', d.lo, 'eur', { key: 'lo' }),
+    N('What is the highest bid price of the put that rules out arbitrage?', d.hi, 'eur', { key: 'hi' }),
   ];
   const sol = p_(`Put-call parity: p = c − S + PV(X), PV(X) = ${f2(d.X)}e<sup>−${f4(d.r)} × ${f4(d.T)}</sup> = ${f4(d.PVX)}.`) +
     p_(`If the put were too cheap you would buy it (at the ask) and sell the synthetic put: sell the call at the bid, buy the share, borrow PV(X). This earns c<sup>bid</sup> − S + PV(X) − p<sup>ask</sup>, so p<sup>ask</sup> ≥ ${f2(d.bid)} − ${f2(d.S)} + ${f4(d.PVX)} = ${e2(d.lo)}.`) +
     p_(`If the put were too expensive you would sell it (at the bid) and buy the synthetic put at c<sup>ask</sup> − S + PV(X): p<sup>bid</sup> ≤ ${f2(d.ask)} − ${f2(d.S)} + ${f4(d.PVX)} = ${e2(d.hi)}.`);
-  return { ...Q('L1.putInterval', 1, html, parts), solution: sol };
+  const kk = calc();
+  kk.s(`**Present value of the strike:** $PV(X) = ${tn(d.X)} \\times e^{-${tn(d.r, 4)} \\times ${tn(d.T, 6)}} = ${tn(d.X)} \\times e^{-${tn(d.r * d.T, 6)}} = ${tn(d.X)} \\times ${tn(Math.exp(-d.r * d.T), 6)} = ${tn(d.PVX, 4)}$.`);
+  kk.r(`**Lowest put ask:** parity $p = c - S + PV(X)$ with the call at its bid: $${tn(d.bid)} - ${tn(d.S)} + ${tn(d.PVX, 4)} = ${tn(d.lo, 4)}$.`, 'lo', d.lo);
+  kk.r(`**Highest put bid:** parity with the call at its ask: $${tn(d.ask)} - ${tn(d.S)} + ${tn(d.PVX, 4)} = ${tn(d.hi, 4)}$.`, 'hi', d.hi);
+  return { ...withCalc(Q('L1.putInterval', 1, html, parts), kk.steps), solution: sol };
 }
 
 /** Early exercise of an American put on a share without income. */
@@ -201,14 +252,19 @@ export function L1_earlyPut(): Question {
     const fv = (X - S) * Math.exp(r * T), yes = fv > X;
     const html = p_(`An American put on a share that pays no dividends has strike ${e2(X)} and ${months(T)} to maturity. The share has fallen to ${e2(S)}. The risk-free rate is ${pp(r)}. ${CONT}`);
     const parts: Part[] = [
-      N('If you exercise now and invest the proceeds at the risk-free rate, how much do you have at maturity?', fv, 'eur'),
-      N('What is the most the put can pay at maturity if you wait?', X, 'eur'),
-      N('Below which share price is immediate exercise certainly optimal by this comparison?', crit, 'eur'),
-      C('Is immediate exercise certainly optimal?', ['Yes: exercising and investing gives more than the most the put can ever pay at maturity', 'This comparison does not show it: waiting can still be worth more'], yes ? 0 : 1),
+      N('If you exercise now and invest the proceeds at the risk-free rate, how much do you have at maturity?', fv, 'eur', { key: 'fv' }),
+      N('What is the most the put can pay at maturity if you wait?', X, 'eur', { key: 'maxPay' }),
+      N('Below which share price is immediate exercise certainly optimal by this comparison?', crit, 'eur', { key: 'crit' }),
+      C('Is immediate exercise certainly optimal?', ['Yes: exercising and investing gives more than the most the put can ever pay at maturity', 'This comparison does not show it: waiting can still be worth more'], yes ? 0 : 1, 'verdict'),
     ];
     const sol = p_(`Exercise now: (X − S)e<sup>rT</sup> = (${f2(X)} − ${f2(S)}) × e<sup>${f4(r)} × ${f4(T)}</sup> = ${e2(fv)}. Waiting pays at most X = ${e2(X)} (if the share falls to zero).`) +
       p_(`Exercise dominates when (X − S)e<sup>rT</sup> > X, i.e. S &lt; X(1 − e<sup>−rT</sup>) = ${e2(crit)}. ${yes ? 'The share is below that level, so exercising now beats any outcome of waiting: the interest on X is worth more than the remaining upside.' : 'The share is above that level. This sufficient condition does not hold; the true exercise boundary of an American put lies higher, so the put may or may not be exercised, but the comparison alone does not show it.'} An American call on a share without dividends is never exercised early.`);
-    return { ...Q('L1.earlyPut', 1, html, parts), solution: sol };
+    const kk = calc();
+    kk.r(`**Exercise now and invest:** $(X - S)e^{rT} = (${tn(X)} - ${tn(S)}) \\times e^{${tn(r, 4)} \\times ${tn(T, 6)}} = ${tn(X - S)} \\times ${tn(Math.exp(r * T), 6)} = ${tn(fv, 4)}$.`, 'fv', fv);
+    kk.r(`**Most the put can pay if you wait:** the share can at best fall to zero, so the payoff is at most $X = ${tn(X)}$.`, 'maxPay', X);
+    kk.r(`**Critical share price:** exercising wins when $(X - S)e^{rT} > X$, i.e. $S < X(1 - e^{-rT}) = ${tn(X)} \\times (1 - e^{-${tn(r * T, 6)}}) = ${tn(X)} \\times (1 - ${tn(Math.exp(-r * T), 6)}) = ${tn(X)} \\times ${tn(1 - Math.exp(-r * T), 6)} = ${tn(crit, 4)}$.`, 'crit', crit);
+    kk.r(yes ? `**Verdict:** ${tn(fv, 4)} > ${tn(X)} (equivalently ${tn(S)} < ${tn(crit, 4)}), so immediate exercise is certainly optimal.` : `**Verdict:** ${tn(fv, 4)} ≤ ${tn(X)} (equivalently ${tn(S)} ≥ ${tn(crit, 4)}), so this comparison does not show that exercising now is optimal.`, 'verdict');
+    return { ...withCalc(Q('L1.earlyPut', 1, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -223,14 +279,21 @@ export function L1_dividend(): Question {
     if (Math.abs(D - thr) < 0.08) continue;
     const html = p_(`A share trades at ${e2(S)} and will pay a dividend of ${e2(D)} in ${months(tD)}. Options on the share have strike ${e2(X)} and mature in ${months(T)}. The risk-free rate is ${pp(r)}. ${CONT}`);
     const parts: Part[] = [
-      N('What is the lower bound on the European call?', lc, 'eur'),
-      N('What is the lower bound on the European put?', lp, 'eur'),
-      N('An American call may be exercised just before the ex-dividend date only if the dividend exceeds the interest on the strike over the remaining life, X(1 − e^(−r(T − t))). What is this threshold?', thr, 'eur'),
-      C('Can early exercise of the American call just before the dividend be optimal?', ['Yes: the dividend exceeds the threshold', 'No: the dividend is smaller than the threshold, so the call is never exercised early'], yes ? 0 : 1),
+      N('What is the lower bound on the European call?', lc, 'eur', { key: 'lc' }),
+      N('What is the lower bound on the European put?', lp, 'eur', { key: 'lp' }),
+      N('An American call may be exercised just before the ex-dividend date only if the dividend exceeds the interest on the strike over the remaining life, X(1 − e^(−r(T − t))). What is this threshold?', thr, 'eur', { key: 'thr' }),
+      C('Can early exercise of the American call just before the dividend be optimal?', ['Yes: the dividend exceeds the threshold', 'No: the dividend is smaller than the threshold, so the call is never exercised early'], yes ? 0 : 1, 'verdict'),
     ];
     const sol = p_(`PV(D) = ${f2(D)}e<sup>−${f4(r)} × ${f4(tD)}</sup> = ${f4(PVD)}, PV(X) = ${f4(PVX)}. Call: c ≥ max(S − D − PV(X), 0) with D in present value = ${e2(lc)}. Put: p ≥ max(PV(X) + PV(D) − S, 0) = ${e2(lp)}.`) +
       p_(`Exercising just before the ex-date captures the dividend but gives up the interest on X for the remaining ${months(T - tD)} (and the time value). Threshold X(1 − e<sup>−r(T − t)</sup>) = ${e2(thr)}. ${yes ? 'The dividend is larger, so early exercise can be optimal (if the call is deep enough in the money).' : 'The dividend is smaller, so it is never optimal to exercise early: C = c.'}`);
-    return { ...Q('L1.dividend', 1, html, parts), solution: sol };
+    const kk = calc();
+    kk.s(`**Present value of the dividend:** $PV(D) = ${tn(D)} \\times e^{-${tn(r, 4)} \\times ${tn(tD, 6)}} = ${tn(D)} \\times ${tn(Math.exp(-r * tD), 6)} = ${tn(PVD, 4)}$.`);
+    kk.s(`**Present value of the strike:** $PV(X) = ${tn(X)} \\times e^{-${tn(r, 4)} \\times ${tn(T, 6)}} = ${tn(X)} \\times ${tn(Math.exp(-r * T), 6)} = ${tn(PVX, 4)}$.`);
+    kk.r(`**Call lower bound:** $\\max(S - PV(D) - PV(X), 0) = \\max(${tn(S)} - ${tn(PVD, 4)} - ${tn(PVX, 4)}, 0) = \\max(${tn(S - PVD - PVX, 4)}, 0) = ${tn(lc, 4)}$.`, 'lc', lc);
+    kk.r(`**Put lower bound:** $\\max(PV(X) + PV(D) - S, 0) = \\max(${tn(PVX, 4)} + ${tn(PVD, 4)} - ${tn(S)}, 0) = \\max(${tn(PVX + PVD - S, 4)}, 0) = ${tn(lp, 4)}$.`, 'lp', lp);
+    kk.r(`**Threshold:** $X(1 - e^{-r(T-t)}) = ${tn(X)} \\times (1 - e^{-${tn(r, 4)} \\times ${tn(T - tD, 6)}}) = ${tn(X)} \\times (1 - ${tn(Math.exp(-r * (T - tD)), 6)}) = ${tn(X)} \\times ${tn(1 - Math.exp(-r * (T - tD)), 6)} = ${tn(thr, 4)}$.`, 'thr', thr);
+    kk.r(yes ? `**Verdict:** the dividend ${tn(D)} exceeds the threshold ${tn(thr, 4)}, so early exercise just before the ex-date can be optimal.` : `**Verdict:** the dividend ${tn(D)} is below the threshold ${tn(thr, 4)}, so the call is never exercised early.`, 'verdict');
+    return { ...withCalc(Q('L1.dividend', 1, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -254,6 +317,9 @@ export const STRATS: Strat[] = [
 ];
 
 export const payoff = (legs: Leg[], s: number) => legs.reduce((t, l) => t + l.q * Math.max(l.k === 'c' ? s - l.X : l.X - s, 0), 0);
+const legPay = (l: Leg, s: number) => l.q * Math.max(l.k === 'c' ? s - l.X : l.X - s, 0);
+/** One leg's payoff at the share price s as a formula: quantity × max(…, 0) = value. */
+const legStr = (l: Leg, s: number) => `${tq(l.q, 0)} \\times \\max(${l.k === 'c' ? `${tn(s)} - ${tn(l.X)}` : `${tn(l.X)} - ${tn(s)}`}, 0) = ${tn(legPay(l, s))}`;
 export const legText = (l: Leg) => `${l.q > 0 ? 'buy' : 'sell'} ${Math.abs(l.q)} ${l.k === 'c' ? 'call' : 'put'}${Math.abs(l.q) > 1 ? 's' : ''} with strike ${f2(l.X)}`;
 
 /** Zeros of a piecewise linear payoff with kinks at the strikes. */
@@ -310,22 +376,41 @@ export function strategyQ(si?: number): Question {
     p_('“Net payoff” is the payoff at maturity plus the initial cash flow carried forward to the maturity date (its future value).');
   const viewOpts = [...new Set(STRATS.map(s => s.view))];
   const items: Item[] = [
-    { part: N('What is the initial cash flow (positive for an inflow, negative for an outflow)?', d.cf0, 'eur'), must: true },
-    { part: N('What is the initial cash flow measured at the maturity date?', d.fv, 'eur'), w: 0.5 },
-    { part: N(`What is the net payoff if the share ends at ${e2(d.s1)}?`, d.net(d.s1), 'eur'), w: 0.8 },
-    { part: N(`What is the net payoff if the share ends at ${e2(d.s2)}?`, d.net(d.s2), 'eur'), w: 0.8 },
-    { part: N(d.be.length > 1 ? 'What is the lower break-even share price at maturity?' : 'What is the break-even share price at maturity?', d.be[0], 'eur'), w: 0.7 },
-    ...(d.be.length > 1 ? [{ part: N('What is the upper break-even share price?', d.be[d.be.length - 1], 'eur'), w: 0.6 }] : []),
-    ...(Number.isFinite(d.maxP) ? [{ part: N('What is the largest possible net payoff?', d.maxP, 'eur'), w: 0.5 }] : []),
-    ...(Number.isFinite(d.maxL) ? [{ part: N('What is the worst possible net payoff (a loss is negative)?', d.maxL, 'eur'), w: 0.5 }] : []),
-    { part: C('What does this position bet on?', shuffle(viewOpts.map(v => STRATS.find(s => s.view === v)!).map(s => s.view)), 0), w: 0.5 },
+    { part: N('What is the initial cash flow (positive for an inflow, negative for an outflow)?', d.cf0, 'eur', { key: 'cf0' }), must: true },
+    { part: N('What is the initial cash flow measured at the maturity date?', d.fv, 'eur', { key: 'fv' }), w: 0.5 },
+    { part: N(`What is the net payoff if the share ends at ${e2(d.s1)}?`, d.net(d.s1), 'eur', { key: 'net1' }), w: 0.8 },
+    { part: N(`What is the net payoff if the share ends at ${e2(d.s2)}?`, d.net(d.s2), 'eur', { key: 'net2' }), w: 0.8 },
+    { part: N(d.be.length > 1 ? 'What is the lower break-even share price at maturity?' : 'What is the break-even share price at maturity?', d.be[0], 'eur', { key: 'be1' }), w: 0.7 },
+    ...(d.be.length > 1 ? [{ part: N('What is the upper break-even share price?', d.be[d.be.length - 1], 'eur', { key: 'be2' }), w: 0.6 }] : []),
+    ...(Number.isFinite(d.maxP) ? [{ part: N('What is the largest possible net payoff?', d.maxP, 'eur', { key: 'maxP' }), w: 0.5 }] : []),
+    ...(Number.isFinite(d.maxL) ? [{ part: N('What is the worst possible net payoff (a loss is negative)?', d.maxL, 'eur', { key: 'maxL' }), w: 0.5 }] : []),
+    { part: C('What does this position bet on?', shuffle(viewOpts.map(v => STRATS.find(s => s.view === v)!).map(s => s.view)), 0, 'view'), w: 0.5 },
   ];
   const parts = chooseParts(items, 4, 6).map(p => p.type === 'choice' ? { ...p, correct: p.options.indexOf(d.st.view) } : p);
   const sol = p_(`This is a <b>${d.st.name}</b>, a bet on ${d.st.view}.`) +
     p_(`Initial cash flow: ${d.legs.map(l => `${l.q > 0 ? '−' : '+'}${Math.abs(l.q) > 1 ? Math.abs(l.q) + ' × ' : ''}${f2(d.prem.get(l.k + l.X)!)}`).join(' ')} = ${e2(d.cf0)}; at maturity ${e2(d.cf0)} × e<sup>${f4(d.r)} × ${f4(d.T)}</sup> = ${e4(d.fv)}.`) +
     p_(`Net payoff = Σ payoffs ${sg(d.fv)}. At S<sub>T</sub> = ${f2(d.s1)}: ${f4(payoff(d.legs, d.s1))} ${sg(d.fv)} = ${e2(d.net(d.s1))}. At S<sub>T</sub> = ${f2(d.s2)}: ${f4(payoff(d.legs, d.s2))} ${sg(d.fv)} = ${e2(d.net(d.s2))}.`) +
     p_(`Break-even${d.be.length > 1 ? 's' : ''}: ${d.be.map(e2).join(' and ')}.${Number.isFinite(d.maxP) ? ` Largest net payoff ${e2(d.maxP)}.` : ' The upside is unlimited.'}${Number.isFinite(d.maxL) ? ` Worst case ${e2(d.maxL)}.` : ' The loss is unlimited if the share rises.'}`);
-  return { ...Q('L2.strategy', 2, html, parts), solution: sol };
+  const kk = calc(), pr = (l: Leg) => d.prem.get(l.k + l.X)!;
+  kk.r(`**Initial cash flow:** buying costs the premium, selling brings it in. In the order of the legs (${d.legs.map(legText).join('; ')}): $CF_0 = ${d.legs.map(l => `${tq(-l.q, 0)} \\times ${tn(pr(l))}`).join(' + ')} = ${d.legs.map(l => tq(-l.q * pr(l))).join(' + ')} = ${tn(d.cf0)}$.`, 'cf0', d.cf0);
+  kk.r(`**Carried to maturity:** $CF_0 e^{rT} = ${tq(d.cf0)} \\times e^{${tn(d.r, 4)} \\times ${tn(d.T, 6)}} = ${tq(d.cf0)} \\times ${tn(Math.exp(d.r * d.T), 6)} = ${tn(d.fv, 4)}$.`, 'fv', d.fv);
+  const netStep = (s: number, key: string) => kk.r(`**Net payoff at ${tn(s)}:** leg payoffs $${d.legs.map(l => legStr(l, s)).join('$; $')}$. Their sum is $${tn(payoff(d.legs, s))}$, plus the carried cash flow: $${tn(payoff(d.legs, s), 4)} + ${tq(d.fv, 4)} = ${tn(d.net(s), 4)}$.`, key, d.net(s));
+  netStep(d.s1, 'net1'); netStep(d.s2, 'net2');
+  const pts = [0, ...[...new Set(d.xs)].sort((a, c) => a - c), d.xs[d.xs.length - 1] * 3];
+  const beStep = (b: number, key: string, label: string) => {
+    let i = 0;
+    for (; i < pts.length - 2; i++) if (b >= pts[i] - 1e-9 && b <= pts[i + 1] + 1e-9) break;
+    const lo = pts[i], up = pts[i + 1], m = Math.round((d.net(up) - d.net(lo)) / (up - lo) * 1e6) / 1e6, a0 = d.net(lo) - m * lo;
+    kk.r(`**${label}:** between ${tn(lo)} and ${tn(up)} the net payoff is $${tn(a0, 4)} ${m < 0 ? '-' : '+'} ${tn(Math.abs(m), 0)} \\cdot S_T$. Setting it to zero gives $S_T = \\frac{${tn(-a0, 4)}}{${tn(m, 0)}} = ${tn(b, 4)}$.`, key, b);
+  };
+  beStep(d.be[0], 'be1', d.be.length > 1 ? 'Lower break-even' : 'Break-even');
+  if (d.be.length > 1) beStep(d.be[d.be.length - 1], 'be2', 'Upper break-even');
+  const kinkLine = [0, ...d.xs].map(s => `\\text{net}(${tn(s)}) = ${tn(payoff(d.legs, s), 4)} + ${tq(d.fv, 4)} = ${tn(d.net(s), 4)}`);
+  const kinkText = `The net payoff is piecewise linear with kinks at 0 and at the strikes, so the extremes sit there: $${kinkLine.join('$; $')}$.`;
+  if (Number.isFinite(d.maxP)) kk.r(`**Largest net payoff:** ${kinkText} The largest value is ${tn(d.maxP, 4)}.`, 'maxP', d.maxP);
+  if (Number.isFinite(d.maxL)) kk.r(`**Worst net payoff:** ${kinkText} The smallest value is ${tn(d.maxL, 4)}.`, 'maxL', d.maxL);
+  kk.r(`**Reading the position:** ${d.legs.map(legText).join('; ')} is a ${d.st.name}, a bet on ${d.st.view}.`, 'view');
+  return { ...withCalc(Q('L2.strategy', 2, html, parts), kk.steps), solution: sol };
 }
 
 export function butterflyDraw() {
@@ -353,15 +438,22 @@ export function L2_butterfly(): Question {
     table(['Strike', 'Call bid', 'Call ask', 'Put bid', 'Put ask'], ([[d.X1, d.C1, d.P1], [d.X2, d.C2, d.P2], [d.X3, d.C3, d.P3]] as const)
       .map(([X, c, p]) => [f2(X), e2(c.bid), e2(c.ask), e2(p.bid), e2(p.ask)]));
   const parts: Part[] = [
-    N('What does a butterfly spread with calls cost to set up (buy at the ask, sell at the bid)?', d.costC, 'eur'),
-    N('What does a butterfly spread with puts cost?', d.costP, 'eur'),
-    C('Which is cheaper?', ['With calls', 'With puts'], d.puts ? 1 : 0),
-    N('For the cheaper butterfly, what is the net payoff at maturity (including the future value of the cost) if the share ends below the lowest strike?', -d.fv, 'eur'),
-    N('… and the net payoff if the share ends exactly at the middle strike?', d.peak, 'eur'),
+    N('What does a butterfly spread with calls cost to set up (buy at the ask, sell at the bid)?', d.costC, 'eur', { key: 'costC' }),
+    N('What does a butterfly spread with puts cost?', d.costP, 'eur', { key: 'costP' }),
+    C('Which is cheaper?', ['With calls', 'With puts'], d.puts ? 1 : 0, 'cheap'),
+    N('For the cheaper butterfly, what is the net payoff at maturity (including the future value of the cost) if the share ends below the lowest strike?', -d.fv, 'eur', { key: 'low' }),
+    N('… and the net payoff if the share ends exactly at the middle strike?', d.peak, 'eur', { key: 'peak' }),
   ];
   const sol = p_(`Calls: buy ${f2(d.X1)} and ${f2(d.X3)} at the ask, sell two ${f2(d.X2)} at the bid: ${f2(d.C1.ask)} + ${f2(d.C3.ask)} − 2 × ${f2(d.C2.bid)} = ${e2(d.costC)}. Puts: ${f2(d.P1.ask)} + ${f2(d.P3.ask)} − 2 × ${f2(d.P2.bid)} = ${e2(d.costP)}. The ${d.puts ? 'puts' : 'calls'} are cheaper.`) +
     p_(`Future value of the cost: ${f4(d.cost)} × e<sup>${f4(d.r)} × ${f4(d.T)}</sup> = ${f4(d.fv)}. Net payoff: −${f2(d.fv)} below ${f2(d.X1)} and above ${f2(d.X3)}; S<sub>T</sub> − ${f2(d.X1 + d.fv)} between ${f2(d.X1)} and ${f2(d.X2)}; ${f2(d.X3 - d.fv)} − S<sub>T</sub> between ${f2(d.X2)} and ${f2(d.X3)}; peak ${f2(d.X2 - d.X1)} − ${f2(d.fv)} = ${e2(d.peak)} at ${f2(d.X2)}.`);
-  return { ...Q('L2.butterfly', 2, html, parts), solution: sol };
+  const kk = calc();
+  kk.r(`**Butterfly with calls:** buy the ${tn(d.X1)} and ${tn(d.X3)} calls at the ask, sell two ${tn(d.X2)} calls at the bid: $C_1^{ask} + C_3^{ask} - 2C_2^{bid} = ${tn(d.C1.ask)} + ${tn(d.C3.ask)} - 2 \\times ${tn(d.C2.bid)} = ${tn(d.C1.ask + d.C3.ask)} - ${tn(2 * d.C2.bid)} = ${tn(d.costC)}$.`, 'costC', d.costC);
+  kk.r(`**Butterfly with puts:** buy the ${tn(d.X1)} and ${tn(d.X3)} puts at the ask, sell two ${tn(d.X2)} puts at the bid: $P_1^{ask} + P_3^{ask} - 2P_2^{bid} = ${tn(d.P1.ask)} + ${tn(d.P3.ask)} - 2 \\times ${tn(d.P2.bid)} = ${tn(d.P1.ask + d.P3.ask)} - ${tn(2 * d.P2.bid)} = ${tn(d.costP)}$.`, 'costP', d.costP);
+  kk.r(`**Cheaper side:** calls cost ${tn(d.costC)} and puts cost ${tn(d.costP)}, so the butterfly with ${d.puts ? 'puts' : 'calls'} is cheaper (cost ${tn(d.cost)}).`, 'cheap');
+  kk.s(`**Cost carried to maturity:** $${tn(d.cost)} \\times e^{rT} = ${tn(d.cost)} \\times e^{${tn(d.r, 4)} \\times ${tn(d.T, 6)}} = ${tn(d.cost)} \\times ${tn(Math.exp(d.r * d.T), 6)} = ${tn(d.fv, 4)}$.`);
+  kk.r(`**Share below the lowest strike:** all options expire worthless, so only the carried cost remains: net payoff $= -${tn(d.fv, 4)}$.`, 'low', -d.fv);
+  kk.r(`**Share at the middle strike ${tn(d.X2)}:** only the long ${d.puts ? 'put at ' + tn(d.X3) : 'call at ' + tn(d.X1)} is in the money, paying $${d.puts ? tn(d.X3) + ' - ' + tn(d.X2) : tn(d.X2) + ' - ' + tn(d.X1)} = ${tn(d.X2 - d.X1)}$. Net payoff $= ${tn(d.X2 - d.X1)} - ${tn(d.fv, 4)} = ${tn(d.peak, 4)}$.`, 'peak', d.peak);
+  return { ...withCalc(Q('L2.butterfly', 2, html, parts), kk.steps), solution: sol };
 }
 
 export function portfolioDraw() {
@@ -385,15 +477,20 @@ export function L2_portfolio(): Question {
   const html = p_(`A trader holds ${d.a} long call${d.a > 1 ? 's' : ''} with strike ${e2(d.X1)}, ${d.b} short calls with strike ${e2(d.kb)} and ${d.c} long put${d.c > 1 ? 's' : ''} with strike ${e2(d.X2)}, all European on one share each and maturing in ${months(d.T)}. Current premiums: ` +
     `call(${f2(d.X1)}) ${e2(d.pc1)}${d.kb !== d.X1 ? `, call(${f2(d.kb)}) ${e2(d.pcb)}` : ''}, put(${f2(d.X2)}) ${e2(d.pp2)}. The share trades at ${e2(d.S)}.`);
   const parts: Part[] = [
-    N('What is the current value of the portfolio (negative if it is a liability)?', d.value, 'eur'),
-    N(`What is the payoff of the portfolio at maturity if the share ends at ${e2(d.sA)}?`, payoff(d.legs, d.sA), 'eur'),
-    N(`… if it ends at ${e2(d.sB)}?`, payoff(d.legs, d.sB), 'eur'),
-    N(`… if it ends at ${e2(d.sC)}?`, payoff(d.legs, d.sC), 'eur'),
-    N('By how much does the payoff change for each €1 rise in the share price above the highest strike?', d.slope, 'n'),
+    N('What is the current value of the portfolio (negative if it is a liability)?', d.value, 'eur', { key: 'value' }),
+    N(`What is the payoff of the portfolio at maturity if the share ends at ${e2(d.sA)}?`, payoff(d.legs, d.sA), 'eur', { key: 'pA' }),
+    N(`… if it ends at ${e2(d.sB)}?`, payoff(d.legs, d.sB), 'eur', { key: 'pB' }),
+    N(`… if it ends at ${e2(d.sC)}?`, payoff(d.legs, d.sC), 'eur', { key: 'pC' }),
+    N('By how much does the payoff change for each €1 rise in the share price above the highest strike?', d.slope, 'n', { key: 'slope' }),
   ];
   const sol = p_(`Value: ${d.a} × ${f2(d.pc1)} − ${d.b} × ${f2(d.pcb)} + ${d.c} × ${f2(d.pp2)} = ${e2(d.value)}.`) +
     p_(`Payoff = ${d.a} max(S − ${f2(d.X1)}, 0) − ${d.b} max(S − ${f2(d.kb)}, 0) + ${d.c} max(${f2(d.X2)} − S, 0). At ${f2(d.sA)}: ${e2(payoff(d.legs, d.sA))}; at ${f2(d.sB)}: ${e2(payoff(d.legs, d.sB))}; at ${f2(d.sC)}: ${e2(payoff(d.legs, d.sC))}. Above ${f2(Math.max(d.X2, d.kb))} only the calls pay, with slope ${d.a} − ${d.b} = ${fmtNum(d.slope, 0)}.`);
-  return { ...Q('L2.portfolio', 2, html, parts), solution: sol };
+  const kk = calc();
+  kk.r(`**Current value:** $${d.a} \\times ${tn(d.pc1)} - ${d.b} \\times ${tn(d.pcb)} + ${d.c} \\times ${tn(d.pp2)} = ${tn(d.a * d.pc1)} - ${tn(d.b * d.pcb)} + ${tn(d.c * d.pp2)} = ${tn(d.value)}$ (long calls and puts at their premiums, short calls with a minus sign).`, 'value', d.value);
+  const payStep = (s: number, key: string) => kk.r(`**Payoff at ${tn(s)}:** $${d.legs.map(l => legStr(l, s)).join('$; $')}$, so the portfolio pays $${d.legs.map(l => tq(legPay(l, s))).join(' + ')} = ${tn(payoff(d.legs, s))}$.`, key, payoff(d.legs, s));
+  payStep(d.sA, 'pA'); payStep(d.sB, 'pB'); payStep(d.sC, 'pC');
+  kk.r(`**Slope above the highest strike ${tn(Math.max(d.X2, d.kb))}:** the puts expire worthless and only the calls pay, so each €1 rise adds $${d.a} - ${d.b} = ${d.slope}$.`, 'slope', d.slope);
+  return { ...withCalc(Q('L2.portfolio', 2, html, parts), kk.steps), solution: sol };
 }
 
 /** Name the strategy from its legs. */

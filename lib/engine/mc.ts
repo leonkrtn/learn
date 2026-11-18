@@ -1,7 +1,7 @@
 // Multiple-choice builders shared by the problem-set generators: A–E options from a computed answer and the values
 // of typical mistakes, "None of the others" as a possible answer, and the "choose the closest number" variant.
 import { Q, chance, p_, pick, rstep, shuffle } from './gen-helpers';
-import type { ConceptMc, Question } from './types';
+import type { CalcStep, ConceptMc, Question } from './types';
 
 export const NONE = 'None of the others';
 export const NONE_ABOVE = 'None of the above';
@@ -17,6 +17,8 @@ export type McOpt = {
   last?: string;
   /** Additive step for filler options when the answer is zero. */
   step?: number;
+  /** Worked calculation with the question's numbers; its result step has the key 'ans'. */
+  calc?: CalcStep[];
 };
 
 const gap = (a: Vec, b: Vec) => Math.max(...a.map((x, i) => Math.abs(x - b[i]) / Math.max(Math.abs(x), Math.abs(b[i]), 1e-12)));
@@ -44,8 +46,8 @@ export function mcVec(fam: string, topic: string, html: string, ans: Vec, wrongs
       const all = shuffle([[shown], ...opts]);
       const note = listed ? '' : ` The exact value, ${fmt(ans)}, is not listed; the closest option is ${fmt([shown])}.`;
       return {
-        ...Q(fam, topic, html + p_('(Choose the closest number.)'), [{ type: 'mc', options: all.map(fmt), correct: all.findIndex(x => x[0] === shown) }]),
-        solution: o.sol + p_(`<b>Answer:</b> ${fmt(ans)}.${note}`),
+        ...Q(fam, topic, html + p_('(Choose the closest number.)'), [{ type: 'mc', options: all.map(fmt), correct: all.findIndex(x => x[0] === shown), key: 'ans', ...(scalar ? { ans: a } : {}) }]),
+        solution: o.sol + p_(`<b>Answer:</b> ${fmt(ans)}.${note}`), ...(o.calc ? { calc: o.calc } : {}),
       };
     }
   }
@@ -55,7 +57,10 @@ export function mcVec(fam: string, topic: string, html: string, ans: Vec, wrongs
   const options = [...nums.map(fmt), last];
   const correct = noneRight ? 4 : nums.indexOf(ans);
   const tail = noneRight ? ` It is not among A–D, so the answer is “${NONE}”.` : '';
-  return { ...Q(fam, topic, html, [{ type: 'mc', options, correct }]), solution: o.sol + p_(`<b>Answer:</b> ${fmt(ans)}.${tail}`) };
+  return {
+    ...Q(fam, topic, html, [{ type: 'mc', options, correct, key: 'ans', ...(scalar ? { ans: ans[0] } : {}) }]),
+    solution: o.sol + p_(`<b>Answer:</b> ${fmt(ans)}.${tail}`), ...(o.calc ? { calc: o.calc } : {}),
+  };
 }
 
 export const mcNum = (fam: string, topic: string, html: string, ans: number, wrongs: number[], fmt: (x: number) => string, o: McOpt) =>

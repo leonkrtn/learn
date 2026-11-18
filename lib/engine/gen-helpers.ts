@@ -1,5 +1,5 @@
 // Shared building blocks for procedural question generators.
-import type { ChoicePart, NumPart, Part, Question, Unit } from './types';
+import type { CalcStep, ChoicePart, NumPart, Part, Question, Unit } from './types';
 
 export const rint = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
 export const rstep = (a: number, b: number, s: number) => { const n = Math.round((b - a) / s); return +(a + s * rint(0, n)).toFixed(8); };
@@ -37,8 +37,43 @@ export function co(suffixes?: string[]): string {
 }
 export function resetNames() { used = new Set(); }
 
-export const N = (prompt: string, ans: number, unit: Unit, o: { alts?: number[]; abs?: number } = {}): NumPart => ({ type: 'num', prompt, ans, unit, alts: o.alts || [], abs: o.abs });
-export const C = (prompt: string, options: string[], correct: number): ChoicePart => ({ type: 'choice', prompt, options, correct });
+export const N = (prompt: string, ans: number, unit: Unit, o: { alts?: number[]; abs?: number; key?: string } = {}): NumPart =>
+  ({ type: 'num', prompt, ans, unit, alts: o.alts || [], abs: o.abs, ...(o.key ? { key: o.key } : {}) });
+export const C = (prompt: string, options: string[], correct: number, key?: string): ChoicePart =>
+  ({ type: 'choice', prompt, options, correct, ...(key ? { key } : {}) });
+/** Gives a part the key of its result step in `Question.calc`. */
+export const K = <T extends Part>(part: T, key: string): T => ({ ...part, key });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Worked calculation with the question's own numbers
+// ---------------------------------------------------------------------------------------------------------------
+
+/** A number for a formula: fixed decimals, thousands as {,}, a real minus sign. */
+export function tn(x: number, d = 2): string {
+  if (!Number.isFinite(x)) return String(x);
+  const [i, f] = Math.abs(x).toFixed(d).split('.');
+  const s = i.replace(/\B(?=(\d{3})+$)/g, '{,}') + (f ? '.' + f : '');
+  return (x < 0 && +Math.abs(x).toFixed(d) !== 0 ? '-' : '') + s;
+}
+/** A fraction as a percentage for a formula: 0.125 → 12.50\%. */
+export const tp = (x: number, d = 2) => tn(x * 100, d) + '\\%';
+/** A number in parentheses when negative, for use after an operator. */
+export const tq = (x: number, d = 2) => (x < 0 ? '(' + tn(x, d) + ')' : tn(x, d));
+
+/**
+ * Collects the steps of a worked calculation. `s(md)` adds an explanatory step, `r(md, key, value)` the step that
+ * yields the answer of the part with that key (value in the part's units).
+ */
+export function calc() {
+  const steps: CalcStep[] = [];
+  return {
+    steps,
+    s(md: string) { steps.push({ md }); },
+    r(md: string, key: string, value?: number) { steps.push(value == null ? { md, key } : { md, key, value }); },
+  };
+}
+/** Attaches a worked calculation to a question. */
+export const withCalc = (q: Question, steps: CalcStep[]): Question => ({ ...q, calc: steps });
 
 export type Item = { part: Part | Part[]; w?: number; must?: boolean };
 /** Random ordered subset of sub-questions: `must` items always, others with probability w. */

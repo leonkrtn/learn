@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { UNIT, fmtSolution } from '@/lib/engine/grade';
 import type { Answers, Graded, Question } from '@/lib/engine/types';
+import { PartDialog } from './Explain';
+import { useSubject } from './SubjectContext';
 
 const LET = 'abcdefghij';
 const wrapTables = (html: string) => html.replace(/<table/g, '<div class="tablewrap"><table').replace(/<\/table>/g, '</table></div>');
@@ -17,9 +19,15 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
   autoFocus?: boolean;
   lastEnterBlurs?: boolean;
 }) {
+  const { mod } = useSubject();
   const box = useRef<HTMLDivElement>(null);
   const locked = !!graded;
   const set = (i: number, v: string | number) => { if (!locked) onChange({ ...answers, [i]: v }); };
+  // After checking, a click on an answer field opens the calculation of that part.
+  const [open, setOpen] = useState<number | null>(null);
+  useEffect(() => setOpen(null), [q]);
+  const show = (i: number) => { if (locked) setOpen(i); };
+  const tip = locked ? 'Show the calculation' : undefined;
 
   useEffect(() => {
     if (!autoFocus || !box.current || !window.matchMedia('(pointer: fine)').matches) return;
@@ -49,7 +57,7 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
               const cls = graded ? (i === single.correct ? 'isright' : sel ? 'iswrong' : '') : sel ? 'sel' : '';
               return (
                 <li key={i}>
-                  <button type="button" className={cls} onClick={() => set(0, i)} aria-pressed={sel}>
+                  <button type="button" className={cls} onClick={() => (locked ? show(0) : set(0, i))} aria-pressed={sel} title={locked ? 'Show the explanation' : undefined}>
                     {single.tf ? o : <><span className="letter">{LET[i]})</span><span>{o}</span><span className="mark">{graded && i === single.correct ? '✓' : ''}</span></>}
                   </button>
                 </li>
@@ -72,10 +80,15 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
                   {p.type === 'num' ? (
                     <div className="numbox">
                       <span className="unit">{UNIT[p.unit]}</span>
-                      <input className={'numin' + (r ? (r.ok ? ' ok' : ' bad') : '')} type="text" inputMode="decimal" autoComplete="off"
+                      <input className={'numin' + (r ? (r.ok ? ' ok' : ' bad') : '') + (locked ? ' calcable' : '')} type="text" inputMode="decimal" autoComplete="off"
                         autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="next" aria-label={'Answer ' + LET[i]}
-                        readOnly={locked} value={(answers[i] as string) ?? ''} onChange={e => set(i, e.target.value)} onKeyDown={onKey} />
+                        readOnly={locked} value={(answers[i] as string) ?? ''} onChange={e => set(i, e.target.value)} onKeyDown={onKey}
+                        onClick={() => show(i)} title={tip} />
                     </div>
+                  ) : p.type === 'choice' && p.options.length > 6 && locked ? (
+                    <button type="button" className={'selin calcable' + (r ? (r.ok ? ' ok' : ' bad') : '')} onClick={() => show(i)} title={tip}>
+                      {typeof answers[i] === 'number' ? p.options[answers[i] as number] : 'Not answered'}
+                    </button>
                   ) : p.type === 'choice' && p.options.length > 6 ? (
                     <select className={'selin' + (r ? (r.ok ? ' ok' : ' bad') : '')} aria-label={'Answer ' + LET[i]} disabled={locked}
                       value={typeof answers[i] === 'number' ? String(answers[i]) : ''} onChange={e => e.target.value !== '' && set(i, +e.target.value)}>
@@ -87,7 +100,7 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
                       {p.options.map((o, j) => {
                         const sel = answers[i] === j;
                         const cls = r ? (j === p.correct ? 'isright' : sel ? 'iswrong' : '') : sel ? 'sel' : '';
-                        return <button type="button" key={j} className={cls} onClick={() => set(i, j)} aria-pressed={sel}>{o}</button>;
+                        return <button type="button" key={j} className={cls} onClick={() => (locked ? show(i) : set(i, j))} aria-pressed={sel} title={tip}>{o}</button>;
                       })}
                     </div>
                   ) : null}
@@ -100,13 +113,11 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
           })}
         </div>
       )}
-      {q.solution && (
-        // Reserved before checking so nothing moves; keyed so it starts closed for every question.
-        <details className="solution" key={q.html} style={{ visibility: graded ? 'visible' : 'hidden' }}>
-          <summary>Show the solution</summary>
-          <div className="qtext" dangerouslySetInnerHTML={{ __html: wrapTables(q.solution) }} />
-        </details>
-      )}
+      {/* Reserved before checking so nothing moves. */}
+      <p className="calchint" style={{ visibility: graded ? 'visible' : 'hidden' }}>
+        {single ? 'Click an option to see the explanation.' : 'Click an answer field to see its full calculation.'}
+      </p>
+      {open != null && <PartDialog mod={mod} q={q} part={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }

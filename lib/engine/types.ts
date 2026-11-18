@@ -1,8 +1,10 @@
 export type Unit = 'm' | 'eur' | 'pct' | 'msh' | 'msh_w' | 'x' | 'k' | 'bn' | 'n' | 'usd' | 'musd';
 
-export type NumPart = { type: 'num'; prompt: string; ans: number; unit: Unit; alts?: number[]; abs?: number };
-export type ChoicePart = { type: 'choice'; prompt: string; options: string[]; correct: number };
-export type McPart = { type: 'mc'; options: string[]; correct: number; tf?: boolean };
+/** `key` links a part to the step of `Question.calc` that produces its answer. */
+export type NumPart = { type: 'num'; prompt: string; ans: number; unit: Unit; alts?: number[]; abs?: number; key?: string };
+export type ChoicePart = { type: 'choice'; prompt: string; options: string[]; correct: number; key?: string };
+/** `ans` is the computed number behind a numeric multiple-choice answer. */
+export type McPart = { type: 'mc'; options: string[]; correct: number; tf?: boolean; key?: string; ans?: number };
 export type Part = NumPart | ChoicePart | McPart;
 
 export type Question = {
@@ -13,9 +15,18 @@ export type Question = {
   html: string;
   parts: Part[];
   pts?: number;
-  /** Worked solution (generator HTML), shown after checking. */
+  /** Worked solution (generator HTML), shown when a question has no `calc`. */
   solution?: string;
+  /** The worked calculation with this question's numbers, step by step; parts point to their result step by `key`. */
+  calc?: CalcStep[];
 };
+
+/**
+ * One calculator-level step: Markdown with $…$ formulas (lib/rich.ts), the formula, the numbers put in and every
+ * intermediate value. `key` marks the step whose result answers the part with the same key; `value` is that result in
+ * the part's units (e.g. 12.5 for 12.5%), checked against the answer by the tests.
+ */
+export type CalcStep = { md: string; key?: string; value?: number };
 
 export type ConceptMc = { q: string; correct: string[]; distractors: string[] };
 export type ConceptTopic = { T: string[]; F: string[]; MC: ConceptMc[] };

@@ -259,11 +259,6 @@ input.numin.bad { border-color: var(--wrong); box-shadow: 0 0 0 3px rgba(192, 38
 .mcfb.bad { color: var(--wrong); }
 .mcfb.ok { color: var(--right); }
 .theorylink { font-size: 14.5px; margin-top: 14px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; min-height: 34px; }
-.explainbtn {
-  height: 34px; padding: 0 14px; border: 0; border-radius: var(--r); background: var(--accent-soft); color: var(--accent-ink);
-  font-size: 14px; font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-soft-2);
-}
-.explainbtn:hover { background: var(--accent-soft-2); }
 .solution { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
 .solution summary { cursor: pointer; font-size: 14.5px; font-weight: 600; color: var(--accent); width: max-content; }
 .solution summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -643,6 +638,35 @@ dialog.explain::backdrop { background: rgba(16, 17, 20, 0.38); -webkit-backdrop-
 .explaincol .exanswer { border-left: 3px solid var(--right); background: var(--right-bg); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding: 12px 18px 6px; margin-top: 10px; }
 .explaincol .exanswer h3 { color: var(--right); }
 .explainmore { font-size: 14.5px; color: var(--muted); margin: 18px 0 0; }
+.calchint { font-size: 14px; color: var(--muted); margin: 14px 0 0; }
+.numin.calcable, .selin.calcable, .seg button[title], .mc button[title] { cursor: pointer; }
+.numin.calcable:hover, .selin.calcable:hover { box-shadow: 0 0 0 3px var(--ring); }
+button.selin { text-align: left; min-width: 12rem; }
+.partlbl { color: var(--muted); font-weight: 600; }
+.explaincol.calccol { padding-bottom: 48px; }
+.calcsteps { list-style: none; counter-reset: s; padding: 0; margin: 0; max-width: var(--measure); }
+.calcsteps > li { counter-increment: s; position: relative; padding: 9px 0 9px 2.2rem; border-bottom: 1px solid var(--rule); }
+.calcsteps > li:last-child { border-bottom: 0; }
+.calcsteps > li::before {
+  content: counter(s); position: absolute; left: 0; top: 10px; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent-ink); font-size: 12.5px; font-weight: 700;
+}
+.calcsteps > li.res::before { background: var(--right-bg); color: var(--right); }
+.calcsteps > li.final { background: var(--right-bg); border-radius: var(--r-sm); border-bottom: 0; padding-right: 12px; margin-top: 4px; }
+.calcsteps > li.final::before { left: 6px; }
+.calcsteps > li.final { padding-left: calc(2.2rem + 6px); }
+.calcsteps .rich { max-width: none; line-height: 1.85; }
+.calcsteps .katex-display { overflow-x: auto; overflow-y: hidden; }
+.calcgroup { border: 1px solid var(--rule); border-radius: var(--r-sm); background: var(--soft); margin: 0 0 8px; }
+.calcgroup > summary { cursor: pointer; padding: 10px 14px; font-size: 14.5px; display: flex; gap: 6px; align-items: baseline; }
+.calcgroup > summary .calcres { margin-left: auto; font-weight: 600; white-space: nowrap; padding-left: 12px; }
+.calcgroup[open] > summary { border-bottom: 1px solid var(--rule); }
+.calcgroup > .calcsteps { padding: 4px 14px 8px; }
+.explainmethod { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.explainmethod > summary { cursor: pointer; font-size: 14.5px; font-weight: 600; color: var(--accent); }
+.explainmethod h4 { font-size: 15px; margin: 14px 0 6px; }
+.explainmethod .rich { margin-top: 8px; }
+.explainmethod .exanswer { margin-top: 8px; }
 .explainmore a { font-weight: 600; }
 
 .texed textarea {

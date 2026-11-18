@@ -1,6 +1,5 @@
 'use client';
 
-import 'katex/dist/katex.min.css';
 import { useMemo } from 'react';
 import { renderRich } from '@/lib/rich';
 
