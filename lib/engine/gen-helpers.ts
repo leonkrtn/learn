@@ -56,6 +56,8 @@ export function tn(x: number, d = 2): string {
   const a = Math.abs(x);
   let t: string;
   if (d === 0) t = a.toFixed(0);
+  // A factor such as e^(−0.0042) would read as 1.00 and make the next product look wrong; it keeps four decimals.
+  else if (a !== 1 && a >= 0.995 && a < 1.005) t = a.toFixed(4);
   else if (a === 0 || a >= 0.1) t = a.toFixed(2);
   else { t = a.toPrecision(2); if (/e/.test(t)) t = a.toFixed(8); }
   const [i, f] = t.split('.');

@@ -23,6 +23,8 @@ test('tn and tp format numbers for formulas', () => {
   assert.equal(tn(0.085, 4), '0.085');
   assert.equal(tn(0.00079365, 6), '0.00079');
   assert.equal(tn(35, 0), '35');
+  assert.equal(tn(0.99583, 6), '0.9958');
+  assert.equal(tn(1, 2), '1.00');
   assert.equal(tp(0.12345, 4), '12.35\\%');
 });
 
