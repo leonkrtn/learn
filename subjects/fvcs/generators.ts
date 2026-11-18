@@ -690,7 +690,7 @@ export function L4_assetSub(): Question {
     ];
   const cc = calc(), vals1 = st.map(([, x]) => x);
   cc.s(`**Firm value in each outcome** (lease plus the remaining active field worth ${tn(A)}): ${st.map(([q, x], i) => `${tn(x)} with probability ${tn(q, 2)}`).join('; ')} (€ million).`);
-  cc.s(`**Expected value of the firm:** $E[V] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(x)}`).join(' + ')} = ${tn(EV)}$ (€ million).`);
+  cc.r(`**Expected value of the firm:** $E[V] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(x)}`).join(' + ')} = ${tn(EV)}$ (€ million).`, 'EV', EV);
   cc.r(`**Change in expected firm value:** accepting gives $${tn(EV)}$, keeping both fields gives $2 \\times ${tn(A)} = ${tn(2 * A)}$, so the change is $${tn(EV)} - ${tn(2 * A)} = ${tn(EV - 2 * A)}$ (€ million).`, 'dEV', EV - 2 * A);
   cc.r(`**Debt holders:** payoff $\\min(F, V)$ with $F = ${tn(F)}$, $E[D] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(Math.min(F, x))}`).join(' + ')} = ${tn(ED)}$ (€ million).`, 'ED', ED);
   cc.r(`**Equity holders:** payoff $\\max(0, V - F)$, $E[E] = ${st.map(([q, x]) => `${tn(q, 2)} \\times ${tn(Math.max(0, x - F))}`).join(' + ')} = ${tn(EE)}$ (€ million).`, 'EE', EE);

@@ -668,7 +668,7 @@ export function L5_norm(): Question {
   k.r(`**NormInv(${vb(p1)}):** $\\mu + \\sigma \\times z = ${tn(mu, 4)} + ${tn(s, 4)} \\times ${tq(z1, 4)} = ${tn(mu, 4)} + ${tq(s * z1, 6)} = ${tn(mu + s * z1, 6)}$, with z = NORM.S.INV(${vb(p1)}) = ${tn(z1, 4)}.`, 'n1', mu + s * z1);
   k.r(`**NormInv(${vb(p2)}):** $${tn(mu, 4)} + ${tn(s, 4)} \\times ${tq(z2, 4)} = ${tn(mu, 4)} + ${tq(s * z2, 6)} = ${tn(mu + s * z2, 6)}$, with z = NORM.S.INV(${vb(p2)}) = ${tn(z2, 4)}.`, 'n2', mu + s * z2);
   k.r(`**NormInv(0.5):** the median of a standard Normal is z = 0, so the result is the mean: $${tn(mu, 4)} + ${tn(s, 4)} \\times 0 = ${tn(mu, 6)}$.`, 'mid', mu);
-  k.r(`**Share between the quantiles:** the interval is the mean plus and minus ${tn(zh, 4)} standard deviations, i.e. it runs from the ${vb(+(1 - hi).toFixed(3))} to the ${vb(hi)} quantile. Its probability is $${tn(hi, 3)} - ${tn(1 - hi, 3)} = ${tn(2 * hi - 1, 3)}$, that is $${tn((2 * hi - 1) * 100, 2)}\\%$.`, 'share', (2 * hi - 1) * 100);
+  k.r(`**Share between the quantiles:** the interval is the mean plus and minus ${tn(zh, 4)} standard deviations, i.e. it runs from the ${tn(1 - hi, 3)} to the ${tn(hi, 3)} quantile. Its probability is $${tn(hi, 3)} - ${tn(1 - hi, 3)} = ${tn(2 * hi - 1, 3)}$, that is $${tn((2 * hi - 1) * 100, 2)}\\%$.`, 'share', (2 * hi - 1) * 100);
   return { ...withCalc(Q('L5.norm', 5, html, parts), k.steps), solution: sol };
 }
 

@@ -785,16 +785,19 @@ export function L4_bs(): Question {
   const b = bs(S, X, T, r, sig), n = pick([100, 500, 1000, 2000]);
   const html = p_(`A share that pays no dividends trades at ${e2(S)} and has a volatility of ${pp(sig, 0)}. The risk-free rate is ${pp(r)}. ${CONT} Consider European options with strike ${e2(X)} maturing in ${months(T)}.`);
   const parts = chooseParts([
-    { part: N('What is d1?', b.d1, 'n'), w: 0.6 },
-    { part: N('What is d2?', b.d2, 'n'), w: 0.6 },
-    { part: N('What is the Black-Scholes value of the call?', b.c, 'eur'), must: true },
-    { part: N('What is the value of the put?', b.p, 'eur'), w: 0.8 },
-    { part: N(`How many shares must a trader who has written ${n} calls hold to be delta-neutral?`, n * b.Nd1, 'n'), w: 0.5 },
+    { part: N('What is d1?', b.d1, 'n', { key: 'd1' }), w: 0.6 },
+    { part: N('What is d2?', b.d2, 'n', { key: 'd2' }), w: 0.6 },
+    { part: N('What is the Black-Scholes value of the call?', b.c, 'eur', { key: 'c' }), must: true },
+    { part: N('What is the value of the put?', b.p, 'eur', { key: 'p' }), w: 0.8 },
+    { part: N(`How many shares must a trader who has written ${n} calls hold to be delta-neutral?`, n * b.Nd1, 'n', { key: 'hedge' }), w: 0.5 },
   ], 3, 5);
   const sol = p_(`d1 = [ln(${f2(S)}/${f2(X)}) + (${f4(r)} + ${f4(sig)}²/2) × ${f4(T)}] / (${f2(sig)}√${f4(T)}) = ${f4(b.d1)}; d2 = d1 − σ√T = ${f4(b.d2)}. N(d1) = ${f4(b.Nd1)}, N(d2) = ${f4(b.Nd2)}.`) +
     p_(`c = S N(d1) − X e<sup>−rT</sup> N(d2) = ${f2(S)} × ${f4(b.Nd1)} − ${f4(b.PVX)} × ${f4(b.Nd2)} = ${e2(b.c)}. p = X e<sup>−rT</sup> N(−d2) − S N(−d1) = ${e2(b.p)} (check: c − p = S − PV(X) = ${f4(S - b.PVX)}).`) +
     p_(`The call delta is N(d1) = ${f4(b.Nd1)}, so ${n} written calls are hedged with ${f2(n * b.Nd1)} shares.`);
-  return { ...Q('L4.bs', 4, html, parts), solution: sol };
+  const kk = calc();
+  bsSteps(kk, { S, X, T, r, sig, keys: { d1: 'd1', d2: 'd2', c: 'c', p: 'p' } });
+  kk.r(`**Delta hedge:** the call delta is $N(d_1) = ${tn(b.Nd1, 6)}$, so writing ${n} calls needs $${n} \\times ${tn(b.Nd1, 6)} = ${tn(n * b.Nd1, 4)}$ shares.`, 'hedge', n * b.Nd1);
+  return { ...withCalc(Q('L4.bs', 4, html, parts), kk.steps), solution: sol };
 }
 
 /** Real-world and risk-neutral probability of exercise, Black-Scholes value and implied volatility (problem set 1, exercise 6). */
@@ -807,16 +810,24 @@ export function L4_probability(): Question {
     if (mkt < 0.03 || !Number.isFinite(iv) || Math.abs(mkt - b.c) < 0.01) continue;
     const html = p_(`The share price of a company follows dS = ${f2(mu)} S dt + ${f2(sig)} S dz, where dz is a Wiener process. European calls with strike ${e2(X)} maturing in ${weeks} weeks trade at ${e2(mkt)}; the share trades at ${e2(S)}. The risk-free rate is ${pp(r, 0)}. ${CONT} Use weeks/52. ${NOTE_PCT}`);
     const parts = chooseParts([
-      { part: N('What is the (real-world) probability that the call is exercised?', pReal * 100, 'pct'), must: true },
-      { part: N('What is the risk-neutral probability that the call is exercised?', b.Nd2 * 100, 'pct'), must: true },
-      { part: N('What is the Black-Scholes value of the call?', b.c, 'eur'), w: 0.8 },
-      { part: N('What volatility is implied by the market price?', iv * 100, 'pct', { abs: 0.3 }), w: 0.6 },
-      { part: C('How does the market price compare with the Black-Scholes value, and what does that say?', ['Higher: the market prices in a higher volatility than the historical estimate', 'Lower: the market prices in a lower volatility than the historical estimate'], mkt > b.c ? 0 : 1), w: 0.5 },
+      { part: N('What is the (real-world) probability that the call is exercised?', pReal * 100, 'pct', { key: 'pReal' }), must: true },
+      { part: N('What is the risk-neutral probability that the call is exercised?', b.Nd2 * 100, 'pct', { key: 'pRN' }), must: true },
+      { part: N('What is the Black-Scholes value of the call?', b.c, 'eur', { key: 'c' }), w: 0.8 },
+      { part: N('What volatility is implied by the market price?', iv * 100, 'pct', { abs: 0.3, key: 'iv' }), w: 0.6 },
+      { part: C('How does the market price compare with the Black-Scholes value, and what does that say?', ['Higher: the market prices in a higher volatility than the historical estimate', 'Lower: the market prices in a lower volatility than the historical estimate'], mkt > b.c ? 0 : 1, 'cmp'), w: 0.5 },
     ], 3, 5);
     const sol = p_(`ln S<sub>T</sub> is normal. Real world: P(S<sub>T</sub> > X) = N(d2 with μ) with d2 = [ln(S/X) + (μ − σ²/2)T]/(σ√T) = [ln(${f2(S)}/${f2(X)}) + (${f2(mu)} − ${f4(sig * sig / 2)}) × ${f4(T)}] / (${f2(sig)}√${f4(T)}) = ${f4(d2mu)}, probability ${pp(pReal)}.`) +
       p_(`Risk-neutral: replace μ by r: d2 = ${f4(b.d2)}, N(d2) = ${pp(b.Nd2)}. The two differ because investors are not risk-neutral; only the risk-neutral probability is used for pricing.`) +
       p_(`Black-Scholes: c = ${f2(S)} × ${f4(b.Nd1)} − ${f4(b.PVX)} × ${f4(b.Nd2)} = ${e2(b.c)}. The market price ${e2(mkt)} is ${mkt > b.c ? 'higher' : 'lower'}; the volatility that reproduces it is ${pp(iv)} (σ from history: ${pp(sig, 0)}).`);
-    return { ...Q('L4.probability', 4, html, parts), solution: sol };
+    const kk = calc(), sq = sig * Math.sqrt(T);
+    kk.s(`**Real world, log term:** $\\ln\\frac{S}{X} = \\ln\\frac{${tn(S)}}{${tn(X)}} = \\ln ${tn(S / X, 6)} = ${tn(Math.log(S / X), 6)}$.`);
+    kk.s(`**Real world, drift:** $(\\mu - \\frac{\\sigma^2}{2})T = (${tn(mu, 4)} - ${tn(sig * sig / 2, 6)}) \\times ${tn(T, 6)} = ${tn(mu - sig * sig / 2, 6)} \\times ${tn(T, 6)} = ${tn((mu - sig * sig / 2) * T, 6)}$ and $\\sigma\\sqrt{T} = ${tn(sig, 4)} \\times ${tn(Math.sqrt(T), 6)} = ${tn(sq, 6)}$.`);
+    kk.r(`**Real-world probability:** $d_2 = \\frac{\\ln(S/X) + (\\mu - \\sigma^2/2)T}{\\sigma\\sqrt{T}} = \\frac{${tn(Math.log(S / X), 6)} + ${tq((mu - sig * sig / 2) * T, 6)}}{${tn(sq, 6)}} = ${tn(d2mu, 4)}$, so $P(S_T > X) = N(${tn(d2mu, 4)}) = ${tn(pReal, 6)}$, i.e. $${tp(pReal, 2)}$.`, 'pReal', pReal * 100);
+    bsSteps(kk, { S, X, T, r, sig, keys: { Nd2: 'pRN', c: 'c' }, only: 'c', nScale: 100 });
+    const ivStep = (s: number) => `$\\sigma = ${tn(s * 100, 2)}\\%$ gives $c = ${tn(bs(S, X, T, r, s).c, 4)}$`;
+    kk.r(`**Implied volatility:** find $\\sigma$ with $c_{BS}(\\sigma) = ${tn(mkt)}$. The call value rises with $\\sigma$: ${ivStep(iv - 0.01)}; ${ivStep(iv)}; ${ivStep(iv + 0.01)}. Hence the implied volatility is $${tp(iv, 2)}$.`, 'iv', iv * 100);
+    kk.r(`**Comparison:** the market price ${tn(mkt)} is ${mkt > b.c ? 'above' : 'below'} the Black-Scholes value ${tn(b.c, 4)} (based on ${tp(sig, 0)}), so the market prices in a ${mkt > b.c ? 'higher' : 'lower'} volatility.`, 'cmp');
+    return { ...withCalc(Q('L4.probability', 4, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -830,14 +841,18 @@ export function L4_dividends(): Question {
     ? p_(`An index stands at ${fmtNum(S, 0)} with a volatility of ${pp(sig, 0)} and a dividend yield of ${pp(q)} (continuous). The risk-free rate is ${pp(r)}. ${CONT} Value European options with strike ${fmtNum(X, 0)} maturing in ${months(T)} (in index points).`)
     : p_(`A share trades at ${e2(S)} and has a volatility of ${pp(sig, 0)}. It will pay a dividend of ${e2(D)} in ${months(tD)}. The risk-free rate is ${pp(r)}. ${CONT} Value European options with strike ${e2(X)} maturing in ${months(T)}.`);
   const parts: Part[] = [
-    ...(yieldCase ? [N('What is S e^(−qT), the index level net of the dividend yield?', S * Math.exp(-q * T), 'n')] : [N('What share price goes into the Black-Scholes formula?', Sadj, 'eur')]),
-    N('What is the value of the call?', b.c, unit),
-    N('What is the value of the put?', b.p, unit),
+    ...(yieldCase ? [N('What is S e^(−qT), the index level net of the dividend yield?', S * Math.exp(-q * T), 'n', { key: 'adj' })] : [N('What share price goes into the Black-Scholes formula?', Sadj, 'eur', { key: 'adj' })]),
+    N('What is the value of the call?', b.c, unit, { key: 'c' }),
+    N('What is the value of the put?', b.p, unit, { key: 'p' }),
   ];
   const sol = (yieldCase ? p_(`With a continuous yield replace S by S e<sup>−qT</sup> = ${fmtNum(S * Math.exp(-q * T), 2)}: d1 = [ln(S/X) + (r − q + σ²/2)T]/(σ√T) = ${f4(b.d1)}, d2 = ${f4(b.d2)}.`)
     : p_(`Subtract the present value of the dividend: ${f2(S)} − ${f2(D)}e<sup>−${f4(r)} × ${f4(tD)}</sup> = ${e2(Sadj)}; d1 = ${f4(b.d1)}, d2 = ${f4(b.d2)}.`)) +
     p_(`c = ${fmt(b.c)}, p = ${fmt(b.p)}. The dividend lowers the call and raises the put.`);
-  return { ...Q('L4.dividends', 4, html, parts), solution: sol };
+  const kk = calc();
+  if (yieldCase) kk.r(`**Index net of the yield:** $Se^{-qT} = ${tn(S, 2)} \\times e^{-${tn(q, 4)} \\times ${tn(T, 6)}} = ${tn(S, 2)} \\times ${tn(Math.exp(-q * T), 6)} = ${tn(S * Math.exp(-q * T), 4)}$.`, 'adj', S * Math.exp(-q * T));
+  else kk.r(`**Share price for the formula:** $PV(D) = ${tn(D)} \\times e^{-${tn(r, 4)} \\times ${tn(tD, 6)}} = ${tn(D)} \\times ${tn(Math.exp(-r * tD), 6)} = ${tn(PVD, 4)}$, so $S - PV(D) = ${tn(S)} - ${tn(PVD, 4)} = ${tn(Sadj, 4)}$.`, 'adj', Sadj);
+  bsSteps(kk, { S: Sadj, X, T, r, sig, q, keys: { c: 'c', p: 'p' } });
+  return { ...withCalc(Q('L4.dividends', 4, html, parts), kk.steps), solution: sol };
 }
 
 /** Implied volatility from a market price. */
@@ -848,7 +863,9 @@ export function L4_implied(): Question {
     if (c < 0.2 || !Number.isFinite(iv)) continue;
     const html = p_(`A European call on a share without dividends has strike ${e2(X)}, matures in ${months(T)} and trades at ${e2(c)}. The share trades at ${e2(S)}; the risk-free rate is ${pp(r)}. ${CONT} ${NOTE_PCT}`);
     const sol = p_(`Solve c<sub>BS</sub>(σ) = ${f2(c)} by trial: the call value rises with σ, so bisect between a low and a high volatility. σ = ${pp(iv)} gives c = ${e2(bs(S, X, T, r, iv).c)}.`);
-    return { ...Q('L4.implied', 4, html, [N('What is the implied volatility?', iv * 100, 'pct', { abs: 0.3 })]), solution: sol };
+    const kk = calc(), ivStep = (s: number) => `$\\sigma = ${tn(s * 100, 2)}\\%$ gives $c = ${tn(bs(S, X, T, r, s).c, 4)}$`;
+    kk.r(`**Implied volatility:** find $\\sigma$ with $c_{BS}(\\sigma) = ${tn(c)}$ for $S = ${tn(S)}$, $X = ${tn(X)}$, $T = ${tn(T, 6)}$, $r = ${tn(r, 4)}$. The Black-Scholes call value rises with $\\sigma$, so bisect: ${ivStep(iv - 0.02)}; ${ivStep(iv - 0.005)}; ${ivStep(iv)}; ${ivStep(iv + 0.005)}; ${ivStep(iv + 0.02)}. The price ${tn(c)} is reached at $\\sigma = ${tp(iv, 2)}$.`, 'iv', iv * 100);
+    return { ...withCalc(Q('L4.implied', 4, html, [N('What is the implied volatility?', iv * 100, 'pct', { abs: 0.3, key: 'iv' })]), kk.steps), solution: sol };
   }
 }
 
@@ -859,16 +876,23 @@ export function L4_lognormal(): Question {
   const lo = Math.exp(m - 1.96 * s), hi = Math.exp(m + 1.96 * s), pK = 1 - Phi((Math.log(K) - m) / s);
   const html = p_(`A share trades at ${e2(S)}, has an expected return of ${pp(mu, 0)} and a volatility of ${pp(sig, 0)} a year (dS = μS dt + σS dz). Consider the share price in ${T === 1 ? 'one year' : T + ' years'}. ${NOTE_PCT}`);
   const parts = chooseParts([
-    { part: N('What is the mean of ln S_T?', m, 'n'), w: 0.7 },
-    { part: N('What is the standard deviation of ln S_T?', s, 'n'), w: 0.7 },
-    { part: N('What is the expected share price E[S_T]?', S * Math.exp(mu * T), 'eur'), w: 0.6 },
-    { part: N('What is the lower end of the 95% confidence interval for S_T?', lo, 'eur'), w: 0.5 },
-    { part: N('What is the upper end of the 95% confidence interval?', hi, 'eur'), w: 0.5 },
-    { part: N(`What is the probability that the share ends above ${e2(K)}?`, pK * 100, 'pct'), w: 0.7 },
+    { part: N('What is the mean of ln S_T?', m, 'n', { key: 'm' }), w: 0.7 },
+    { part: N('What is the standard deviation of ln S_T?', s, 'n', { key: 's' }), w: 0.7 },
+    { part: N('What is the expected share price E[S_T]?', S * Math.exp(mu * T), 'eur', { key: 'E' }), w: 0.6 },
+    { part: N('What is the lower end of the 95% confidence interval for S_T?', lo, 'eur', { key: 'lo' }), w: 0.5 },
+    { part: N('What is the upper end of the 95% confidence interval?', hi, 'eur', { key: 'hi' }), w: 0.5 },
+    { part: N(`What is the probability that the share ends above ${e2(K)}?`, pK * 100, 'pct', { key: 'pK' }), w: 0.7 },
   ], 3, 5);
   const sol = p_(`ln S<sub>T</sub> ~ N(ln S<sub>0</sub> + (μ − σ²/2)T, σ²T): mean ln ${f2(S)} + (${f2(mu)} − ${f4(sig * sig / 2)}) × ${T} = ${f4(m)}, sd ${f2(sig)}√${T} = ${f4(s)}.`) +
     p_(`E[S<sub>T</sub>] = S<sub>0</sub>e<sup>μT</sup> = ${e2(S * Math.exp(mu * T))}. 95% interval: e<sup>${f4(m)} ± 1.96 × ${f4(s)}</sup> = ${e2(lo)} to ${e2(hi)}. P(S<sub>T</sub> > ${f2(K)}) = N([${f4(m)} − ln ${f2(K)}]/${f4(s)}) = ${pp(pK)}.`);
-  return { ...Q('L4.lognormal', 4, html, parts), solution: sol };
+  const kk = calc(), z = (Math.log(K) - m) / s;
+  kk.r(`**Mean of ln S_T:** $\\ln S + (\\mu - \\frac{\\sigma^2}{2})T = \\ln ${tn(S)} + (${tn(mu, 4)} - ${tn(sig * sig / 2, 6)}) \\times ${tn(T, 2)} = ${tn(Math.log(S), 6)} + ${tn(mu - sig * sig / 2, 6)} \\times ${tn(T, 2)} = ${tn(Math.log(S), 6)} + ${tn((mu - sig * sig / 2) * T, 6)} = ${tn(m, 6)}$.`, 'm', m);
+  kk.r(`**Standard deviation of ln S_T:** $\\sigma\\sqrt{T} = ${tn(sig, 4)} \\times \\sqrt{${tn(T, 2)}} = ${tn(sig, 4)} \\times ${tn(Math.sqrt(T), 6)} = ${tn(s, 6)}$.`, 's', s);
+  kk.r(`**Expected price:** $E[S_T] = Se^{\\mu T} = ${tn(S)} \\times e^{${tn(mu, 4)} \\times ${tn(T, 2)}} = ${tn(S)} \\times e^{${tn(mu * T, 6)}} = ${tn(S)} \\times ${tn(Math.exp(mu * T), 6)} = ${tn(S * Math.exp(mu * T), 4)}$.`, 'E', S * Math.exp(mu * T));
+  kk.r(`**Lower end of the 95% interval:** $e^{m - 1.96s} = e^{${tn(m, 6)} - 1.96 \\times ${tn(s, 6)}} = e^{${tn(m - 1.96 * s, 6)}} = ${tn(lo, 4)}$.`, 'lo', lo);
+  kk.r(`**Upper end of the 95% interval:** $e^{m + 1.96s} = e^{${tn(m, 6)} + 1.96 \\times ${tn(s, 6)}} = e^{${tn(m + 1.96 * s, 6)}} = ${tn(hi, 4)}$.`, 'hi', hi);
+  kk.r(`**Probability of ending above ${tn(K)}:** $z = \\frac{\\ln K - m}{s} = \\frac{${tn(Math.log(K), 6)} - ${tq(m, 6)}}{${tn(s, 6)}} = ${tn(z, 4)}$, so $P(S_T > K) = 1 - N(${tn(z, 4)}) = 1 - ${tn(Phi(z), 6)} = ${tn(pK, 6)}$, i.e. $${tp(pK, 2)}$.`, 'pK', pK * 100);
+  return { ...withCalc(Q('L4.lognormal', 4, html, parts), kk.steps), solution: sol };
 }
 
 // =====================================================================
@@ -886,14 +910,20 @@ export function guaranteedQ(forcePut?: boolean): Question {
     const sT = roundTo(put ? X * rstep(0.3, 0.9, 0.05) : X * rstep(1.1, 1.6, 0.05), 0.5), pay = G + alpha * Math.max(put ? X - sT : sT - X, 0);
     const html = p_(`A bank sells a structured product at €${price} per unit, maturing in ${months(T)}. At maturity it pays a guaranteed €${G} plus α × max(${put ? `${f2(X)} − S<sub>T</sub>` : `S<sub>T</sub> − ${f2(X)}`}, 0), where S<sub>T</sub> is the price of a share that trades at ${e2(S)} today, pays no dividends and has a volatility of ${pp(sig, 0)}. The risk-free rate is ${pp(r)}. ${CONT} The bank wants a margin of ${P(mar, 0)} of the selling price.`);
     const parts = chooseParts([
-      { part: N('What is the present value of the guaranteed amount?', pvG, 'eur'), w: 0.7 },
-      { part: N(`What is the Black-Scholes value of one ${put ? 'put' : 'call'} with strike ${f2(X)}?`, opt, 'eur'), must: true },
-      { part: N('What is α?', alpha, 'n'), must: true },
-      { part: N(`What does one unit pay if the share ends at ${e2(sT)}?`, pay, 'eur'), w: 0.5 },
+      { part: N('What is the present value of the guaranteed amount?', pvG, 'eur', { key: 'pvG' }), w: 0.7 },
+      { part: N(`What is the Black-Scholes value of one ${put ? 'put' : 'call'} with strike ${f2(X)}?`, opt, 'eur', { key: 'opt' }), must: true },
+      { part: N('What is α?', alpha, 'n', { key: 'alpha' }), must: true },
+      { part: N(`What does one unit pay if the share ends at ${e2(sT)}?`, pay, 'eur', { key: 'pay' }), w: 0.5 },
     ], 3, 4);
     const sol = p_(`Building blocks: a zero-coupon bond paying €${G} plus α European ${put ? 'puts' : 'calls'} with strike ${f2(X)}. PV(guarantee) = ${G}e<sup>−${f4(r)} × ${f4(T)}</sup> = ${e2(pvG)}; one option (Black-Scholes) = ${e4(opt)}.`) +
       p_(`Value to the buyer must be ${price} × (1 − ${P(mar, 0)}) = ${f2(price * (1 - mar))}: α = (${f2(price * (1 - mar))} − ${f2(pvG)}) / ${f4(opt)} = ${f2(alpha)}. At S<sub>T</sub> = ${f2(sT)} the unit pays ${G} + ${f2(alpha)} × ${f2(Math.max(put ? X - sT : sT - X, 0))} = ${e2(pay)}.`);
-    return { ...Q('L5.guaranteed', 5, html, parts), solution: sol };
+    const kk = calc(), ex = Math.max(put ? X - sT : sT - X, 0);
+    kk.r(`**Present value of the guarantee:** $${tn(G, 0)} \\times e^{-${tn(r, 4)} \\times ${tn(T, 6)}} = ${tn(G, 0)} \\times ${tn(Math.exp(-r * T), 6)} = ${tn(pvG, 4)}$.`, 'pvG', pvG);
+    bsSteps(kk, { S, X, T, r, sig, keys: put ? { p: 'opt' } : { c: 'opt' }, only: put ? 'p' : 'c' });
+    kk.s(`**Budget for the options:** the buyer must receive ${tn(price, 0)} minus the margin: $${tn(price, 0)} \\times (1 - ${tn(mar, 2)}) - ${tn(pvG, 4)} = ${tn(price * (1 - mar), 2)} - ${tn(pvG, 4)} = ${tn(budget, 4)}$.`);
+    kk.r(`**Number of options per unit:** $\\alpha = \\frac{\\text{budget}}{\\text{option value}} = \\frac{${tn(budget, 4)}}{${tn(opt, 4)}} = ${tn(alpha, 4)}$.`, 'alpha', alpha);
+    kk.r(`**Payoff at ${tn(sT)}:** $${tn(G, 0)} + \\alpha \\times \\max(${put ? `${tn(X)} - ${tn(sT)}` : `${tn(sT)} - ${tn(X)}`}, 0) = ${tn(G, 0)} + ${tn(alpha, 4)} \\times ${tn(ex)} = ${tn(G, 0)} + ${tn(alpha * ex, 4)} = ${tn(pay, 4)}$.`, 'pay', pay);
+    return { ...withCalc(Q('L5.guaranteed', 5, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -915,18 +945,27 @@ export function L5_floor(): Question {
   const html = p_(`A battery producer issues a ${d.T}-year structured product linked to the price of lead. Each unit pays at maturity max(€${d.A}, €${d.B} − S<sub>T</sub>), where S<sub>T</sub> is the spot price of lead per ton. Lead trades at €${fmtNum(d.S, 0)} per ton; its convenience yield is ${pp(d.y, 0)} and its storage cost ${pp(d.u, 0)} a year; the risk-free rate is ${pp(d.r, 0)}. ${CONT}`) +
     p_(`Weekly log price changes have a historical mean of ${pp(d.mw, 1)} and a standard deviation of ${pp(d.sw, 1)} (52 weeks a year). ${NOTE_PCT}`);
   const parts = chooseParts([
-    { part: C('How does the product decompose?', [`A zero-coupon bond paying €${d.A} plus a put on lead with strike €${fmtNum(d.K, 0)}`, `A zero-coupon bond paying €${d.B} minus a call on lead with strike €${fmtNum(d.K, 0)}`, `A zero-coupon bond paying €${d.A} minus a put on lead with strike €${fmtNum(d.B, 0)}`, `A forward on lead plus a call with strike €${fmtNum(d.A, 0)}`], 0), w: 0.6 },
-    { part: N('What is the annual volatility of the lead price?', d.sig * 100, 'pct'), w: 0.6 },
-    { part: N(`What is the (real-world) probability that a unit pays exactly €${d.A}?`, d.pReal * 100, 'pct'), w: 0.6 },
-    { part: N(`What is the risk-neutral probability that a unit pays exactly €${d.A}?`, d.pRN * 100, 'pct'), w: 0.6 },
-    { part: N('What is the value of the option component per unit?', d.b.p, 'eur'), w: 0.7 },
-    { part: N('What is the theoretical value of one unit?', d.value, 'eur'), must: true },
+    { part: C('How does the product decompose?', [`A zero-coupon bond paying €${d.A} plus a put on lead with strike €${fmtNum(d.K, 0)}`, `A zero-coupon bond paying €${d.B} minus a call on lead with strike €${fmtNum(d.K, 0)}`, `A zero-coupon bond paying €${d.A} minus a put on lead with strike €${fmtNum(d.B, 0)}`, `A forward on lead plus a call with strike €${fmtNum(d.A, 0)}`], 0, 'decomp'), w: 0.6 },
+    { part: N('What is the annual volatility of the lead price?', d.sig * 100, 'pct', { key: 'vol' }), w: 0.6 },
+    { part: N(`What is the (real-world) probability that a unit pays exactly €${d.A}?`, d.pReal * 100, 'pct', { key: 'pReal' }), w: 0.6 },
+    { part: N(`What is the risk-neutral probability that a unit pays exactly €${d.A}?`, d.pRN * 100, 'pct', { key: 'pRN' }), w: 0.6 },
+    { part: N('What is the value of the option component per unit?', d.b.p, 'eur', { key: 'opt' }), w: 0.7 },
+    { part: N('What is the theoretical value of one unit?', d.value, 'eur', { key: 'value' }), must: true },
   ], 3, 5);
   const sol = p_(`max(${d.A}, ${d.B} − S<sub>T</sub>) = ${d.A} + max(${fmtNum(d.K, 0)} − S<sub>T</sub>, 0): a bond paying ${d.A} plus a put with strike ${fmtNum(d.K, 0)}. It pays exactly ${d.A} when S<sub>T</sub> ≥ ${fmtNum(d.K, 0)}.`) +
     p_(`σ = ${pp(d.sw, 1)} × √52 = ${pp(d.sig)}. Real world: ln S<sub>T</sub> ~ N(ln ${fmtNum(d.S, 0)} + ${52 * d.T} × ${f4(d.mw)}, ${f4(d.sw)}² × ${52 * d.T}) = N(${f4(d.mReal)}, ${f4(d.sReal)}²), so P(S<sub>T</sub> ≥ ${fmtNum(d.K, 0)}) = ${pp(d.pReal)}.`) +
     p_(`Risk-neutral, lead grows at r + u − y = ${pp(d.r + d.u - d.y, 0)}: it is priced like an asset with yield q = y − u = ${pp(d.q, 0)}. N(d2) = ${pp(d.pRN)}. Put (Black-Scholes with q): ${e2(d.b.p)}. Value = ${d.A}e<sup>−${f2(d.r)} × ${d.T}</sup> + ${f2(d.b.p)} = ${e2(d.value)}.`) +
     p_('The issuer is short a put on lead: it pays more when lead is cheap, which is when its own input costs are low, so the product hedges its exposure.');
-  return { ...Q('L5.floor', 5, html, parts), solution: sol };
+  const kk = calc(), n52 = 52 * d.T;
+  kk.r(`**Decomposition:** $\\max(${d.A}, ${d.B} - S_T) = ${d.A} + \\max(${d.B} - ${d.A} - S_T, 0) = ${d.A} + \\max(${tn(d.K, 0)} - S_T, 0)$: a zero-coupon bond paying ${d.A} plus a put on lead with strike ${tn(d.K, 0)}.`, 'decomp');
+  kk.r(`**Annual volatility:** $\\sigma = \\sigma_{week}\\sqrt{52} = ${tn(d.sw, 4)} \\times ${tn(Math.sqrt(52), 6)} = ${tn(d.sig, 6)}$, i.e. $${tp(d.sig, 2)}$.`, 'vol', d.sig * 100);
+  kk.s(`**Real-world distribution of ln S_T:** mean $\\ln S + ${n52} \\times \\bar u = \\ln ${tn(d.S, 0)} + ${n52} \\times ${tn(d.mw, 4)} = ${tn(Math.log(d.S), 6)} + ${tq(n52 * d.mw, 6)} = ${tn(d.mReal, 6)}$ and standard deviation $${tn(d.sw, 4)} \\times \\sqrt{${n52}} = ${tn(d.sw, 4)} \\times ${tn(Math.sqrt(n52), 6)} = ${tn(d.sReal, 6)}$.`);
+  const zr = (Math.log(d.K) - d.mReal) / d.sReal;
+  kk.r(`**Real-world probability of paying ${d.A}:** the unit pays ${d.A} when $S_T \\ge ${tn(d.K, 0)}$: $z = \\frac{\\ln ${tn(d.K, 0)} - m}{s} = \\frac{${tn(Math.log(d.K), 6)} - ${tq(d.mReal, 6)}}{${tn(d.sReal, 6)}} = ${tn(zr, 4)}$, so $P = 1 - N(${tn(zr, 4)}) = 1 - ${tn(Phi(zr), 6)} = ${tn(d.pReal, 6)}$, i.e. $${tp(d.pReal, 2)}$.`, 'pReal', d.pReal * 100);
+  kk.s(`**Cost-of-carry yield:** lead behaves like an asset with yield $q = y - u = ${tn(d.y, 4)} - ${tn(d.u, 4)} = ${tn(d.q, 4)}$.`);
+  bsSteps(kk, { S: d.S, X: d.K, T: d.T, r: d.r, sig: d.sig, q: d.q, keys: { Nd2: 'pRN', p: 'opt' }, only: 'p', nScale: 100 });
+  kk.r(`**Value of one unit:** $${d.A} \\times e^{-${tn(d.r, 4)} \\times ${d.T}} + p = ${d.A} \\times ${tn(Math.exp(-d.r * d.T), 6)} + ${tn(d.b.p, 4)} = ${tn(d.A * Math.exp(-d.r * d.T), 4)} + ${tn(d.b.p, 4)} = ${tn(d.value, 4)}$.`, 'value', d.value);
+  return { ...withCalc(Q('L5.floor', 5, html, parts), kk.steps), solution: sol };
 }
 
 /** Product paying K(1 + |R|): bond plus K/S0 straddles at the money; solve K for the margin (problem set 1, exercise 8). */
@@ -938,15 +977,21 @@ export function L5_absolute(): Question {
     const Rx = pick([-1, 1]) * rstep(0.05, 0.3, 0.01), sT = S * (1 + Rx), pay = K * (1 + Math.abs(Rx));
     const html = p_(`A bank sells a product at €${price} per unit that pays after ${months(T)} K(1 + R) if R > 0 and K(1 − R) if R ≤ 0, where R is the return on a share between today and maturity. The share trades at ${e2(S)}, pays no dividends and has a volatility of ${pp(sig, 0)}; the risk-free rate is ${pp(r)}. ${CONT} The bank wants a margin of ${P(mar, 0)} of the selling price.`);
     const parts = chooseParts([
-      { part: C('Which building blocks replicate one unit?', ['A zero-coupon bond paying K plus K/S₀ calls and K/S₀ puts with strike S₀', 'A zero-coupon bond paying K plus K/S₀ calls with strike S₀', 'K/S₀ shares plus K/S₀ puts with strike S₀', 'A zero-coupon bond paying K minus K/S₀ puts with strike S₀'], 0), w: 0.5 },
-      { part: N('What is the value of an at-the-money call?', b.c, 'eur'), w: 0.6 },
-      { part: N('What is the value of an at-the-money put?', b.p, 'eur'), w: 0.6 },
-      { part: N('What is K?', K, 'eur'), must: true },
-      { part: N(`What does a unit pay if the share ends at ${e2(sT)}?`, pay, 'eur'), w: 0.5 },
+      { part: C('Which building blocks replicate one unit?', ['A zero-coupon bond paying K plus K/S₀ calls and K/S₀ puts with strike S₀', 'A zero-coupon bond paying K plus K/S₀ calls with strike S₀', 'K/S₀ shares plus K/S₀ puts with strike S₀', 'A zero-coupon bond paying K minus K/S₀ puts with strike S₀'], 0, 'decomp'), w: 0.5 },
+      { part: N('What is the value of an at-the-money call?', b.c, 'eur', { key: 'c' }), w: 0.6 },
+      { part: N('What is the value of an at-the-money put?', b.p, 'eur', { key: 'p' }), w: 0.6 },
+      { part: N('What is K?', K, 'eur', { key: 'K' }), must: true },
+      { part: N(`What does a unit pay if the share ends at ${e2(sT)}?`, pay, 'eur', { key: 'pay' }), w: 0.5 },
     ], 3, 5);
     const sol = p_(`K(1 + |R|) = K + (K/S<sub>0</sub>)|S<sub>T</sub> − S<sub>0</sub>| = K + (K/S<sub>0</sub>)[max(S<sub>T</sub> − S<sub>0</sub>, 0) + max(S<sub>0</sub> − S<sub>T</sub>, 0)]: a bond plus K/S<sub>0</sub> at-the-money straddles.`) +
       p_(`c = ${e4(b.c)}, p = ${e4(b.p)}. Value per € of K: e<sup>−rT</sup> + (c + p)/S<sub>0</sub> = ${f4(Math.exp(-r * T))} + ${f4((b.c + b.p) / S)} = ${f4(per)}. K = ${price} × ${f2(1 - mar)} / ${f4(per)} = ${e2(K)}. At S<sub>T</sub> = ${f2(sT)}, |R| = ${pp(Math.abs(Rx))}: pays ${e2(pay)}.`);
-    return { ...Q('L5.absolute', 5, html, parts), solution: sol };
+    const kk = calc();
+    kk.r(`**Building blocks:** $K(1 + |R|) = K + \\frac{K}{S_0}|S_T - S_0| = K + \\frac{K}{S_0}[\\max(S_T - S_0, 0) + \\max(S_0 - S_T, 0)]$: a zero-coupon bond paying K plus K/S₀ calls and K/S₀ puts, all with strike S₀.`, 'decomp');
+    bsSteps(kk, { S, X: S, T, r, sig, keys: { c: 'c', p: 'p' } });
+    kk.s(`**Value per € of K:** $e^{-rT} + \\frac{c + p}{S_0} = ${tn(Math.exp(-r * T), 6)} + \\frac{${tn(b.c, 4)} + ${tn(b.p, 4)}}{${tn(S)}} = ${tn(Math.exp(-r * T), 6)} + ${tn((b.c + b.p) / S, 6)} = ${tn(per, 6)}$.`);
+    kk.r(`**K:** the buyer pays ${tn(price, 0)}, of which the bank keeps the margin: $K = \\frac{${tn(price, 0)} \\times (1 - ${tn(mar, 2)})}{${tn(per, 6)}} = \\frac{${tn(price * (1 - mar), 2)}}{${tn(per, 6)}} = ${tn(K, 4)}$.`, 'K', K);
+    kk.r(`**Payoff at ${tn(sT)}:** $R = \\frac{${tn(sT)}}{${tn(S)}} - 1 = ${tn(sT / S - 1, 6)}$, so the unit pays $K(1 + |R|) = ${tn(K, 4)} \\times (1 + ${tn(Math.abs(Rx), 6)}) = ${tn(K, 4)} \\times ${tn(1 + Math.abs(Rx), 6)} = ${tn(pay, 4)}$.`, 'pay', pay);
+    return { ...withCalc(Q('L5.absolute', 5, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -959,14 +1004,20 @@ export function L5_participation(): Question {
     const up = rstep(0.1, 0.6, 0.05), pay = prot * N0 + part * N0 * up;
     const html = p_(`A capital-protected note costs €${N0} and matures in ${T} years. At maturity it pays ${prot === 1 ? 'the full €1,000' : P(prot, 0) + ' of the €1,000'} plus a participation rate × €1,000 × max(S<sub>T</sub>/S<sub>0</sub> − 1, 0) in the rise of an index that stands at ${fmtNum(S, 0)}. Index volatility ${pp(sig, 0)}, dividend yield ${pp(q, 1)}, risk-free rate ${pp(r, 1)}. ${CONT} The issuer keeps a margin of ${P(mar, 0)} of the price. ${NOTE_PCT}`);
     const parts: Part[] = [
-      N('What is the present value of the protected amount?', pv, 'eur'),
-      N('What is the value of one at-the-money call on the index (in index points)?', b.c, 'n'),
-      N('What participation rate can the issuer offer?', part * 100, 'pct'),
-      N(`What does the note pay if the index rises by ${P(up, 0)}?`, pay, 'eur'),
+      N('What is the present value of the protected amount?', pv, 'eur', { key: 'pv' }),
+      N('What is the value of one at-the-money call on the index (in index points)?', b.c, 'n', { key: 'c' }),
+      N('What participation rate can the issuer offer?', part * 100, 'pct', { key: 'part' }),
+      N(`What does the note pay if the index rises by ${P(up, 0)}?`, pay, 'eur', { key: 'pay' }),
     ];
     const sol = p_(`Building blocks: a zero-coupon bond paying ${f2(prot * N0)} plus participation × (1000/S<sub>0</sub>) at-the-money calls. PV(bond) = ${e2(pv)}. Call (Black-Scholes with yield) = ${f2(b.c)} points, i.e. ${e4(N0 / S * b.c)} per €1,000 of notional.`) +
       p_(`Budget for options: 1000 × (1 − ${P(mar, 0)}) − ${f2(pv)} = ${f2(budget)}; participation = ${f2(budget)} / ${f4(N0 / S * b.c)} = ${pp(part)}. A ${P(up, 0)} rise pays ${f2(prot * N0)} + ${pp(part)} × 1000 × ${f2(up)} = ${e2(pay)}.`);
-    return { ...Q('L5.participation', 5, html, parts), solution: sol };
+    const kk = calc();
+    kk.r(`**Present value of the protected amount:** $${tn(prot, 2)} \\times ${tn(N0, 0)} \\times e^{-${tn(r, 4)} \\times ${tn(T, 0)}} = ${tn(prot * N0, 2)} \\times ${tn(Math.exp(-r * T), 6)} = ${tn(pv, 4)}$.`, 'pv', pv);
+    bsSteps(kk, { S, X: S, T, r, sig, q, keys: { c: 'c' }, only: 'c' });
+    kk.s(`**Budget and call per note:** the options may cost $${tn(N0, 0)} \\times (1 - ${tn(mar, 2)}) - ${tn(pv, 4)} = ${tn(N0 * (1 - mar), 2)} - ${tn(pv, 4)} = ${tn(budget, 4)}$; one at-the-money call per €${tn(N0, 0)} of notional costs $\\frac{${tn(N0, 0)}}{${tn(S, 0)}} \\times ${tn(b.c, 4)} = ${tn(N0 / S, 6)} \\times ${tn(b.c, 4)} = ${tn(N0 / S * b.c, 4)}$.`);
+    kk.r(`**Participation rate:** $\\frac{${tn(budget, 4)}}{${tn(N0 / S * b.c, 4)}} = ${tn(part, 6)}$, i.e. $${tp(part, 2)}$.`, 'part', part * 100);
+    kk.r(`**Payoff for a ${tp(up, 0)} rise:** $${tn(prot * N0, 2)} + ${tn(part, 6)} \\times ${tn(N0, 0)} \\times ${tn(up, 2)} = ${tn(prot * N0, 2)} + ${tn(part * N0 * up, 4)} = ${tn(pay, 4)}$.`, 'pay', pay);
+    return { ...withCalc(Q('L5.participation', 5, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -979,14 +1030,20 @@ export function L5_reverse(): Question {
     const sT = roundTo(S * rstep(0.6, 0.95, 0.05), 0.5), pay = N0 * k + Math.min(N0, shares * sT);
     const html = p_(`A reverse convertible costs €${N0} and matures in ${months(T)}. It pays a coupon of k × €${N0} at maturity and, in addition, €${N0} if the share ends at or above its current price of ${e2(S)}, otherwise ${f2(shares)} shares (€${N0}/S<sub>0</sub>). The share pays no dividends and has a volatility of ${pp(sig, 0)}; the risk-free rate is ${pp(r)}. ${CONT} The issuer wants a margin of ${P(mar, 0)}. ${NOTE_PCT}`);
     const parts: Part[] = [
-      C('Which building blocks replicate the note?', [`A zero-coupon bond paying ${N0}(1 + k) minus ${f2(shares)} puts with strike S₀`, `A zero-coupon bond paying ${N0}(1 + k) plus ${f2(shares)} calls with strike S₀`, `${f2(shares)} shares plus ${f2(shares)} puts with strike S₀`, `A zero-coupon bond paying ${N0} minus ${f2(shares)} calls with strike S₀`], 0),
-      N('What is the value of one at-the-money put?', b.p, 'eur'),
-      N('What coupon rate k can the issuer offer?', k * 100, 'pct'),
-      N(`What does the note pay if the share ends at ${e2(sT)}?`, pay, 'eur'),
+      C('Which building blocks replicate the note?', [`A zero-coupon bond paying ${N0}(1 + k) minus ${f2(shares)} puts with strike S₀`, `A zero-coupon bond paying ${N0}(1 + k) plus ${f2(shares)} calls with strike S₀`, `${f2(shares)} shares plus ${f2(shares)} puts with strike S₀`, `A zero-coupon bond paying ${N0} minus ${f2(shares)} calls with strike S₀`], 0, 'decomp'),
+      N('What is the value of one at-the-money put?', b.p, 'eur', { key: 'p' }),
+      N('What coupon rate k can the issuer offer?', k * 100, 'pct', { key: 'k' }),
+      N(`What does the note pay if the share ends at ${e2(sT)}?`, pay, 'eur', { key: 'pay' }),
     ];
     const sol = p_(`Payoff = ${N0}k + min(${N0}, (${N0}/S<sub>0</sub>)S<sub>T</sub>) = ${N0}(1 + k) − ${f2(shares)} max(S<sub>0</sub> − S<sub>T</sub>, 0): the investor has sold puts to the issuer.`) +
       p_(`Value = ${N0}(1 + k)e<sup>−rT</sup> − ${f2(shares)} × ${f4(b.p)} = ${N0} × ${f2(1 - mar)}, so 1 + k = (${f2(N0 * (1 - mar))} + ${f2(shares * b.p)}) × e<sup>${f4(r)} × ${f4(T)}</sup> / ${N0}: k = ${pp(k)}. At ${f2(sT)}: ${f2(N0 * k)} + ${f2(Math.min(N0, shares * sT))} = ${e2(pay)}.`);
-    return { ...Q('L5.reverse', 5, html, parts), solution: sol };
+    const kk = calc();
+    kk.r(`**Building blocks:** $${tn(N0, 0)}k + \\min(${tn(N0, 0)}, \\frac{${tn(N0, 0)}}{S_0}S_T) = ${tn(N0, 0)}(1 + k) - \\frac{${tn(N0, 0)}}{S_0}\\max(S_0 - S_T, 0)$: a zero-coupon bond paying ${tn(N0, 0)}(1 + k) minus ${tn(shares, 2)} puts with strike $S_0$.`, 'decomp');
+    bsSteps(kk, { S, X: S, T, r, sig, keys: { p: 'p' }, only: 'p' });
+    kk.s(`**Number of shares:** $\\frac{${tn(N0, 0)}}{${tn(S)}} = ${tn(shares, 6)}$.`);
+    kk.r(`**Coupon rate:** the note must be worth $${tn(N0, 0)} \\times (1 - ${tn(mar, 2)}) = ${tn(N0 * (1 - mar), 2)}$ to the buyer, so $1 + k = \\frac{(${tn(N0 * (1 - mar), 2)} + ${tn(shares, 6)} \\times ${tn(b.p, 4)}) \\times e^{rT}}{${tn(N0, 0)}} = \\frac{${tn(N0 * (1 - mar) + shares * b.p, 4)} \\times ${tn(Math.exp(r * T), 6)}}{${tn(N0, 0)}} = ${tn(1 + k, 6)}$, giving $k = ${tp(k, 2)}$.`, 'k', k * 100);
+    kk.r(`**Payoff at ${tn(sT)}:** the share is below ${tn(S)}, so the investor gets the coupon $${tn(N0, 0)} \\times ${tn(k, 6)} = ${tn(N0 * k, 4)}$ plus shares worth $${tn(shares, 6)} \\times ${tn(sT)} = ${tn(shares * sT, 4)}$ (at most ${tn(N0, 0)}): $${tn(N0 * k, 4)} + ${tn(Math.min(N0, shares * sT), 4)} = ${tn(pay, 4)}$.`, 'pay', pay);
+    return { ...withCalc(Q('L5.reverse', 5, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -999,25 +1056,44 @@ export function L6_forward(): Question {
   for (;;) {
     const kind = pick(['none', 'income', 'yield', 'fx', 'commodity'] as const), r = rstep(0.01, 0.06, 0.0025), T = pick([3, 6, 9, 12]) / 12;
     let S = rstep(20, 150, 0.5), F = 0, html = '', how = '', unit: 'eur' | 'n' = 'eur';
-    if (kind === 'none') { F = S * Math.exp(r * T); html = `A share that pays no dividends trades at ${e2(S)}.`; how = `F = S e<sup>rT</sup> = ${f2(S)}e<sup>${f4(r)} × ${f4(T)}</sup>`; }
+    const kk = calc(), fd = kind === 'fx' ? 6 : 4; let fin = '';
+    if (kind === 'none') { F = S * Math.exp(r * T);
+      kk.s(`**Growth factor:** $e^{rT} = e^{${tn(r, 4)} \\times ${tn(T, 6)}} = e^{${tn(r * T, 6)}} = ${tn(Math.exp(r * T), 6)}$.`);
+      fin = `**Forward price:** $F = Se^{rT} = ${tn(S)} \\times ${tn(Math.exp(r * T), 6)} = ${tn(F, fd)}$.`; html = `A share that pays no dividends trades at ${e2(S)}.`; how = `F = S e<sup>rT</sup> = ${f2(S)}e<sup>${f4(r)} × ${f4(T)}</sup>`; }
     if (kind === 'income') {
       const D = roundTo(S * rstep(0.01, 0.04, 0.005), 0.05), tD = T / 2, I = D * Math.exp(-r * tD);
-      F = (S - I) * Math.exp(r * T); html = `A share trades at ${e2(S)} and pays a dividend of ${e2(D)} in ${months(tD)}.`; how = `F = (S − PV(D))e<sup>rT</sup> = (${f2(S)} − ${f4(I)})e<sup>${f4(r)} × ${f4(T)}</sup>`;
+      F = (S - I) * Math.exp(r * T);
+      kk.s(`**Present value of the dividend:** $I = ${tn(D)} \\times e^{-${tn(r, 4)} \\times ${tn(tD, 6)}} = ${tn(D)} \\times ${tn(Math.exp(-r * tD), 6)} = ${tn(I, 4)}$.`);
+      kk.s(`**Growth factor:** $e^{rT} = e^{${tn(r, 4)} \\times ${tn(T, 6)}} = ${tn(Math.exp(r * T), 6)}$.`);
+      fin = `**Forward price:** $F = (S - I)e^{rT} = (${tn(S)} - ${tn(I, 4)}) \\times ${tn(Math.exp(r * T), 6)} = ${tn(S - I, 4)} \\times ${tn(Math.exp(r * T), 6)} = ${tn(F, fd)}$.`;
+      html = `A share trades at ${e2(S)} and pays a dividend of ${e2(D)} in ${months(tD)}.`; how = `F = (S − PV(D))e<sup>rT</sup> = (${f2(S)} − ${f4(I)})e<sup>${f4(r)} × ${f4(T)}</sup>`;
     }
-    if (kind === 'yield') { S = rstep(2000, 6000, 50); const q = rstep(0.01, 0.04, 0.005); F = S * Math.exp((r - q) * T); unit = 'n'; html = `An index stands at ${fmtNum(S, 0)} and has a dividend yield of ${pp(q)}.`; how = `F = S e<sup>(r − q)T</sup> = ${fmtNum(S, 0)}e<sup>(${f4(r)} − ${f4(q)}) × ${f4(T)}</sup>`; }
-    if (kind === 'fx') { S = rstep(0.8, 1.6, 0.0005); const rf = rstep(0.005, 0.06, 0.0025); F = S * Math.exp((r - rf) * T); unit = 'n'; html = `The spot exchange rate is ${f4(S)} euros per unit of a foreign currency whose risk-free rate is ${pp(rf)} (the euro rate is the domestic rate).`; how = `F = S e<sup>(r − r<sub>f</sub>)T</sup> = ${f4(S)}e<sup>(${f4(r)} − ${f4(rf)}) × ${f4(T)}</sup>`; }
-    if (kind === 'commodity') { const u = rstep(0.01, 0.05, 0.005), y = rstep(0.005, 0.04, 0.005); F = S * Math.exp((r + u - y) * T); html = `A commodity trades at ${e2(S)} per unit, has a storage cost of ${pp(u)} and a convenience yield of ${pp(y)} a year (both continuous, proportional to the price).`; how = `F = S e<sup>(r + u − y)T</sup> = ${f2(S)}e<sup>(${f4(r)} + ${f4(u)} − ${f4(y)}) × ${f4(T)}</sup>`; }
+    if (kind === 'yield') { S = rstep(2000, 6000, 50); const q = rstep(0.01, 0.04, 0.005); F = S * Math.exp((r - q) * T); unit = 'n';
+      kk.s(`**Growth factor:** $e^{(r-q)T} = e^{(${tn(r, 4)} - ${tn(q, 4)}) \\times ${tn(T, 6)}} = e^{${tn((r - q) * T, 6)}} = ${tn(Math.exp((r - q) * T), 6)}$.`);
+      fin = `**Forward price:** $F = Se^{(r-q)T} = ${tn(S, 2)} \\times ${tn(Math.exp((r - q) * T), 6)} = ${tn(F, fd)}$.`; html = `An index stands at ${fmtNum(S, 0)} and has a dividend yield of ${pp(q)}.`; how = `F = S e<sup>(r − q)T</sup> = ${fmtNum(S, 0)}e<sup>(${f4(r)} − ${f4(q)}) × ${f4(T)}</sup>`; }
+    if (kind === 'fx') { S = rstep(0.8, 1.6, 0.0005); const rf = rstep(0.005, 0.06, 0.0025); F = S * Math.exp((r - rf) * T); unit = 'n';
+      kk.s(`**Growth factor:** $e^{(r-r_f)T} = e^{(${tn(r, 4)} - ${tn(rf, 4)}) \\times ${tn(T, 6)}} = e^{${tn((r - rf) * T, 6)}} = ${tn(Math.exp((r - rf) * T), 6)}$.`);
+      fin = `**Forward price:** $F = Se^{(r-r_f)T} = ${tn(S, 4)} \\times ${tn(Math.exp((r - rf) * T), 6)} = ${tn(F, fd)}$.`; html = `The spot exchange rate is ${f4(S)} euros per unit of a foreign currency whose risk-free rate is ${pp(rf)} (the euro rate is the domestic rate).`; how = `F = S e<sup>(r − r<sub>f</sub>)T</sup> = ${f4(S)}e<sup>(${f4(r)} − ${f4(rf)}) × ${f4(T)}</sup>`; }
+    if (kind === 'commodity') { const u = rstep(0.01, 0.05, 0.005), y = rstep(0.005, 0.04, 0.005); F = S * Math.exp((r + u - y) * T);
+      kk.s(`**Growth factor:** $e^{(r+u-y)T} = e^{(${tn(r, 4)} + ${tn(u, 4)} - ${tn(y, 4)}) \\times ${tn(T, 6)}} = e^{${tn((r + u - y) * T, 6)}} = ${tn(Math.exp((r + u - y) * T), 6)}$.`);
+      fin = `**Forward price:** $F = Se^{(r+u-y)T} = ${tn(S)} \\times ${tn(Math.exp((r + u - y) * T), 6)} = ${tn(F, fd)}$.`;
+      html = `A commodity trades at ${e2(S)} per unit, has a storage cost of ${pp(u)} and a convenience yield of ${pp(y)} a year (both continuous, proportional to the price).`; how = `F = S e<sup>(r + u − y)T</sup> = ${f2(S)}e<sup>(${f4(r)} + ${f4(u)} − ${f4(y)}) × ${f4(T)}</sup>`; }
     const arb = kind !== 'commodity', quoted = unit === 'n' && kind === 'fx' ? roundTo(F * (1 + pick([-1, 1]) * rstep(0.005, 0.02, 0.001)), 0.0001) : roundTo(F * (1 + pick([-1, 1]) * rstep(0.01, 0.04, 0.005)), unit === 'n' ? 1 : 0.05);
     if (Math.abs(quoted - F) < (kind === 'fx' ? 0.002 : 0.1)) continue;
     const fmt = kind === 'fx' ? f4 : unit === 'n' ? f2 : e2;
     const intro = p_(`${html} The risk-free rate is ${pp(r)}. ${CONT}`);
-    const parts: Part[] = [N(`What is the fair forward price for delivery in ${months(T)}?`, F, unit, kind === 'fx' ? { abs: 0.0005 } : {})];
+    const parts: Part[] = [N(`What is the fair forward price for delivery in ${months(T)}?`, F, unit, kind === 'fx' ? { abs: 0.0005, key: 'F' } : { key: 'F' })];
     if (arb) {
-      parts.push(C(`A dealer quotes a forward price of ${fmt(quoted)}. What is the arbitrage?`, ['Cash and carry: borrow, buy the asset, sell it forward', 'Reverse cash and carry: short the asset, invest the proceeds, buy it forward', 'There is none'], quoted > F ? 0 : 1));
-      parts.push(N('What is the riskless profit at maturity per unit of the asset?', Math.abs(quoted - F), unit, kind === 'fx' ? { abs: 0.0002 } : {}));
+      parts.push(C(`A dealer quotes a forward price of ${fmt(quoted)}. What is the arbitrage?`, ['Cash and carry: borrow, buy the asset, sell it forward', 'Reverse cash and carry: short the asset, invest the proceeds, buy it forward', 'There is none'], quoted > F ? 0 : 1, 'arb'));
+      parts.push(N('What is the riskless profit at maturity per unit of the asset?', Math.abs(quoted - F), unit, kind === 'fx' ? { abs: 0.0002, key: 'profit' } : { key: 'profit' }));
     }
     const sol = p_(`${how} = ${fmt(F)}.`) + (arb ? p_(quoted > F ? `The quote ${fmt(quoted)} is above the fair price: borrow, buy the asset (keeping its income), sell it forward at ${fmt(quoted)}; at maturity repaying the loan costs ${fmt(F)}, so you earn ${fmt(quoted - F)}.` : `The quote ${fmt(quoted)} is below the fair price: short the asset, invest the proceeds, buy it forward at ${fmt(quoted)}; the investment grows to ${fmt(F)}, so you earn ${fmt(F - quoted)}.`) : p_('For a consumption commodity the convenience yield is what holders give up by lending it, so only the cash-and-carry side gives a clean arbitrage.'));
-    return { ...Q('L6.forward', 6, intro, parts), solution: sol };
+    kk.r(fin, 'F', F);
+    if (arb) {
+      kk.r(quoted > F ? `**Arbitrage:** the quote ${tn(quoted, fd)} is above the fair price ${tn(F, fd)}, so do cash and carry: borrow, buy the asset, sell it forward.` : `**Arbitrage:** the quote ${tn(quoted, fd)} is below the fair price ${tn(F, fd)}, so do reverse cash and carry: short the asset, invest the proceeds, buy it forward.`, 'arb');
+      kk.r(`**Riskless profit:** $|${tn(quoted, fd)} - ${tn(F, fd)}| = ${tn(Math.abs(quoted - F), fd)}$ per unit.`, 'profit', Math.abs(quoted - F));
+    }
+    return { ...withCalc(Q('L6.forward', 6, intro, parts), kk.steps), solution: sol };
   }
 }
 
@@ -1027,12 +1103,17 @@ export function L6_value(): Question {
   const K = roundTo(S * rstep(0.9, 1.1, 0.01), 0.5), F0 = S * Math.exp((r - q) * T), f = (F0 - K) * Math.exp(-r * T);
   const html = p_(`Some time ago a trader entered a long forward contract to buy one unit of an asset for ${e2(K)}; delivery is in ${months(T)}. The asset trades at ${e2(S)} today${q ? ` and pays a continuous yield of ${pp(q)}` : ' and pays no income'}. The risk-free rate is ${pp(r)}. ${CONT}`);
   const parts: Part[] = [
-    N('What is the forward price for the same delivery date today?', F0, 'eur'),
-    N('What is the value of the long forward contract?', f, 'eur'),
-    N('What is the value of the short side?', -f, 'eur'),
+    N('What is the forward price for the same delivery date today?', F0, 'eur', { key: 'F0' }),
+    N('What is the value of the long forward contract?', f, 'eur', { key: 'f' }),
+    N('What is the value of the short side?', -f, 'eur', { key: 'short' }),
   ];
   const sol = p_(`F<sub>0</sub> = S e<sup>${q ? '(r − q)T' : 'rT'}</sup> = ${e2(F0)}. Value of the long position: f = (F<sub>0</sub> − K)e<sup>−rT</sup> = (${f2(F0)} − ${f2(K)}) × ${f4(Math.exp(-r * T))} = ${e2(f)}${q ? `, equivalently S e<sup>−qT</sup> − K e<sup>−rT</sup>` : ', equivalently S − K e<sup>−rT</sup>'}. The short side is worth ${e2(-f)}.`);
-  return { ...Q('L6.value', 6, html, parts), solution: sol };
+  const kk = calc();
+  kk.r(`**Forward price today:** $F_0 = Se^{${q ? '(r-q)T' : 'rT'}} = ${tn(S)} \\times e^{${q ? `(${tn(r, 4)} - ${tn(q, 4)}) \\times ${tn(T, 6)}` : `${tn(r, 4)} \\times ${tn(T, 6)}`}} = ${tn(S)} \\times ${tn(Math.exp((r - q) * T), 6)} = ${tn(F0, 4)}$.`, 'F0', F0);
+  kk.s(`**Discount factor:** $e^{-rT} = e^{-${tn(r, 4)} \\times ${tn(T, 6)}} = ${tn(Math.exp(-r * T), 6)}$.`);
+  kk.r(`**Value of the long forward:** $f = (F_0 - K)e^{-rT} = (${tn(F0, 4)} - ${tn(K)}) \\times ${tn(Math.exp(-r * T), 6)} = ${tq(F0 - K, 4)} \\times ${tn(Math.exp(-r * T), 6)} = ${tn(f, 4)}$.`, 'f', f);
+  kk.r(`**Short side:** the short forward has the opposite value, $-f = ${tn(-f, 4)}$.`, 'short', -f);
+  return { ...withCalc(Q('L6.value', 6, html, parts), kk.steps), solution: sol };
 }
 
 /** Minimum-variance hedge ratio and the number of futures contracts, or a stock-index hedge with beta. */
@@ -1042,21 +1123,27 @@ export function L6_hedge(): Question {
     const h = rho * sS / sF, n = h * QA / QF, long = chance(0.5);
     const html = p_(`A company will ${long ? 'buy' : 'sell'} ${fmtNum(QA, 0)} units of a commodity in three months and hedges with futures on a related commodity (contract size ${fmtNum(QF, 0)} units). The standard deviation of the change in the spot price over three months is ${f4(sS)}, that of the futures price ${f4(sF)} (per unit), and their correlation is ${f2(rho)}.`);
     const parts: Part[] = [
-      N('What is the minimum-variance hedge ratio?', h, 'n'),
-      N('How many futures contracts should it trade (unrounded)?', n, 'n'),
-      C('Which side of the futures?', ['Long futures', 'Short futures'], long ? 0 : 1),
+      N('What is the minimum-variance hedge ratio?', h, 'n', { key: 'h' }),
+      N('How many futures contracts should it trade (unrounded)?', n, 'n', { key: 'n' }),
+      C('Which side of the futures?', ['Long futures', 'Short futures'], long ? 0 : 1, 'side'),
     ];
     const sol = p_(`h* = ρ σ<sub>S</sub>/σ<sub>F</sub> = ${f2(rho)} × ${f4(sS)}/${f4(sF)} = ${f4(h)}. N* = h* Q<sub>A</sub>/Q<sub>F</sub> = ${f4(h)} × ${fmtNum(QA, 0)}/${fmtNum(QF, 0)} = ${f2(n)} contracts. A future ${long ? 'purchase is hedged with a long' : 'sale is hedged with a short'} futures position.`);
-    return { ...Q('L6.hedge', 6, html, parts), solution: sol };
+    const kk = calc();
+    kk.r(`**Hedge ratio:** $h^* = \\rho\\frac{\\sigma_S}{\\sigma_F} = ${tn(rho)} \\times \\frac{${tn(sS, 4)}}{${tn(sF, 4)}} = ${tn(rho)} \\times ${tn(sS / sF, 6)} = ${tn(h, 6)}$.`, 'h', h);
+    kk.r(`**Number of contracts:** $N^* = h^*\\frac{Q_A}{Q_F} = ${tn(h, 6)} \\times \\frac{${tn(QA, 0)}}{${tn(QF, 0)}} = ${tn(h, 6)} \\times ${tn(QA / QF, 6)} = ${tn(n, 4)}$.`, 'n', n);
+    kk.r(`**Side:** the company will ${long ? 'buy' : 'sell'} the commodity, so it takes a ${long ? 'long' : 'short'} futures position.`, 'side');
+    return { ...withCalc(Q('L6.hedge', 6, html, parts), kk.steps), solution: sol };
   }
   const V = pick([5, 10, 20, 50]) * 1e6, beta = rstep(0.6, 1.6, 0.05), F = rstep(3000, 5500, 10), mult = pick([10, 25, 50]), target = pick([0, 0, 0.5, beta + 0.4]);
   const n = (target - beta) * V / (F * mult);
   const html = p_(`A fund manager holds a share portfolio worth €${fmtNum(V / 1e6, 0)} million with a beta of ${f2(beta)}. Index futures trade at ${fmtNum(F, 0)} points with a multiplier of €${mult} per point.`);
   const parts: Part[] = [
-    N(target === 0 ? 'How many contracts hedge the portfolio completely (negative = sell)?' : `How many contracts change the beta to ${f2(target)} (negative = sell)?`, n, 'n'),
+    N(target === 0 ? 'How many contracts hedge the portfolio completely (negative = sell)?' : `How many contracts change the beta to ${f2(target)} (negative = sell)?`, n, 'n', { key: 'n' }),
   ];
   const sol = p_(`N = (β* − β) × V/(F × multiplier) = (${f2(target)} − ${f2(beta)}) × ${fmtNum(V, 0)}/(${fmtNum(F, 0)} × ${mult}) = ${f2(n)} contracts${n < 0 ? ' (sell)' : ' (buy)'}.`);
-  return { ...Q('L6.hedge', 6, html, parts), solution: sol };
+  const kk = calc();
+  kk.r(`**Contracts:** $N = (\\beta^* - \\beta)\\frac{V}{F \\times \\text{multiplier}} = (${tn(target)} - ${tn(beta)}) \\times \\frac{${tn(V, 0)}}{${tn(F, 0)} \\times ${mult}} = ${tq(target - beta)} \\times \\frac{${tn(V, 0)}}{${tn(F * mult, 0)}} = ${tq(target - beta)} \\times ${tn(V / (F * mult), 4)} = ${tn(n, 4)}$, so ${n < 0 ? 'sell' : 'buy'} about ${tn(Math.abs(n), 2)} contracts.`, 'n', n);
+  return { ...withCalc(Q('L6.hedge', 6, html, parts), kk.steps), solution: sol };
 }
 
 /** Daily settlement of a futures position and margin calls. */
@@ -1077,15 +1164,29 @@ export function L6_margin(): Question {
     const html = p_(`An investor takes a ${long ? 'long' : 'short'} position in ${n} futures contracts of ${fmtNum(size, 0)} units each at ${e2(F0)}. The initial margin is ${eur(init, 0)} and the maintenance margin ${eur(maint, 0)} per contract; a margin call restores the initial margin. Settlement prices on the next ${days} days:`) +
       table(['Day', ...F.slice(1).map((_, i) => String(i + 1))], [['Settlement price', ...F.slice(1).map(e2)]]);
     const parts: Part[] = [
-      N('What is the balance of the margin account at the end of day 1 (before any margin call)?', init * n + (long ? 1 : -1) * n * size * (F[1] - F0), 'eur'),
-      C('On which day is the first margin call?', ['Day 1', 'Day 2', 'Day 3', 'Day 4'], callDay - 1),
-      N('How much must be paid in at the first margin call?', call1, 'eur'),
-      N(`What is the cumulative gain (negative for a loss) on the position after day ${days}?`, gain, 'eur'),
+      N('What is the balance of the margin account at the end of day 1 (before any margin call)?', init * n + (long ? 1 : -1) * n * size * (F[1] - F0), 'eur', { key: 'bal1' }),
+      C('On which day is the first margin call?', ['Day 1', 'Day 2', 'Day 3', 'Day 4'], callDay - 1, 'callDay'),
+      N('How much must be paid in at the first margin call?', call1, 'eur', { key: 'call1' }),
+      N(`What is the cumulative gain (negative for a loss) on the position after day ${days}?`, gain, 'eur', { key: 'gain' }),
     ];
     const sol = p_(`Each day the account changes by ${long ? '+' : '−'}${n} × ${fmtNum(size, 0)} × (F<sub>t</sub> − F<sub>t−1</sub>). Start: ${eur(init * n, 0)}; maintenance level ${eur(maint * n, 0)}.`) +
       table(['Day', 'Price', 'Balance after settlement and call'], F.slice(1).map((x, i) => [String(i + 1), e2(x), e2(bals[i])])) +
       p_(`First call on day ${callDay}: top up by ${e2(call1)} to ${eur(init * n, 0)}. Cumulative gain ${long ? '' : '−'}${n} × ${fmtNum(size, 0)} × (${f2(F[days])} − ${f2(F0)}) = ${e2(gain)}.`);
-    return { ...Q('L6.margin', 6, html, parts), solution: sol };
+    const kk = calc(), sg2 = long ? 1 : -1, lvl = init * n, mnt = maint * n;
+    let b2 = lvl, first = true;
+    for (let i = 1; i <= days; i++) {
+      const ch = sg2 * n * size * (F[i] - F[i - 1]), before = b2 + ch, call = before < mnt;
+      const md = `**Day ${i}:** change $= ${long ? '' : '-'}${n} \\times ${tn(size, 0)} \\times (${tn(F[i])} - ${tn(F[i - 1])}) = ${tn(ch)}$; balance $${tn(b2)} + ${tq(ch)} = ${tn(before)}$, ${call ? `below the maintenance level ${tn(mnt, 0)}, so a margin call restores the initial level ${tn(lvl, 0)}` : `at or above the maintenance level ${tn(mnt, 0)}, so no margin call`}.`;
+      if (i === 1) kk.r(md, 'bal1', before); else kk.s(md);
+      if (call && first) {
+        first = false;
+        kk.r(`**First margin call:** the balance first falls below the maintenance level on day ${i}.`, 'callDay');
+        kk.r(`**Payment at the first margin call:** $${tn(lvl, 0)} - ${tn(before)} = ${tn(lvl - before)}$.`, 'call1', lvl - before);
+      }
+      b2 = call ? lvl : before;
+    }
+    kk.r(`**Cumulative gain after day ${days}:** $${long ? '' : '-'}${n} \\times ${tn(size, 0)} \\times (${tn(F[days])} - ${tn(F0)}) = ${tn(sg2 * n * size, 0)} \\times ${tq(F[days] - F0)} = ${tn(gain)}$.`, 'gain', gain);
+    return { ...withCalc(Q('L6.margin', 6, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -1097,12 +1198,21 @@ export function L6_swap(): Question {
   const K = +(s + pick([-1, 1]) * rstep(0.0025, 0.015, 0.0025)).toFixed(4), Bfix = K * L * A + L * DF[n - 1], V = Bfix - L;
   const html = p_(`Continuously compounded zero rates: ${z.map((r, i) => `${i + 1} year${i ? 's' : ''} ${pp(r)}`).join(', ')}. An interest rate swap with notional €${L} million exchanges annual fixed payments for 12-month floating rates for ${n} years; the floating rate has just been reset, so the floating leg is worth par. Amounts in millions.`);
   const parts: Part[] = [
-    N(`What is the ${n}-year discount factor?`, DF[n - 1], 'n', { abs: 0.0005 }),
-    N('What is the par swap rate (annual payments)?', s * 100, 'pct', { abs: 0.01 }),
-    N(`An existing swap of this kind has a fixed rate of ${pp(K)}. What is the value of the fixed-rate bond (in € million)?`, Bfix, 'm'),
-    N('What is the value of the swap to the party that receives fixed (in € million)?', V, 'm'),
+    N(`What is the ${n}-year discount factor?`, DF[n - 1], 'n', { abs: 0.0005, key: 'DF' }),
+    N('What is the par swap rate (annual payments)?', s * 100, 'pct', { abs: 0.01, key: 's' }),
+    N(`An existing swap of this kind has a fixed rate of ${pp(K)}. What is the value of the fixed-rate bond (in € million)?`, Bfix, 'm', { key: 'Bfix' }),
+    N('What is the value of the swap to the party that receives fixed (in € million)?', V, 'm', { key: 'V' }),
   ];
   const sol = p_(`Discount factors e<sup>−z<sub>t</sub>t</sup>: ${DF.map(f4).join(', ')}; their sum is ${f4(A)}. Par rate s = (1 − DF<sub>${n}</sub>)/ΣDF = (1 − ${f4(DF[n - 1])}) / ${f4(A)} = ${pp(s, 3)}.`) +
     p_(`Fixed bond: ${pp(K)} × ${L} × ${f4(A)} + ${L} × ${f4(DF[n - 1])} = ${f4(Bfix)}; floating bond = ${L}. Receive-fixed swap = B<sub>fix</sub> − B<sub>fl</sub> = ${f4(V)} million (= (K − s) × L × ΣDF); the payer of fixed has the opposite value.`);
-  return { ...Q('L6.swap', 6, html, parts), solution: sol };
+  const kk = calc();
+  DF.forEach((x, i) => {
+    const md = `**Year ${i + 1}:** $DF_{${i + 1}} = e^{-z_{${i + 1}} \\times ${i + 1}} = e^{-${tn(z[i], 4)} \\times ${i + 1}} = e^{-${tn(z[i] * (i + 1), 6)}} = ${tn(x, 6)}$.`;
+    if (i === n - 1) kk.r(md, 'DF', x); else kk.s(md);
+  });
+  kk.s(`**Annuity factor:** $\\sum DF = ${DF.map(x => tn(x, 6)).join(' + ')} = ${tn(A, 6)}$.`);
+  kk.r(`**Par swap rate:** $s = \\frac{1 - DF_{${n}}}{\\sum DF} = \\frac{1 - ${tn(DF[n - 1], 6)}}{${tn(A, 6)}} = \\frac{${tn(1 - DF[n - 1], 6)}}{${tn(A, 6)}} = ${tn(s, 6)}$, i.e. $${tp(s, 3)}$.`, 's', s * 100);
+  kk.r(`**Fixed-rate bond (€ million):** $B_{fix} = K \\times L \\times \\sum DF + L \\times DF_{${n}} = ${tn(K, 4)} \\times ${tn(L, 0)} \\times ${tn(A, 6)} + ${tn(L, 0)} \\times ${tn(DF[n - 1], 6)} = ${tn(K * L * A, 4)} + ${tn(L * DF[n - 1], 4)} = ${tn(Bfix, 4)}$.`, 'Bfix', Bfix);
+  kk.r(`**Swap value for the fixed receiver (€ million):** the floating leg is worth par, so $V = B_{fix} - L = ${tn(Bfix, 4)} - ${tn(L, 0)} = ${tn(V, 4)}$.`, 'V', V);
+  return { ...withCalc(Q('L6.swap', 6, html, parts), kk.steps), solution: sol };
 }

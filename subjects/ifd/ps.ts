@@ -278,15 +278,17 @@ export function PS4_terminalMc(): Question {
   if (chance(0.5)) {
     const sale = rstep(2, 8, 0.5), book = rstep(0, 6, 0.5);
     if (Math.abs(sale - book) < 0.5) return PS4_terminalMc();
-    const salv = sale - tau * (sale - book);
+    const salv = sale - tau * (sale - book), k = calc();
+    k.r(`**After-tax cash flow:** only the gain over book value is taxed (a loss gives a tax credit). $${tn(sale, 2)} - ${tn(tau, 2)} \\times (${tn(sale, 2)} - ${tn(book, 2)}) = ${tn(sale, 2)} - ${tn(tau, 2)} \\times ${tq(sale - book, 2)} = ${tn(salv, 4)}$ (${c === '€' ? '€' : 'USD'} million).`, 'ans', salv);
     return mcNum('PS4.terminalMc', '4', p_(`At the end of a project, equipment with a book value of ${c}${f2(book)} million is sold for ${c}${f2(sale)} million. The tax rate is ${P(tau, 0)}. What after-tax cash flow does the sale bring?`), salv,
       [sale, sale * (1 - tau), book, sale + tau * (sale - book), book + (1 - tau) * sale], mil(c),
-      { sol: p_(`Only the gain over book value is taxed${sale < book ? ' (here a loss, which gives a tax credit)' : ''}: ${f2(sale)} − ${P(tau, 0)} × (${f2(sale)} − ${f2(book)}) = ${c}${f2(salv)} million.`) });
+      { calc: k.steps, sol: p_(`Only the gain over book value is taxed${sale < book ? ' (here a loss, which gives a tax credit)' : ''}: ${f2(sale)} − ${P(tau, 0)} × (${f2(sale)} − ${f2(book)}) = ${c}${f2(salv)} million.`) });
   }
-  const T = pick([3, 4, 5]), g = rstep(0.01, 0.04, 0.005), fcfT = rstep(5, 30, 0.5), tv = fcfT * (1 + g) / (r - g);
+  const T = pick([3, 4, 5]), g = rstep(0.01, 0.04, 0.005), fcfT = rstep(5, 30, 0.5), tv = fcfT * (1 + g) / (r - g), k = calc();
+  k.r(`**Continuation value:** the cash flow of year ${T + 1} is $${tn(fcfT, 2)} \\times (1 + ${tn(g, 3)}) = ${tn(fcfT * (1 + g), 4)}$, and $TV_{${T}} = \\frac{CF_{${T + 1}}}{r - g} = \\frac{${tn(fcfT * (1 + g), 4)}}{${tn(r, 2)} - ${tn(g, 3)}} = \\frac{${tn(fcfT * (1 + g), 4)}}{${tn(r - g, 3)}} = ${tn(tv, 4)}$ (${c === '€' ? '€' : 'USD'} million).`, 'ans', tv);
   return mcNum('PS4.terminalMc', '4', p_(`A project’s free cash flow in year ${T} is ${c}${f2(fcfT)} million and is expected to grow at ${pp(g, 1)} a year forever afterwards. The discount rate is ${pp(r, 0)}. What is the continuation value at the end of year ${T}?`), tv,
     [fcfT / (r - g), fcfT * (1 + g) / r, tv / (1 + r) ** T, fcfT / r, fcfT * (1 + g) / (r + g)], mil(c),
-    { sol: p_(`TV<sub>${T}</sub> = FCF<sub>${T + 1}</sub> / (r − g) = ${f2(fcfT)} × ${fmtNum(1 + g, 3)} / (${pp(r, 0)} − ${pp(g, 1)}) = ${c}${f2(tv)} million, a value at year ${T}.`) });
+    { calc: k.steps, sol: p_(`TV<sub>${T}</sub> = FCF<sub>${T + 1}</sub> / (r − g) = ${f2(fcfT)} × ${fmtNum(1 + g, 3)} / (${pp(r, 0)} − ${pp(g, 1)}) = ${c}${f2(tv)} million, a value at year ${T}.`) });
 }
 
 // Quiz: NPV of a master's degree against staying in the job.
