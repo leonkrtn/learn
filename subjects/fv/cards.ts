@@ -1,7 +1,7 @@
-// Official Firm Valuation flashcards for lectures 1 and 2. Seeded into Supabase by `npm run seed:sql`.
+// Official Firm Valuation flashcards for lectures 1–7. Seeded into Supabase by `npm run seed:sql`.
 import type { SeedCard } from '../fvcs/cards';
 
-export const DECK_NAME = 'FV lectures 1–2';
+export const DECK_NAME = 'FV lectures 1–7';
 
 export const CARDS: SeedCard[] = [
   // Lecture 1
@@ -34,4 +34,51 @@ export const CARDS: SeedCard[] = [
   { key: 'l2-dtl', front: 'Deferred tax liability in a DCF', back: 'Its reversal is a future cash outflow: forecast the payments and subtract their PV from firm value.' },
   { key: 'l2-horizon', front: 'Why 3–10 explicit years plus a terminal value?', back: 'Cash flows stabilise, uncertainty grows and the value becomes very sensitive to distant forecasts.' },
   { key: 'l2-dt', front: 'Dichev & Tang (2009)', back: 'Volatile earnings are harder to forecast; analysts do not fully adjust, so pull volatile earnings towards the mean in projections.' },
+  { key: 'l2-apv', front: 'Adjusted present value (APV)', back: 'V<sub>L</sub> = V<sub>U</sub> + PV(tax shields) − expected distress costs. V<sub>U</sub> at ρ = r<sub>f</sub> + β<sub>U</sub>·MRP. Constant permanent debt: PV(TS) = t·D. Easiest with a known amount of debt.' },
+  // Lecture 3
+  { key: 'l3-avg', front: 'Arithmetic vs geometric average growth', back: 'Arithmetic: mean of annual rates. Geometric (CAGR): (end/start)<sup>1/n</sup> − 1. Geometric ≤ arithmetic; n = number of periods.' },
+  { key: 'l3-negative', front: 'Growth with negative past earnings', back: 'Fit EPS<sub>t</sub> = a + b·t; growth ≈ b / average EPS. Or use revenues and absolute changes.' },
+  { key: 'l3-analysts', front: 'Analyst forecasts: strengths and limits', back: 'More information, better short-term accuracy. Accuracy falls with the horizon; weak for small, volatile, thinly covered firms; possible bias.' },
+  { key: 'l3-rir', front: 'Reinvestment rate', back: '(Net CapEx + ΔOWC) / EBIT(1 − t)' },
+  { key: 'l3-roc', front: 'Return on capital', back: 'EBIT(1 − t) / (BV equity + BV debt − cash), start of year.' },
+  { key: 'l3-g', front: 'Fundamental growth', back: 'Operating income: g = RIR × ROC. Net income: g = retention × ROE.' },
+  { key: 'l3-dROC', front: 'Growth when ROC changes', back: 'g = RIR × ROC<sub>t</sub> + (ROC<sub>t</sub> − ROC<sub>t−1</sub>) / ROC<sub>t−1</sub>' },
+  { key: 'l3-negroc', front: 'Negative return on capital', back: 'Forecast revenues (market size × share) and a margin path to a sustainable level instead of RIR × ROC.' },
+  { key: 'l3-ltg', front: 'Long-term growth anchors', back: 'Long-run reinvestment and ROIC, the industry average, GDP growth (often proxied by the risk-free rate).' },
+  // Lecture 4
+  { key: 'l4-risk', front: 'Which risk is priced?', back: 'Only systematic (non-diversifiable) risk: the marginal investor is diversified.' },
+  { key: 'l4-rf', front: 'Risk-free rate', back: 'Long-term default-free government bond in the currency of the cash flows; nominal with nominal, real with real.' },
+  { key: 'l4-erp', front: 'Historical vs implied equity premium', back: 'Historical: past returns; depends on period, proxy, averaging; large standard error. Implied: r from index = PV(expected cash flows), minus r<sub>f</sub>.' },
+  { key: 'l4-implied', front: 'Implied ERP with constant growth', back: 'r = D<sub>1</sub>/P<sub>0</sub> + g; ERP = r − r<sub>f</sub>.' },
+  { key: 'l4-levered', front: 'Levered beta', back: 'Constant D/E: β<sub>L</sub> = β<sub>U</sub>(1 + D/E). Fixed debt: β<sub>U</sub>[1 + (1 − t)D/E]. Risky debt: − β<sub>D</sub>(1 − t)D/E.' },
+  { key: 'l4-regression', front: 'Regression beta', back: 'Slope of the stock’s excess returns on the market’s: the LEVERED beta at the estimation period’s leverage. High standard error, backward-looking.' },
+  { key: 'l4-bottomup', front: 'Bottom-up beta', back: 'Value- (or revenue-) weighted unlevered betas of the businesses, relevered at the firm’s D/E.' },
+  { key: 'l4-drivers', front: 'What raises the unlevered beta?', back: 'Cyclical revenues and high operating leverage (fixed costs).' },
+  { key: 'l4-total', front: 'Total beta (private firm)', back: 'β<sub>U</sub> / ρ (correlation with the market), relevered at market-value D/E. For an IPO use the ordinary market beta.' },
+  { key: 'l4-synthetic', front: 'Synthetic rating', back: 'Interest coverage = EBIT / interest → rating → default spread; k<sub>d</sub> = r<sub>f</sub> + spread.' },
+  { key: 'l4-mvdebt', front: 'Market value of book debt', back: 'I × [1 − (1 + k<sub>d</sub>)<sup>−n</sup>]/k<sub>d</sub> + F/(1 + k<sub>d</sub>)<sup>n</sup>' },
+  { key: 'l4-wacc', front: 'WACC', back: 'E/(D + E)·k<sub>e</sub> + D/(D + E)·k<sub>d</sub>(1 − t), market-value weights.' },
+  // Lecture 5
+  { key: 'l5-rf', front: 'Local-currency risk-free rate', back: 'Local government yield − default spread (dollar/euro bond spread, CDS net of US CDS, or rating spread).' },
+  { key: 'l5-crp', front: 'Country risk premium: three approaches', back: '(1) US ERP + spread. (2) CRP = spread × σ<sub>equity</sub>/σ<sub>bond</sub>. (3) Total = US ERP × σ<sub>country</sub>/σ<sub>US</sub>.' },
+  { key: 'l5-ke', front: 'Country risk in k<sub>e</sub>', back: 'Additive r<sub>f</sub> + CRP + β·ERP; integrated r<sub>f</sub> + β(ERP + CRP); factor r<sub>f</sub> + β·ERP + λ·CRP.' },
+  { key: 'l5-lambda', front: 'λ (lambda)', back: 'A firm’s exposure to country risk: regression, or its share of local revenues relative to the average local firm.' },
+  // Lecture 6
+  { key: 'l6-bridge', front: 'Operating assets to equity', back: 'E = V<sub>op</sub> + cash + minority holdings + unutilised assets − minority interests − debt − options.' },
+  { key: 'l6-netdebt', front: 'Cost of net debt', back: '(k<sub>d</sub>·D − r<sub>f</sub>·Cash)/(D − Cash). Example: (7%·400 − 5%·200)/200 = 9%.' },
+  { key: 'l6-cashvalue', front: 'How is a dollar of cash valued?', back: 'ROC = cost of capital: neutral (face value). ROC below: wasting asset. ROC above: potential value creator.' },
+  { key: 'l6-holdings', front: 'Minority holdings vs minority interests', back: 'Holdings (not consolidated): add at market value (P/B or P/E). Interests (outsiders in consolidated subsidiaries): subtract at market value.' },
+  { key: 'l6-options', front: 'Options: three approaches', back: 'Diluted E/(N + n) overstates dilution. Treasury stock (E + nK)/(N + n) ignores time value. Option value (E − n·OV)/N.' },
+  { key: 'l6-goodwill', front: 'Goodwill', back: 'A plug: purchase price − fair value of net identifiable assets. Not an asset to add; overpayment lowers ROC.' },
+  { key: 'l6-commit', front: 'Contractual commitments', back: 'Treat as debt: PV at the pre-tax cost of debt. Raises debt, operating income and invested capital (Netflix).' },
+  { key: 'l6-whatif', front: 'Sensitivity vs scenario vs simulation', back: 'Sensitivity: one input at a time. Scenario: consistent best/base/worst cases. Monte Carlo: inputs drawn from distributions.' },
+  // Lecture 7
+  { key: 'l7-consistent', front: 'Consistent multiples', back: 'Equity value / equity measure (P/E, P/BV, P/FCFE); EV / firm measure (EV/EBITDA, EV/EBIT, EV/Sales, EV/FCFF). Price/EBITDA is invalid.' },
+  { key: 'l7-pe', front: 'Justified P/E', back: 'payout × (1 + g)/(r − g); forward: payout/(r − g). Up with growth and payout, down with risk.' },
+  { key: 'l7-pb', front: 'Justified P/BV', back: 'ROE × payout × (1 + g)/(r − g). High ROE + high risk → low P/E, high P/B.' },
+  { key: 'l7-peg', front: 'PEG ratio', back: 'P/E ÷ expected growth (in %). About 1 often read as fair; still depends on risk and payout.' },
+  { key: 'l7-steps', front: 'Relative valuation in four steps', back: 'Define the multiple; describe its distribution; analyse its drivers; apply to the target (median), adjusting for differences.' },
+  { key: 'l7-ev', front: 'From EV/EBITDA to a share price', back: '(multiple × EBITDA − debt + cash) / shares.' },
+  { key: 'l7-exit', front: 'Loss-making firm with an exit multiple', back: 'Multiple × metric in year n, discounted n years, + cash − debt; × survival probability if failure is possible.' },
+  { key: 'l7-limits', front: 'Limits of relative valuation', back: 'Sector-wide mispricing and sentiment, dissimilar peers, outliers and negative earnings, snapshot bias. Cross-check with a DCF.' },
 ];

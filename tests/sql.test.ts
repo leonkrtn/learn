@@ -89,7 +89,7 @@ test('decks: official visible to all, own decks private, overview counts', async
   });
   await assert.rejects(as(db, U2, () => db.query(`insert into public.cards (deck_id, front, back) values ('${deck}', 'x', 'y')`)));
   const seen2 = await as(db, U2, () => db.query<{ name: string }>('select name from public.decks'));
-  assert.deepEqual(seen2.rows.map(r => r.name).sort(), ['FD core concepts', 'FI core concepts', 'FV lectures 1–2', 'FVCS core concepts', 'IFD core concepts', 'PIF core concepts']);
+  assert.deepEqual(seen2.rows.map(r => r.name).sort(), ['FD core concepts', 'FI core concepts', 'FV lectures 1–7', 'FVCS core concepts', 'IFD core concepts', 'PIF core concepts']);
   const ov = await as(db, U1, async () => {
     const card = await db.query<{ id: string }>(`select id from public.cards where deck_id = '${deck}' limit 1`);
     await db.query(`insert into public.card_states (user_id, card_id, due, fsrs) values ('${U1}', '${card.rows[0].id}', now() - interval '1 hour', '{}')`);

@@ -76,6 +76,11 @@ export default function L2() {
         }}
       </Lab>
 
+      <h2 id="apv">Adjusted present value</h2>
+      <p>APV separates operations from financing: value the firm as if it had no debt, at the unlevered cost of capital ρ = r<sub>f</sub> + β<sub>U</sub> × MRP, then add the present value of the interest tax shields (and, in general, subtract expected distress costs).</p>
+      <div className="eqline">V<sub>L</sub> = V<sub>U</sub> + PV(t × k<sub>d</sub> × D)<span className="up">,</span>&nbsp;&nbsp; V<sub>U</sub> = <Frac n={<>FCFF<sub>1</sub></>} d="ρ − g" /></div>
+      <p>A permanent, constant amount of debt gives PV(tax shields) = t × D (discounted at k<sub>d</sub>); a loan repaid after n years gives an n-year annuity. APV is easiest when the amount of debt is known; with a constant D/E ratio the WACC is easier, and the tax shields are then as risky as the assets (discount them at ρ). The 2021–2023 exams combine both: APV for years with a fixed amount of debt, WACC once the firm moves to a target ratio.</p>
+
       <h2>Worked example: H-model (class 2, Q2)</h2>
       <p>D<sub>0</sub> = €2, growth falls linearly from 8% to 3% over 10 years (H = 5), k<sub>e</sub> = 10%.</p>
       <ol className="steps">

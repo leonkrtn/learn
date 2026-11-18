@@ -49,7 +49,7 @@ function useTypeInfo(mod: SubjectModule, typeKey: string) {
     const type = allTypes(mod).find(t => t.key === typeKey);
     const ps = mod.problemSets?.find(p => p.types.some(t => t.key === typeKey));
     const theory = mod.theory.find(p => p.types.includes(typeKey)) || (!ps && type ? mod.theory.find(p => p.topic === type.topic) : undefined);
-    const unit = ps ? `${ps.label || 'Problem set'} ${ps.id}: ${ps.title}` : mod.topics.find(t => t.id === type?.topic)?.name || '';
+    const unit = ps ? `${ps.label ?? 'Problem set ' + ps.id}: ${ps.title}` : mod.topics.find(t => t.id === type?.topic)?.name || '';
     return { type, theory, unit, e: resolveExplainer(mod.explain, typeKey) };
   }, [mod, typeKey]);
 }
