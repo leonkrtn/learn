@@ -1,7 +1,7 @@
 // Investment and Financing Decisions: practice in the format of the Moodle quizzes and the practice exercises.
 // Cases with several steps keep numeric entry, single questions are multiple choice A–E with wrong options from
 // typical mistakes. Each set also covers content of the lecture and its additional material that the quizzes leave out.
-import { C, N, P, Q, chance, chooseParts, fmtNum, p_, pick, rint, roundTo, rstep, shuffle } from '@/lib/engine/gen-helpers';
+import { C, N, P, Q, calc, chance, chooseParts, fmtNum, p_, pick, rint, roundTo, rstep, shuffle, tn, tp, tq, withCalc } from '@/lib/engine/gen-helpers';
 import { CANNOT, mcNum, mcText, shortAnswer } from '@/lib/engine/mc';
 import type { Part, Question } from '@/lib/engine/types';
 import { BANK } from './concepts';
@@ -20,21 +20,30 @@ const one = (s: string) => (x: number) => (x < 0 ? '−' : '') + s + fmtNum(Math
 export function PS1_ipoMc(): Question {
   const d = G.ipoDraw(), { c } = d;
   const html = p_(`${d.name} has ${d.n0} million shares outstanding and issues ${d.nNew} million new shares in an IPO at ${c.one(d.P0, 0)} per share, with an underwriting spread of ${P(d.s, 0)}. The share price rises to ${c.one(d.P1, 0)} on the first day of trading.`);
+  const k = calc();
   if (chance(0.5)) {
+    k.r(`**Proceeds:** the firm gets the offer price minus the spread. $${d.nNew} \\times ${tn(d.P0, 0)} \\times (1 - ${tn(d.s, 2)}) = ${tn(d.nNew * d.P0, 2)} \\times ${tn(1 - d.s, 2)} = ${tn(d.raised, 4)}$ (${c.um}).`, 'ans', d.raised);
     return mcNum('PS1.ipoMc', '1', html + p_('How much money does the firm receive from the IPO?'), d.raised,
       [d.nNew * d.P0, d.nNew * d.P1 * (1 - d.s), d.nNew * d.P1, d.nNew * d.P0 * d.s, (d.n0 + d.nNew) * d.P0 * (1 - d.s)], mil(c.s),
-      { sol: p_(`The firm receives the offer price net of the spread: ${d.nNew}m × ${c.one(d.P0, 0)} × (1 − ${P(d.s, 0)}) = ${c.mil(d.raised)}. The first-day price goes to the investors who bought the shares.`) });
+      { calc: k.steps, sol: p_(`The firm receives the offer price net of the spread: ${d.nNew}m × ${c.one(d.P0, 0)} × (1 − ${P(d.s, 0)}) = ${c.mil(d.raised)}. The first-day price goes to the investors who bought the shares.`) });
   }
+  k.s(`**Underpricing:** the new shares were sold at ${c.u1}${tn(d.P0, 0)} but are worth ${c.u1}${tn(d.P1, 0)}. $${d.nNew} \\times (${tn(d.P1, 0)} - ${tn(d.P0, 0)}) = ${tn(d.under, 4)}$ (${c.um}).`);
+  k.s(`**Underwriting spread:** $${d.nNew} \\times ${tn(d.P0, 0)} \\times ${tn(d.s, 2)} = ${tn(d.direct, 4)}$ (${c.um}).`);
+  k.r(`**Total cost:** underpricing plus spread, $${tn(d.under, 4)} + ${tn(d.direct, 4)} = ${tn(d.total, 4)}$ (${c.um}).`, 'ans', d.total);
   return mcNum('PS1.ipoMc', '1', html + p_('What is the total cost to the original shareholders due to market imperfections?'), d.total,
     [d.under, d.direct, d.n0 * (d.P1 - d.P0), (d.n0 + d.nNew) * (d.P1 - d.P0), d.mv - d.raised], mil(c.s),
-    { sol: p_(`Underpricing ${d.nNew}m × (${c.one(d.P1, 0)} − ${c.one(d.P0, 0)}) = ${c.mil(d.under)} plus the spread ${d.nNew}m × ${c.one(d.P0, 0)} × ${P(d.s, 0)} = ${c.mil(d.direct)}: ${c.mil(d.total)}. Equivalently, in a perfect market the old shares would be worth ${c.mil(d.mv)} − ${c.mil(d.raised)} = ${c.mil(d.pre)}, against ${c.mil(d.n0 * d.P1)} now.`) });
+    { calc: k.steps, sol: p_(`Underpricing ${d.nNew}m × (${c.one(d.P1, 0)} − ${c.one(d.P0, 0)}) = ${c.mil(d.under)} plus the spread ${d.nNew}m × ${c.one(d.P0, 0)} × ${P(d.s, 0)} = ${c.mil(d.direct)}: ${c.mil(d.total)}. Equivalently, in a perfect market the old shares would be worth ${c.mil(d.mv)} − ${c.mil(d.raised)} = ${c.mil(d.pre)}, against ${c.mil(d.n0 * d.P1)} now.`) });
 }
 
 export function PS1_rightsMc(): Question {
   const d = G.rightsDraw(), { c } = d;
   const html = p_(`${d.name} has ${d.n} million shares outstanding at ${c.one(d.P0, 0)}. In a rights issue each shareholder receives one right per share, and ${d.k} rights buy one new share at ${c.one(d.X, 0)}. All rights are exercised. What is the share price after the rights issue?`);
   const sol = p_(`New shares ${d.n}m / ${d.k} = ${f2(d.n / d.k)}m raise ${c.mil(d.raised)}. Price = (${d.n}m × ${c.one(d.P0, 0)} + ${c.mil(d.raised)}) / ${f2(d.n + d.n / d.k)}m = ${c.one(d.post)}.`);
-  return mcNum('PS1.rightsMc', '1', html, d.post, [d.P0, d.X, (d.n * d.P0 + d.raised) / d.n, (d.P0 + d.X) / 2, d.P0 - d.X / d.k], one(c.s), { sol });
+  const k = calc(), newSh = d.n / d.k;
+  k.s(`**New shares:** ${d.k} rights buy one share, so $\\frac{${d.n}}{${d.k}} = ${tn(newSh, 4)}$ million new shares.`);
+  k.s(`**Money raised:** $${tn(newSh, 4)} \\times ${tn(d.X, 0)} = ${tn(d.raised, 4)}$ (${c.um}).`);
+  k.r(`**Share price after the issue:** $\\frac{${d.n} \\times ${tn(d.P0, 0)} + ${tn(d.raised, 4)}}{${d.n} + ${tn(newSh, 4)}} = \\frac{${tn(d.n * d.P0 + d.raised, 4)}}{${tn(d.n + newSh, 4)}} = ${tn(d.post, 4)}$ (${c.u1} per share).`, 'ans', d.post);
+  return mcNum('PS1.rightsMc', '1', html, d.post, [d.P0, d.X, (d.n * d.P0 + d.raised) / d.n, (d.P0 + d.X) / 2, d.P0 - d.X / d.k], one(c.s), { sol, calc: k.steps });
 }
 
 const PS1_short = () => shortAnswer('PS1.short', '1', BANK['1'].MC);

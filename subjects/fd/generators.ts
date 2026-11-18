@@ -522,16 +522,26 @@ export function L3_replicate(): Question {
     const opts = ['No arbitrage: the market price equals the value of the replicating portfolio',
       `The ${k} is overpriced: sell it and buy the replicating portfolio`, `The ${k} is underpriced: buy it and sell the replicating portfolio`];
     const parts: Part[] = [
-      N('How many shares m does the replicating portfolio hold (negative = short)?', m, 'n'),
-      N('How much does it borrow, B (negative = lend)?', B, 'eur'),
-      N(`What is the value of the ${k}?`, c0, 'eur'),
-      N('What is the risk-neutral probability π of the up move?', pi * 100, 'pct'),
-      C('What does the market price imply?', opts, Math.abs(gap) < 0.02 ? 0 : gap > 0 ? 1 : 2),
+      N('How many shares m does the replicating portfolio hold (negative = short)?', m, 'n', { key: 'm' }),
+      N('How much does it borrow, B (negative = lend)?', B, 'eur', { key: 'B' }),
+      N(`What is the value of the ${k}?`, c0, 'eur', { key: 'val' }),
+      N('What is the risk-neutral probability π of the up move?', pi * 100, 'pct', { key: 'pi' }),
+      C('What does the market price imply?', opts, Math.abs(gap) < 0.02 ? 0 : gap > 0 ? 1 : 2, 'arb'),
     ];
     const sol = p_(`Payoffs: ${k}<sup>u</sup> = ${e2(cu)}, ${k}<sup>d</sup> = ${e2(cd)}. m = (${f2(cu)} − ${f2(cd)}) / (${f2(Su)} − ${f2(Sd)}) = ${f4(m)}; B = (m S<sup>u</sup> − ${k}<sup>u</sup>) / (1 + r) = (${f4(m)} × ${f2(Su)} − ${f2(cu)}) / ${f4(1 + r)} = ${f4(B)}.`) +
       p_(`Value = mS − B = ${f4(m)} × ${f2(S)} − ${f4(B)} = ${e2(c0)}. The same with π = (1 + r − d)/(u − d) = ${f4(pi)}: [${f4(pi)} × ${f2(cu)} + ${f4(1 - pi)} × ${f2(cd)}] / ${f4(1 + r)} = ${e2(c0)}.`) +
       p_(Math.abs(gap) < 0.02 ? 'The market price matches: no arbitrage.' : gap > 0 ? `Market ${e2(mkt)} > ${e2(c0)}: sell the ${k}, buy m shares and borrow B; riskless profit ${e2(gap)} today.` : `Market ${e2(mkt)} < ${e2(c0)}: buy the ${k}, short m shares and lend B; riskless profit ${e2(-gap)} today.`);
-    return { ...Q('L3.replicate', 3, html, parts), solution: sol };
+    const kk = calc(), payF = (s: number) => put ? `\\max(${tn(X)} - ${tn(s, 4)}, 0)` : `\\max(${tn(s, 4)} - ${tn(X)}, 0)`, nm = `\\text{${k}}`;
+    kk.s(`**Share prices next period:** $S_u = Su = ${tn(S)} \\times ${tn(u)} = ${tn(Su, 4)}$ and $S_d = Sd = ${tn(S)} \\times ${tn(d)} = ${tn(Sd, 4)}$.`);
+    kk.s(`**Payoffs at maturity:** $${nm}_u = ${payF(Su)} = ${tn(cu, 4)}$ and $${nm}_d = ${payF(Sd)} = ${tn(cd, 4)}$.`);
+    kk.r(`**Shares in the replicating portfolio:** $m = \\frac{${nm}_u - ${nm}_d}{S_u - S_d} = \\frac{${tn(cu, 4)} - ${tq(cd, 4)}}{${tn(Su, 4)} - ${tn(Sd, 4)}} = \\frac{${tn(cu - cd, 4)}}{${tn(Su - Sd, 4)}} = ${tn(m, 6)}$.`, 'm', m);
+    kk.r(`**Borrowing:** $B = \\frac{mS_u - ${nm}_u}{1 + r} = \\frac{${tq(m, 6)} \\times ${tn(Su, 4)} - ${tn(cu, 4)}}{${tn(1 + r, 4)}} = \\frac{${tn(m * Su, 4)} - ${tn(cu, 4)}}{${tn(1 + r, 4)}} = \\frac{${tn(m * Su - cu, 4)}}{${tn(1 + r, 4)}} = ${tn(B, 4)}$.`, 'B', B);
+    kk.r(`**Value of the ${k}:** $mS - B = ${tq(m, 6)} \\times ${tn(S)} - ${tq(B, 4)} = ${tn(m * S, 4)} - ${tq(B, 4)} = ${tn(c0, 4)}$.`, 'val', c0);
+    kk.r(`**Risk-neutral probability:** $\\pi = \\frac{1 + r - d}{u - d} = \\frac{${tn(1 + r, 4)} - ${tn(d)}}{${tn(u)} - ${tn(d)}} = \\frac{${tn(1 + r - d, 4)}}{${tn(u - d, 4)}} = ${tn(pi, 6)}$, i.e. $${tp(pi, 2)}$. Check: $\\frac{\\pi ${nm}_u + (1 - \\pi)${nm}_d}{1 + r} = \\frac{${tn(pi, 6)} \\times ${tn(cu, 4)} + ${tn(1 - pi, 6)} \\times ${tn(cd, 4)}}{${tn(1 + r, 4)}} = ${tn(c0, 4)}$.`, 'pi', pi * 100);
+    kk.r(Math.abs(gap) < 0.02 ? `**Verdict:** the market price ${tn(mkt)} equals the value ${tn(c0, 4)} (up to rounding), so there is no arbitrage.`
+      : gap > 0 ? `**Verdict:** the market price ${tn(mkt)} is above the value ${tn(c0, 4)}, so the ${k} is overpriced: sell it and buy the replicating portfolio (profit ${tn(gap, 4)} today).`
+      : `**Verdict:** the market price ${tn(mkt)} is below the value ${tn(c0, 4)}, so the ${k} is underpriced: buy it and sell the replicating portfolio (profit ${tn(-gap, 4)} today).`, 'arb');
+    return { ...withCalc(Q('L3.replicate', 3, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -544,16 +554,28 @@ export function L3_twoStep(): Question {
     const k = put ? 'put' : 'call';
     const html = p_(`A share that pays no income trades at ${e2(S)} and has a volatility of ${pp(sig, 0)}. Value a European ${k} with strike ${e2(X)} maturing in ${months(T)} with a two-period binomial tree (u = e<sup>σ√Δt</sup>, d = 1/u). The risk-free rate is ${pp(r)}. ${CONT}`);
     const parts = chooseParts([
-      { part: N('What is the up factor u?', u, 'n'), w: 0.6 },
-      { part: N('What is the risk-neutral probability of an up move?', t.pi * 100, 'pct'), w: 0.7 },
-      { part: N(`What is the value of the ${k} at the up node after one period?`, t.V[1][0], 'eur'), w: 0.5 },
-      { part: N(`What is the value of the ${k} today?`, t.V[0][0], 'eur'), must: true },
-      { part: N(`What is the delta of the ${k} today?`, t.delta[0][0], 'n'), w: 0.7 },
+      { part: N('What is the up factor u?', u, 'n', { key: 'u' }), w: 0.6 },
+      { part: N('What is the risk-neutral probability of an up move?', t.pi * 100, 'pct', { key: 'pi' }), w: 0.7 },
+      { part: N(`What is the value of the ${k} at the up node after one period?`, t.V[1][0], 'eur', { key: 'vu' }), w: 0.5 },
+      { part: N(`What is the value of the ${k} today?`, t.V[0][0], 'eur', { key: 'val' }), must: true },
+      { part: N(`What is the delta of the ${k} today?`, t.delta[0][0], 'n', { key: 'delta' }), w: 0.7 },
     ], 3, 5);
     const sol = p_(`Δt = ${f4(dt)}, u = e<sup>${f2(sig)}√${f4(dt)}</sup> = ${f4(u)}, d = ${f4(d)}, π = (e<sup>rΔt</sup> − d)/(u − d) = (${f4(Math.exp(r * dt))} − ${f4(d)}) / (${f4(u)} − ${f4(d)}) = ${f4(t.pi)}.`) +
       treeTable(t, k[0].toUpperCase() + k.slice(1) + ' value') +
       p_(`Backward: each node = e<sup>−rΔt</sup>[π V<sup>u</sup> + (1 − π)V<sup>d</sup>]. Today ${e2(t.V[0][0])}. Delta = (V<sup>u</sup> − V<sup>d</sup>)/(S<sup>u</sup> − S<sup>d</sup>) = (${f4(t.V[1][0])} − ${f4(t.V[1][1])}) / (${f2(t.S[1][0])} − ${f2(t.S[1][1])}) = ${f4(t.delta[0][0])}.`);
-    return { ...Q('L3.twoStep', 3, html, parts), solution: sol };
+    const kk = calc(), g = Math.exp(r * dt), disc = Math.exp(-r * dt), nm = `\\text{${k}}`, payF = (s: number) => put ? `\\max(${tn(X)} - ${tn(s, 4)}, 0)` : `\\max(${tn(s, 4)} - ${tn(X)}, 0)`;
+    kk.s(`**Step length:** $\\Delta t = T/2 = ${tn(T, 6)}/2 = ${tn(dt, 6)}$ years.`);
+    kk.r(`**Up factor:** $u = e^{\\sigma\\sqrt{\\Delta t}} = e^{${tn(sig, 4)} \\times ${tn(Math.sqrt(dt), 6)}} = e^{${tn(sig * Math.sqrt(dt), 6)}} = ${tn(u, 6)}$.`, 'u', u);
+    kk.s(`**Down factor:** $d = 1/u = 1/${tn(u, 6)} = ${tn(d, 6)}$.`);
+    kk.r(`**Risk-neutral probability:** $e^{r\\Delta t} = e^{${tn(r, 4)} \\times ${tn(dt, 6)}} = ${tn(g, 6)}$, so $\\pi = \\frac{e^{r\\Delta t} - d}{u - d} = \\frac{${tn(g, 6)} - ${tn(d, 6)}}{${tn(u, 6)} - ${tn(d, 6)}} = \\frac{${tn(g - d, 6)}}{${tn(u - d, 6)}} = ${tn(t.pi, 6)}$, i.e. $${tp(t.pi, 2)}$.`, 'pi', t.pi * 100);
+    kk.s(`**Share prices after two periods:** $S_{uu} = Su^2 = ${tn(S)} \\times ${tn(u * u, 6)} = ${tn(t.S[2][0], 4)}$, $S_{ud} = Sud = ${tn(S)} \\times ${tn(u, 6)} \\times ${tn(d, 6)} = ${tn(t.S[2][1], 4)}$, $S_{dd} = Sd^2 = ${tn(S)} \\times ${tn(d * d, 6)} = ${tn(t.S[2][2], 4)}$.`);
+    kk.s(`**Payoffs at maturity:** $${nm}_{uu} = ${payF(t.S[2][0])} = ${tn(t.V[2][0], 4)}$, $${nm}_{ud} = ${payF(t.S[2][1])} = ${tn(t.V[2][1], 4)}$, $${nm}_{dd} = ${payF(t.S[2][2])} = ${tn(t.V[2][2], 4)}$.`);
+    kk.s(`**One-period discount factor:** $e^{-r\\Delta t} = e^{-${tn(r * dt, 6)}} = ${tn(disc, 6)}$.`);
+    kk.r(`**Up node after one period:** $${nm}_u = e^{-r\\Delta t}[\\pi ${nm}_{uu} + (1 - \\pi)${nm}_{ud}] = ${bwd(disc, t.pi, t.V[2][0], t.V[2][1])}$.`, 'vu', t.V[1][0]);
+    kk.s(`**Down node after one period:** $${nm}_d = e^{-r\\Delta t}[\\pi ${nm}_{ud} + (1 - \\pi)${nm}_{dd}] = ${bwd(disc, t.pi, t.V[2][1], t.V[2][2])}$.`);
+    kk.r(`**Value today:** $${nm}_0 = e^{-r\\Delta t}[\\pi ${nm}_u + (1 - \\pi)${nm}_d] = ${bwd(disc, t.pi, t.V[1][0], t.V[1][1])}$.`, 'val', t.V[0][0]);
+    kk.r(`**Delta:** $S_u = Su = ${tn(S)} \\times ${tn(u, 6)} = ${tn(t.S[1][0], 4)}$ and $S_d = Sd = ${tn(S)} \\times ${tn(d, 6)} = ${tn(t.S[1][1], 4)}$, so $\\Delta = \\frac{${nm}_u - ${nm}_d}{S_u - S_d} = \\frac{${tn(t.V[1][0], 4)} - ${tq(t.V[1][1], 4)}}{${tn(t.S[1][0], 4)} - ${tn(t.S[1][1], 4)}} = \\frac{${tn(t.V[1][0] - t.V[1][1], 4)}}{${tn(t.S[1][0] - t.S[1][1], 4)}} = ${tn(t.delta[0][0], 6)}$.`, 'delta', t.delta[0][0]);
+    return { ...withCalc(Q('L3.twoStep', 3, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -561,13 +583,16 @@ export function L3_twoStep(): Question {
 export function L3_american(): Question {
   for (;;) {
     const cont = chance(0.5), S = rstep(40, 120, 5), X = strikeNear(S, 1, 1.2);
-    let u: number, d: number, growth: number, setup: string;
+    let u: number, d: number, growth: number, setup: string, utxt = '', gtxt = '';
     if (cont) {
       const sig = rstep(0.2, 0.45, 0.05), r = rstep(0.03, 0.1, 0.005), T = pick([6, 12]) / 12, dt = T / 2;
       u = Math.exp(sig * Math.sqrt(dt)); d = 1 / u; growth = Math.exp(r * dt);
+      utxt = `**Up and down factors:** $u = e^{\\sigma\\sqrt{\\Delta t}} = e^{${tn(sig, 4)} \\times \\sqrt{${tn(dt, 6)}}} = e^{${tn(sig * Math.sqrt(dt), 6)}} = ${tn(u, 6)}$ and $d = 1/u = ${tn(d, 6)}$.`;
+      gtxt = `$e^{r\\Delta t} = e^{${tn(r, 4)} \\times ${tn(dt, 6)}} = ${tn(growth, 6)}$`;
       setup = `The share has a volatility of ${pp(sig, 0)} and the risk-free rate is ${pp(r)} (annual, continuous compounding). Use a two-period tree for ${months(T)} with u = e<sup>σ√Δt</sup> and d = 1/u.`;
     } else {
       u = rstep(1.08, 1.25, 0.01); d = rstep(0.8, 0.94, 0.01); const r = rstep(0.01, 0.05, 0.0025); growth = 1 + r;
+      utxt = `**Up and down factors:** given, $u = ${tn(u)}$ and $d = ${tn(d)}$.`; gtxt = `$1 + r = 1 + ${tn(r, 4)} = ${tn(growth, 4)}$`;
       if (!(d < growth && growth < u)) continue;
       setup = `Each period the share rises by the factor u = ${f2(u)} or falls by d = ${f2(d)}; the risk-free rate is ${pp(r)} per period (simple). Use two periods.`;
     }
@@ -577,13 +602,29 @@ export function L3_american(): Question {
     if (am.ex[0][0] || am.V[0][0] - eu.V[0][0] < 0.01 && early) continue;
     const html = p_(`A share that pays no income trades at ${e2(S)}. ${setup} Consider puts with strike ${e2(X)}.`);
     const parts: Part[] = [
-      N('What is the value of the European put?', eu.V[0][0], 'eur'),
-      N('What is the value of the American put?', am.V[0][0], 'eur'),
-      C('At which node after one period is early exercise optimal?', ['Neither', 'The up node', 'The down node'], early),
+      N('What is the value of the European put?', eu.V[0][0], 'eur', { key: 'eu' }),
+      N('What is the value of the American put?', am.V[0][0], 'eur', { key: 'am' }),
+      C('At which node after one period is early exercise optimal?', ['Neither', 'The up node', 'The down node'], early, 'early'),
     ];
     const sol = p_(`π = (${f4(growth)} − ${f4(d)}) / (${f4(u)} − ${f4(d)}) = ${f4(eu.pi)}.`) + treeTable(am, 'American put') +
       p_(`At each node compare keeping the option alive, ${f4(1 / growth)}[π P<sup>u</sup> + (1 − π)P<sup>d</sup>], with killing it, X − S. ${early ? `At the ${early === 1 ? 'up' : 'down'} node exercise gives ${e2(X - am.S[1][early - 1])} against ${e2(eu.V[1][early - 1])} alive, so the put is exercised there.` : 'Keeping the put alive is worth more at both nodes, so the American put equals the European one.'} European put ${e2(eu.V[0][0])}, American put ${e2(am.V[0][0])}.`);
-    return { ...Q('L3.american', 3, html, parts), solution: sol };
+    const kk = calc(), disc = 1 / growth, pi = eu.pi;
+    const amStep = (lbl: string, Sx: number, V2: number[], V: number, ex: boolean) => {
+      const contV = disc * (pi * V2[0] + (1 - pi) * V2[1]);
+      return `**American ${lbl}:** keep the put alive: $${bwd(disc, pi, V2[0], V2[1])}$. Exercise now: $\\max(X - S, 0) = \\max(${tn(X)} - ${tn(Sx, 4)}, 0) = ${tn(Math.max(X - Sx, 0), 4)}$. ${ex ? `Exercising is worth more than ${tn(contV, 4)}` : `Keeping it alive (${tn(contV, 4)}) is worth at least as much`}, so the node value is ${tn(V, 4)}.`;
+    };
+    kk.s(utxt);
+    kk.s(`**Risk-neutral probability:** growth factor ${gtxt}, so $\\pi = \\frac{\\text{growth} - d}{u - d} = \\frac{${tn(growth, 6)} - ${tn(d, 6)}}{${tn(u, 6)} - ${tn(d, 6)}} = \\frac{${tn(growth - d, 6)}}{${tn(u - d, 6)}} = ${tn(pi, 6)}$ and the discount factor is $1/\\text{growth} = ${tn(disc, 6)}$.`);
+    kk.s(`**Share prices and payoffs:** $S_{uu} = ${tn(eu.S[2][0], 4)}$, $S_{ud} = ${tn(eu.S[2][1], 4)}$, $S_{dd} = ${tn(eu.S[2][2], 4)}$ (each $S u^{i}d^{j}$), so the put pays $\\max(X - S, 0) = ${tn(eu.V[2][0], 4)}$, $${tn(eu.V[2][1], 4)}$ and $${tn(eu.V[2][2], 4)}$.`);
+    kk.s(`**European up node:** $${bwd(disc, pi, eu.V[2][0], eu.V[2][1])}$.`);
+    kk.s(`**European down node:** $${bwd(disc, pi, eu.V[2][1], eu.V[2][2])}$.`);
+    kk.r(`**European put today:** $${bwd(disc, pi, eu.V[1][0], eu.V[1][1])}$.`, 'eu', eu.V[0][0]);
+    kk.s(`**Share prices after one period:** $S_u = ${tn(am.S[1][0], 4)}$ and $S_d = ${tn(am.S[1][1], 4)}$.`);
+    kk.s(amStep('up node', am.S[1][0], eu.V[2].slice(0, 2), am.V[1][0], am.ex[1][0]));
+    kk.s(amStep('down node', am.S[1][1], eu.V[2].slice(1), am.V[1][1], am.ex[1][1]));
+    kk.r(`**American put today:** $${bwd(disc, pi, am.V[1][0], am.V[1][1])}$ (exercising at once, $\\max(X - S, 0) = ${tn(Math.max(X - S, 0), 4)}$, is not better).`, 'am', am.V[0][0]);
+    kk.r(early ? `**Early exercise:** at the ${early === 1 ? 'up' : 'down'} node exercise gives ${tn(X - am.S[1][early - 1], 4)}, more than keeping the put alive (${tn(eu.V[1][early - 1], 4)}), so early exercise is optimal there.` : '**Early exercise:** at both nodes keeping the put alive is worth more than exercising, so early exercise is optimal at neither node.', 'early');
+    return { ...withCalc(Q('L3.american', 3, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -601,14 +642,22 @@ export function L3_nPeriod(): Question {
     const c = terms.reduce((s, t) => s + t.w * Math.max(t.S - X, 0), 0) / (1 + r) ** n, pItm = itm.reduce((s, t) => s + t.w, 0);
     const html = p_(`A share trades at ${e2(S)}. Each period it moves up by u = ${f2(u)} or down by d = ${f2(d)}, and the risk-free rate is ${pp(r, 0)} per period (simple). A European call with strike ${e2(X)} matures after ${n} periods.`);
     const parts: Part[] = [
-      N('What is the risk-neutral probability π?', pi * 100, 'pct'),
-      N('What is the risk-neutral probability that the call ends in the money?', pItm * 100, 'pct'),
-      N('What is the value of the call today?', c, 'eur'),
+      N('What is the risk-neutral probability π?', pi * 100, 'pct', { key: 'pi' }),
+      N('What is the risk-neutral probability that the call ends in the money?', pItm * 100, 'pct', { key: 'pItm' }),
+      N('What is the value of the call today?', c, 'eur', { key: 'c' }),
     ];
     const sol = p_(`π = (1 + r − d)/(u − d) = (${f2(1 + r)} − ${f2(d)}) / (${f2(u)} − ${f2(d)}) = ${f4(pi)}.`) +
       table(['Up moves j', 'Probability C(n, j)π<sup>j</sup>(1 − π)<sup>n−j</sup>', 'S<sub>T</sub>', 'Payoff'], terms.slice().reverse().map(t => [String(t.j), f4(t.w), f2(t.S), f2(Math.max(t.S - X, 0))])) +
       p_(`c = [1/(1 + r)]<sup>${n}</sup> Σ C(n, j) π<sup>j</sup>(1 − π)<sup>n−j</sup> max(S u<sup>j</sup>d<sup>n−j</sup> − X, 0) = ${e2(c)}. Probability of ending in the money: ${pp(pItm)}.`);
-    return { ...Q('L3.nPeriod', 3, html, parts), solution: sol };
+    const kk = calc();
+    kk.r(`**Risk-neutral probability:** $\\pi = \\frac{1 + r - d}{u - d} = \\frac{${tn(1 + r, 4)} - ${tn(d)}}{${tn(u)} - ${tn(d)}} = \\frac{${tn(1 + r - d, 4)}}{${tn(u - d, 4)}} = ${tn(pi, 6)}$, i.e. $${tp(pi, 2)}$.`, 'pi', pi * 100);
+    for (const t of terms.slice().reverse()) {
+      kk.s(`**${t.j} up moves:** $S_T = Su^{${t.j}}d^{${n - t.j}} = ${tn(S)} \\times ${tn(u ** t.j, 6)} \\times ${tn(d ** (n - t.j), 6)} = ${tn(t.S, 4)}$; probability $\\binom{${n}}{${t.j}}\\pi^{${t.j}}(1 - \\pi)^{${n - t.j}} = ${tn(binomC(n, t.j), 0)} \\times ${tn(pi ** t.j, 6)} \\times ${tn((1 - pi) ** (n - t.j), 6)} = ${tn(t.w, 6)}$; payoff $\\max(S_T - X, 0) = \\max(${tn(t.S, 4)} - ${tn(X)}, 0) = ${tn(Math.max(t.S - X, 0), 4)}$.`);
+    }
+    kk.r(`**Probability of ending in the money:** add the probabilities of the nodes with $S_T > X$: $${itm.map(t => tn(t.w, 6)).join(' + ')} = ${tn(pItm, 6)}$, i.e. $${tp(pItm, 2)}$.`, 'pItm', pItm * 100);
+    const num = terms.reduce((s, t) => s + t.w * Math.max(t.S - X, 0), 0);
+    kk.r(`**Value of the call:** $c = \\frac{\\sum \\text{probability} \\times \\text{payoff}}{(1 + r)^{${n}}} = \\frac{${itm.map(t => `${tn(t.w, 6)} \\times ${tn(t.S - X, 4)}`).join(' + ')}}{${tn(1 + r, 4)}^{${n}}} = \\frac{${tn(num, 4)}}{${tn((1 + r) ** n, 6)}} = ${tn(c, 4)}$.`, 'c', c);
+    return { ...withCalc(Q('L3.nPeriod', 3, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -632,17 +681,42 @@ export function L3_dividendTree(): Question {
   const html = p_(`A share trades at ${e2(d.S)}, has a volatility of ${pp(d.sig, 0)} and pays a dividend of ${e2(d.D)} in 3 months. Options on the share have strike ${e2(d.X)} and mature in 6 months; the risk-free rate is ${pp(d.r, 0)}. ${CONT}`) +
     p_(`Use a two-period tree with 3-month steps for S* = S − PV(dividend), with u = e<sup>σ√Δt</sup>, d = 1/u. The share price at a node is S* plus the present value of the dividends still to come; at the 3-month nodes the price just before the dividend is S* + ${f2(d.D)}.`);
   const parts = chooseParts([
-    { part: N('What is S* today?', d.Ss, 'eur'), w: 0.5 },
-    { part: N('What is the value of the European call?', d.eu.V[0][0], 'eur'), must: true },
-    { part: N('What is the delta of the call today?', d.eu.delta[0][0], 'n'), w: 0.5 },
-    { part: N('What is the value of the American call (exercise possible just before the dividend)?', d.am.V[0][0], 'eur'), w: 0.8 },
-    { part: N('What is the value of the European put with the same strike and maturity?', d.pe.V[0][0], 'eur'), w: 0.7 },
+    { part: N('What is S* today?', d.Ss, 'eur', { key: 'Ss' }), w: 0.5 },
+    { part: N('What is the value of the European call?', d.eu.V[0][0], 'eur', { key: 'euc' }), must: true },
+    { part: N('What is the delta of the call today?', d.eu.delta[0][0], 'n', { key: 'delta' }), w: 0.5 },
+    { part: N('What is the value of the American call (exercise possible just before the dividend)?', d.am.V[0][0], 'eur', { key: 'amc' }), w: 0.8 },
+    { part: N('What is the value of the European put with the same strike and maturity?', d.pe.V[0][0], 'eur', { key: 'eup' }), w: 0.7 },
   ], 3, 5);
   const sol = p_(`PV(D) = ${f2(d.D)}e<sup>−${f2(d.r)} × 0.25</sup> = ${f4(d.PVD)}, S* = ${f4(d.Ss)}; u = ${f4(d.u)}, d = ${f4(d.d)}, π = ${f4(d.eu.pi)}.`) +
     treeTable(d.am, 'American call', e2, ['today', '3 months (cum)', '6 months']) +
     p_(`European call: discount the 6-month payoffs, ${e2(d.eu.V[0][0])} (delta ${f4(d.eu.delta[0][0])}). American call: at the 3-month nodes compare exercising just before the dividend, S* + D − X, with keeping it alive; ${d.early ? 'early exercise pays at the up node' : 'keeping it alive is better at both nodes'}, value ${e2(d.am.V[0][0])}.`) +
     p_(`European put by parity: p = c − S + PV(D) + PV(X) = ${f4(d.eu.V[0][0])} − ${f2(d.S)} + ${f4(d.PVD)} + ${f4(d.PVX)} = ${e2(d.parity)}; the tree gives the same, ${e2(d.pe.V[0][0])}. At each node the put delta equals the call delta minus 1.`);
-  return { ...Q('L3.dividendTree', 3, html, parts), solution: sol };
+  const kk = calc(), tr = d.eu, disc = Math.exp(-d.r * d.dt), g = Math.exp(d.r * d.dt), pi = tr.pi, sqd = Math.sqrt(d.dt);
+  const payC = (s: number) => `\\max(${tn(s, 4)} - ${tn(d.X)}, 0)`;
+  kk.s(`**Present value of the dividend:** $PV(D) = ${tn(d.D)} \\times e^{-${tn(d.r, 4)} \\times ${tn(d.dt, 6)}} = ${tn(d.D)} \\times ${tn(disc, 6)} = ${tn(d.PVD, 4)}$.`);
+  kk.r(`**Dividend-adjusted price:** $S^* = S - PV(D) = ${tn(d.S)} - ${tn(d.PVD, 4)} = ${tn(d.Ss, 4)}$.`, 'Ss', d.Ss);
+  kk.s(`**Up and down factors:** $\\sigma\\sqrt{\\Delta t} = ${tn(d.sig, 4)} \\times ${tn(sqd, 6)} = ${tn(d.sig * sqd, 6)}$, so $u = e^{${tn(d.sig * sqd, 6)}} = ${tn(d.u, 6)}$ and $d = 1/u = ${tn(d.d, 6)}$.`);
+  kk.s(`**Risk-neutral probability:** $e^{r\\Delta t} = e^{${tn(d.r, 4)} \\times ${tn(d.dt, 6)}} = ${tn(g, 6)}$, so $\\pi = \\frac{${tn(g, 6)} - ${tn(d.d, 6)}}{${tn(d.u, 6)} - ${tn(d.d, 6)}} = ${tn(pi, 6)}$; the discount factor per step is $e^{-r\\Delta t} = ${tn(disc, 6)}$.`);
+  kk.s(`**Share prices after 3 months (just before the dividend):** $S_u = S^*u + D = ${tn(d.Ss, 4)} \\times ${tn(d.u, 6)} + ${tn(d.D)} = ${tn(tr.S[1][0], 4)}$ and $S_d = S^*d + D = ${tn(d.Ss, 4)} \\times ${tn(d.d, 6)} + ${tn(d.D)} = ${tn(tr.S[1][1], 4)}$.`);
+  kk.s(`**Share prices after 6 months:** $S_{uu} = S^*u^2 = ${tn(d.Ss, 4)} \\times ${tn(d.u * d.u, 6)} = ${tn(tr.S[2][0], 4)}$, $S_{ud} = S^*ud = ${tn(tr.S[2][1], 4)}$, $S_{dd} = S^*d^2 = ${tn(d.Ss, 4)} \\times ${tn(d.d * d.d, 6)} = ${tn(tr.S[2][2], 4)}$.`);
+  kk.s(`**Call payoffs at 6 months:** $c_{uu} = ${payC(tr.S[2][0])} = ${tn(tr.V[2][0], 4)}$, $c_{ud} = ${payC(tr.S[2][1])} = ${tn(tr.V[2][1], 4)}$, $c_{dd} = ${payC(tr.S[2][2])} = ${tn(tr.V[2][2], 4)}$.`);
+  kk.s(`**European call, up node:** $c_u = e^{-r\\Delta t}[\\pi c_{uu} + (1 - \\pi)c_{ud}] = ${bwd(disc, pi, tr.V[2][0], tr.V[2][1])}$.`);
+  kk.s(`**European call, down node:** $c_d = ${bwd(disc, pi, tr.V[2][1], tr.V[2][2])}$.`);
+  kk.r(`**European call today:** $c = ${bwd(disc, pi, tr.V[1][0], tr.V[1][1])}$.`, 'euc', tr.V[0][0]);
+  kk.r(`**Delta:** $\\Delta = \\frac{c_u - c_d}{S_u - S_d} = \\frac{${tn(tr.V[1][0], 4)} - ${tq(tr.V[1][1], 4)}}{${tn(tr.S[1][0], 4)} - ${tn(tr.S[1][1], 4)}} = \\frac{${tn(tr.V[1][0] - tr.V[1][1], 4)}}{${tn(tr.S[1][0] - tr.S[1][1], 4)}} = ${tn(tr.delta[0][0], 6)}$.`, 'delta', tr.delta[0][0]);
+  const am = d.am, amStep = (lbl: string, Sx: number, V2: number[], V: number, ex: boolean) => {
+    const contV = disc * (pi * V2[0] + (1 - pi) * V2[1]);
+    return `**American call, ${lbl}:** keep it alive: $${bwd(disc, pi, V2[0], V2[1])}$. Exercise now: $${payC(Sx)} = ${tn(Math.max(Sx - d.X, 0), 4)}$. ${ex ? `Exercising is worth more than ${tn(contV, 4)}` : `Keeping it alive (${tn(contV, 4)}) is worth at least as much`}, so the node value is ${tn(V, 4)}.`;
+  };
+  kk.s(amStep('up node (just before the dividend)', am.S[1][0], tr.V[2].slice(0, 2), am.V[1][0], am.ex[1][0]));
+  kk.s(amStep('down node (just before the dividend)', am.S[1][1], tr.V[2].slice(1), am.V[1][1], am.ex[1][1]));
+  kk.r(`**American call today:** keep it alive: $${bwd(disc, pi, am.V[1][0], am.V[1][1])}$; exercising at once gives ${payC(am.S[0][0])} $= ${tn(Math.max(am.S[0][0] - d.X, 0), 4)}$, so the value is ${tn(am.V[0][0], 4)}.`, 'amc', am.V[0][0]);
+  const pe = d.pe, payP = (s: number) => `\\max(${tn(d.X)} - ${tn(s, 4)}, 0)`;
+  kk.s(`**Put payoffs at 6 months:** $p_{uu} = ${payP(pe.S[2][0])} = ${tn(pe.V[2][0], 4)}$, $p_{ud} = ${payP(pe.S[2][1])} = ${tn(pe.V[2][1], 4)}$, $p_{dd} = ${payP(pe.S[2][2])} = ${tn(pe.V[2][2], 4)}$.`);
+  kk.s(`**European put, up node:** $p_u = ${bwd(disc, pi, pe.V[2][0], pe.V[2][1])}$.`);
+  kk.s(`**European put, down node:** $p_d = ${bwd(disc, pi, pe.V[2][1], pe.V[2][2])}$.`);
+  kk.r(`**European put today:** $p = ${bwd(disc, pi, pe.V[1][0], pe.V[1][1])}$. Check with put-call parity: $p = c - S + PV(D) + PV(X) = ${tn(tr.V[0][0], 4)} - ${tn(d.S)} + ${tn(d.PVD, 4)} + ${tn(d.PVX, 4)} = ${tn(d.parity, 4)}$.`, 'eup', pe.V[0][0]);
+  return { ...withCalc(Q('L3.dividendTree', 3, html, parts), kk.steps), solution: sol };
 }
 
 /** Tree for an index with a continuous dividend yield (problem set 1, exercise 5). */
@@ -655,14 +729,25 @@ export function L3_yield(): Question {
     const k = put ? 'put' : 'call';
     const html = p_(`An index stands at ${fmtNum(S, 0)}, has a volatility of ${pp(sig, 0)} and a dividend yield of ${pp(q)} (continuous). The risk-free rate is ${pp(r)}. ${CONT} Using a binomial tree with monthly steps, value a European ${k} with strike ${fmtNum(X, 0)} maturing in 2 months.`);
     const parts: Part[] = [
-      N('What is the risk-neutral probability of an up move?', t.pi * 100, 'pct'),
-      N(`What is the value of one ${k} (in index points)?`, t.V[0][0], 'n'),
-      N(`What is the current delta of the ${k}?`, t.delta[0][0], 'n'),
+      N('What is the risk-neutral probability of an up move?', t.pi * 100, 'pct', { key: 'pi' }),
+      N(`What is the value of one ${k} (in index points)?`, t.V[0][0], 'n', { key: 'val' }),
+      N(`What is the current delta of the ${k}?`, t.delta[0][0], 'n', { key: 'delta' }),
     ];
     const sol = p_(`u = e<sup>${f2(sig)}√(1/12)</sup> = ${f4(u)}, d = ${f4(d)}; with a dividend yield π = (e<sup>(r − q)Δt</sup> − d)/(u − d) = (${f4(Math.exp((r - q) * dt))} − ${f4(d)}) / (${f4(u)} − ${f4(d)}) = ${f4(t.pi)}.`) +
       treeTable(t, k[0].toUpperCase() + k.slice(1), x => fmtNum(x, 2), undefined, x => fmtNum(x, 2)) +
       p_(`Value ${f2(t.V[0][0])}; delta = (${f2(t.V[1][0])} − ${f2(t.V[1][1])}) / (${f2(t.S[1][0])} − ${f2(t.S[1][1])}) = ${f4(t.delta[0][0])}.`);
-    return { ...Q('L3.yield', 3, html, parts), solution: sol };
+    const kk = calc(), g = Math.exp((r - q) * dt), disc = Math.exp(-r * dt), nm = `\\text{${k}}`, sqd = Math.sqrt(dt);
+    const payF = (s: number) => put ? `\\max(${tn(X, 0)} - ${tn(s, 4)}, 0)` : `\\max(${tn(s, 4)} - ${tn(X, 0)}, 0)`;
+    kk.s(`**Up and down factors:** $\\Delta t = 1/12 = ${tn(dt, 6)}$, $\\sigma\\sqrt{\\Delta t} = ${tn(sig, 4)} \\times ${tn(sqd, 6)} = ${tn(sig * sqd, 6)}$, so $u = e^{${tn(sig * sqd, 6)}} = ${tn(u, 6)}$ and $d = 1/u = ${tn(d, 6)}$.`);
+    kk.r(`**Risk-neutral probability:** with a dividend yield $e^{(r-q)\\Delta t} = e^{(${tn(r, 4)} - ${tn(q, 4)}) \\times ${tn(dt, 6)}} = e^{${tn((r - q) * dt, 6)}} = ${tn(g, 6)}$, so $\\pi = \\frac{${tn(g, 6)} - ${tn(d, 6)}}{${tn(u, 6)} - ${tn(d, 6)}} = \\frac{${tn(g - d, 6)}}{${tn(u - d, 6)}} = ${tn(t.pi, 6)}$, i.e. $${tp(t.pi, 2)}$.`, 'pi', t.pi * 100);
+    kk.s(`**Index levels after two months:** $S_{uu} = Su^2 = ${tn(S, 0)} \\times ${tn(u * u, 6)} = ${tn(t.S[2][0], 4)}$, $S_{ud} = ${tn(t.S[2][1], 4)}$, $S_{dd} = Sd^2 = ${tn(S, 0)} \\times ${tn(d * d, 6)} = ${tn(t.S[2][2], 4)}$.`);
+    kk.s(`**Payoffs at maturity:** $${nm}_{uu} = ${payF(t.S[2][0])} = ${tn(t.V[2][0], 4)}$, $${nm}_{ud} = ${payF(t.S[2][1])} = ${tn(t.V[2][1], 4)}$, $${nm}_{dd} = ${payF(t.S[2][2])} = ${tn(t.V[2][2], 4)}$.`);
+    kk.s(`**Discount factor per month:** $e^{-r\\Delta t} = e^{-${tn(r * dt, 6)}} = ${tn(disc, 6)}$.`);
+    kk.s(`**Up node after one month:** $${nm}_u = ${bwd(disc, t.pi, t.V[2][0], t.V[2][1])}$.`);
+    kk.s(`**Down node after one month:** $${nm}_d = ${bwd(disc, t.pi, t.V[2][1], t.V[2][2])}$.`);
+    kk.r(`**Value today:** $${nm}_0 = ${bwd(disc, t.pi, t.V[1][0], t.V[1][1])}$ (index points).`, 'val', t.V[0][0]);
+    kk.r(`**Delta:** $S_u = Su = ${tn(S, 0)} \\times ${tn(u, 6)} = ${tn(t.S[1][0], 4)}$ and $S_d = Sd = ${tn(S, 0)} \\times ${tn(d, 6)} = ${tn(t.S[1][1], 4)}$, so $\\Delta = \\frac{${tn(t.V[1][0], 4)} - ${tq(t.V[1][1], 4)}}{${tn(t.S[1][0], 4)} - ${tn(t.S[1][1], 4)}} = \\frac{${tn(t.V[1][0] - t.V[1][1], 4)}}{${tn(t.S[1][0] - t.S[1][1], 4)}} = ${tn(t.delta[0][0], 6)}$.`, 'delta', t.delta[0][0]);
+    return { ...withCalc(Q('L3.yield', 3, html, parts), kk.steps), solution: sol };
   }
 }
 
@@ -675,13 +760,19 @@ export function L3_vol(): Question {
   const html = p_('Closing prices of a share on consecutive trading days:') + table(['Day', ...p.map((_, i) => String(i + 1))], [['Price', ...p.map(x => f2(x))]]) +
     p_(`Estimate the annual volatility from the continuously compounded daily returns u<sub>t</sub> = ln(S<sub>t</sub>/S<sub>t−1</sub>), with the sample variance (divide by n − 1) and 252 trading days a year. ${NOTE_PCT}`);
   const parts: Part[] = [
-    N('What is the average daily return?', m * 100, 'pct', { abs: 0.01 }),
-    N('What is the sample variance of the daily returns?', v, 'n', { abs: 0.00002 }),
-    N('What is the estimated annual volatility?', sig * 100, 'pct'),
+    N('What is the average daily return?', m * 100, 'pct', { abs: 0.01, key: 'mean' }),
+    N('What is the sample variance of the daily returns?', v, 'n', { abs: 0.00002, key: 'var' }),
+    N('What is the estimated annual volatility?', sig * 100, 'pct', { key: 'sig' }),
   ];
   const sol = table(['Day', 'u<sub>t</sub>'], u.map((x, i) => [String(i + 2), f4(x)])) +
     p_(`Mean ${f4(m)} (${pp(m, 3)}); variance Σ(u<sub>t</sub> − ū)²/(n − 1) = ${fmtNum(v, 6)}; σ = √(${fmtNum(v, 6)} × 252) = ${pp(sig)}.`);
-  return { ...Q('L3.vol', 3, html, parts), solution: sol };
+  const kk = calc(), sum = u.reduce((s, x) => s + x, 0), sumsq = u.reduce((s, x) => s + (x - m) ** 2, 0);
+  u.forEach((x, i) => kk.s(`**Day ${i + 2}:** $u_{${i + 2}} = \\ln\\frac{${tn(p[i + 1])}}{${tn(p[i])}} = \\ln ${tn(p[i + 1] / p[i], 6)} = ${tn(x, 6)}$.`));
+  kk.r(`**Average return:** $\\bar u = \\frac{\\sum u_t}{${u.length}} = \\frac{${u.map(x => tq(x, 6)).join(' + ')}}{${u.length}} = \\frac{${tn(sum, 6)}}{${u.length}} = ${tn(m, 6)}$, i.e. $${tp(m, 4)}$.`, 'mean', m * 100);
+  kk.s(`**Squared deviations:** $${u.map(x => `(${tn(x, 6)} - ${tq(m, 6)})^2 = ${tn((x - m) ** 2, 8)}`).join('$; $')}$.`);
+  kk.r(`**Sample variance:** $s^2 = \\frac{\\sum (u_t - \\bar u)^2}{n - 1} = \\frac{${tn(sumsq, 8)}}{${u.length - 1}} = ${tn(v, 8)}$.`, 'var', v);
+  kk.r(`**Annual volatility:** $\\sigma = \\sqrt{s^2 \\times 252} = \\sqrt{${tn(v, 8)} \\times 252} = \\sqrt{${tn(v * 252, 6)}} = ${tn(sig, 6)}$, i.e. $${tp(sig, 2)}$.`, 'sig', sig * 100);
+  return { ...withCalc(Q('L3.vol', 3, html, parts), kk.steps), solution: sol };
 }
 
 // =====================================================================
