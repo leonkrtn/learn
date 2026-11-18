@@ -7,7 +7,7 @@ Next.js 16 (App Router, `proxy.ts` instead of middleware, async `params`) + Supa
 New subjects are code modules plus seed content. Follow the exam-practice-builder rules: procedural generators only, solutions computed from the same inputs, 2% tolerance, comma and point input, each family and type selectable.
 
 1. Create `subjects/<slug>/`:
-   - `generators.ts`: one exported function per question type returning `Question` (use `lib/engine/gen-helpers.ts`: `Q`, `N`, `C`, `chooseParts`, `co`, `rstep` …). Redraw invalid parameter sets in a loop rather than accepting them.
+   - `generators.ts`: one exported function per question type returning `Question` (use `lib/engine/gen-helpers.ts`: `Q`, `N`, `C`, `chooseParts`, `co`, `rstep` …). Redraw invalid parameter sets in a loop rather than accepting them. Every generator attaches its worked calculation (see "Worked calculations per part").
    - `concepts.ts`: `BANK: ConceptBank` with `T` (true statements), `F` (false statements) and `MC` (question, correct variants, distractors) per topic, plus topic names.
    - `cards.ts`: official flashcards with stable `key`s.
    - `FormulaSheet.tsx`: exactly the sheet handed out in the exam.
@@ -16,14 +16,14 @@ New subjects are code modules plus seed content. Follow the exam-practice-builde
    - `index.ts`: the `SubjectModule` (topics, types with weights, `typeKeyOf`, optional `mock` spec with the real paper's structure, `explain`).
 2. Register the module in `subjects/index.ts`.
 3. Add the subject, its trimester, bank and deck to `scripts/build-seed.ts`, run `npm run seed:sql`, and run the new content migration (or `supabase/setup.sql`) in Supabase.
-4. Extend `tests/engine.test.ts` so every new generator runs a few hundred times with finite answers, then `npm test` and `npm run build`.
+4. Extend `tests/engine.test.ts` so every new generator runs a few hundred times with finite answers, then `npm test` and `npm run build`. `tests/calc.test.ts` and `tests/explain.test.ts` cover new types automatically and fail until the calculation and the explanation exist.
 
 ## Worked calculations per part
 
 After checking, a click on an answer field (or choice button) opens a lightbox (`PartDialog` in `components/Explain.tsx`) with the calculation of that part in the question's own numbers: every step up to the part's result, steps of earlier parts collapsed (`lib/calc.ts`). Below the question there is only a short hint; there is no solution block any more.
 
 - Every generator builds it with `calc()` from `lib/engine/gen-helpers.ts`: `k.s(md)` for a step, `k.r(md, key, value)` for the step that yields a part's answer, then `withCalc(Q(…), k.steps)`. Parts get the same key: `N(…, { key })`, `C(…, correct, key)` or `K(part, key)`. Numeric multiple choice passes `calc` to `mcNum` with result key `'ans'`. Text-only multiple choice and concept questions need none.
-- Calculator-exact: formula, the numbers put in, every intermediate (each power, exponential, N(d), sum), result. Format numbers with `tn`, `tp`, `tq`; units and € go outside `$…$`; dollars as `\\$`. Steps in dependency order, side results (shares, verdicts) last. Use the generator's own variables, never rounded copies.
+- Every step: formula, the numbers put in, the intermediates (each power, exponential, N(d), sum), result. Shown values are rounded to two decimals (values below 0.1 keep two significant digits); `tn`, `tp`, `tq` do this centrally, so never format with `toFixed`; units and € go outside `$…$`; dollars as `\\$`. Steps in dependency order, side results (shares, verdicts) last. Use the generator's own variables, never rounded copies.
 - `tests/calc.test.ts` generates every type many times and fails when a part lacks its key or result step, when the step's value differs from the answer, or when a step has a formula error or a stray control character (a single backslash in a template literal). Every new generator needs this in the same change.
 
 ## Question-type explanations
