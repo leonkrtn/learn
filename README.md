@@ -37,7 +37,7 @@ Both are public by design (row level security protects the data); the code falls
 npm install          # also copies the sql.js wasm used by the Anki importer to public/vendor
 cp .env.example .env.local
 npm run dev
-npm test             # parser, tolerance, all generators x400, cycle bag, SQL schema in PGlite
+npm test             # parser, tolerance, all generators x400, question sets, SQL schema in PGlite
 npm run lint         # type check
 ```
 
@@ -45,8 +45,8 @@ npm run lint         # type check
 
 - **Grading**: answers within 2% count (floor ±0.05 points for percentages, ±0.011 otherwise). Percentages can be typed as `12.5` or `0.125`; decimal comma and point both work (`12,5`, `(1.234,56)`, `1,234.56`).
 - **Practice** draws lectures equally often and, inside a lecture, types with a high recent error rate up to four times as often. The same type never comes twice in a row. Every lecture and every type can be switched on or off in Settings.
-- **Cycle** asks every type of one lecture once per round in random order.
-- **Review due**: a wrong answer schedules that question type again after 1 day; correct answers on due items push it to 3, 7, 16 and 35 days, then it leaves the queue. Every review uses new numbers.
+- **One lecture**: "Practise this lecture" on a theory page (or a weak type on the dashboard) opens practice limited to that lecture, with its own stored set.
+- **Account** (`/account`): display name, study time (estimated from the gaps between answers and card reviews, pauses over ten minutes left out), active days, answers, accuracy and flashcards per period and subject, the history charts, and a reset of the right/wrong tracking per subject or for all subjects.
 - **Mock exam** follows the real paper, runs a countdown, submits at zero and survives a page reload on the same device.
 - **Flashcards** use FSRS (`ts-fsrs`) with Again/Hard/Good/Easy. Imports: `.apkg` (old and new Anki formats, cloze notes), CSV/TSV. Media is not imported; HTML is sanitised. Imported decks are private.
 - **Theory** has one page per lecture with steps, formulas, an interactive model, a worked example, common mistakes and three true/false checks from the concept bank. Wrong answers in practice link to the matching page.

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import Icon from './Icons';
 import Logo from './Logo';
 import { useSubject } from './SubjectContext';
@@ -12,18 +11,15 @@ function Brand() {
 }
 
 export default function Sidebar() {
-  const { mod, due } = useSubject();
+  const { mod } = useSubject();
   const path = usePathname();
   const base = '/s/' + mod.slug;
-  // Counted after mount so server and client markup agree.
-  const [dueNow, setDueNow] = useState(0);
-  useEffect(() => { const now = Date.now(); setDueNow(due.filter(d => Date.parse(d.due_at) <= now).length); }, [due]);
-  const item = (href: string, label: string, icon: string, exact = false, count = 0) => {
+  const item = (href: string, label: string, icon: string, exact = false) => {
     const full = base + href;
     const on = exact ? path === full : path === full || path.startsWith(full + '/');
     return (
       <Link className={'item' + (on ? ' on' : '')} href={full}>
-        <Icon name={icon} /><span>{label}</span>{count > 0 && <span className="count">{count}</span>}
+        <Icon name={icon} /><span>{label}</span>
       </Link>
     );
   };
@@ -38,9 +34,7 @@ export default function Sidebar() {
       <nav>
         <div className="group">Practice</div>
         {item('', 'Practice', 'practice', true)}
-        {item('/cycle', 'Cycle by lecture', 'cycle')}
         {mod.problemSets && item('/ps', 'Problem sets', 'ps')}
-        {item('/review', 'Review', 'review', false, dueNow)}
         {mod.mock && item('/mock', 'Mock exam', 'mock')}
         <div className="group">Learn</div>
         {item('/cards', 'Flashcards', 'cards')}
@@ -49,20 +43,21 @@ export default function Sidebar() {
         {item('/slides', 'Slides', 'slides')}
         <div className="group">You</div>
         {item('/cheatsheet', 'My cheatsheet', 'sheet')}
-        {item('/stats', 'Statistics', 'stats')}
         {item('/settings', 'Settings', 'settings')}
+        <Link className="item" href="/account"><Icon name="user" /><span>Account</span></Link>
       </nav>
     </aside>
   );
 }
 
-/** Sidebar on the dashboard: the subjects that are ready to practise. */
-export function HomeSidebar({ subjects }: { subjects: { slug: string; short: string; name: string }[] }) {
+/** Sidebar on the dashboard and the account page: the subjects that are ready to practise. */
+export function HomeSidebar({ subjects, active = 'home' }: { subjects: { slug: string; short: string; name: string }[]; active?: 'home' | 'account' }) {
   return (
     <aside className="sidebar">
       <Brand />
       <nav>
-        <Link className="item on" href="/"><Icon name="home" /><span>Dashboard</span></Link>
+        <Link className={'item' + (active === 'home' ? ' on' : '')} href="/"><Icon name="home" /><span>Dashboard</span></Link>
+        <Link className={'item' + (active === 'account' ? ' on' : '')} href="/account"><Icon name="user" /><span>Account</span></Link>
         <div className="group">Subjects</div>
         {subjects.map(s => (
           <Link className="item" href={`/s/${s.slug}`} key={s.slug} title={s.name}>

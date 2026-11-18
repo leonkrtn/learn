@@ -33,18 +33,6 @@ export function drawItems(pool: TypeDef[], ctx: Parameters<TypeDef['gen']>[0], e
   return out;
 }
 
-/** One question per due type, lowest box first. */
-export function reviewItems(due: { type_key: string; box: number }[], types: TypeDef[], ctx: Parameters<TypeDef['gen']>[0], n: number): SetItem[] {
-  const out: SetItem[] = [];
-  for (const d of [...due].sort((a, b) => a.box - b.box)) {
-    if (out.length >= n) break;
-    const t = types.find(x => x.key === d.type_key);
-    const q = t && gen(t, ctx);
-    if (q) out.push({ type: t.key, q });
-  }
-  return out;
-}
-
 /** A stored set is usable if it was drawn from the same pool and every type still exists. */
 export function isUsable(s: QSet | null | undefined, pool: string, types: TypeDef[]): s is QSet {
   if (!s || s.pool !== pool || !Array.isArray(s.items) || !s.items.length) return false;

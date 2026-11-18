@@ -61,5 +61,5 @@ export type SubjectModule = {
 
 export type { ConceptBank };
 
-/** Lecture types plus problem-set types, for review, statistics and look-ups by key. */
+/** Lecture types plus problem-set types, for statistics and look-ups by key. */
 export const allTypes = (m: SubjectModule): TypeDef[] => [...m.types, ...(m.problemSets || []).flatMap(p => p.types)];

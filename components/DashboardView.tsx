@@ -30,7 +30,7 @@ export default function DashboardView({ d }: { d: DashData }) {
             <h1>{Math.round(100 * worst.rate)}% on {wType?.name || worst.type}</h1>
             <p className="greet">Your weakest question type, in {wMod!.name}. {wSet
               ? <Link href={`/s/${worst.slug}/ps?run=1&set=${wSet.id}`}>Practise problem set {wSet.id}</Link>
-              : <Link href={`/s/${worst.slug}/cycle?topic=${wType?.topic || ''}`}>Practise lecture {wType?.topic}</Link>}</p>
+              : <Link href={`/s/${worst.slug}?topic=${wType?.topic || ''}`}>Practise lecture {wType?.topic}</Link>}</p>
           </>
         ) : A ? (
           <><h1>{A} answers, {pct(C, A)} correct</h1><p className="greet">Weak spots show up here after three answers per question type.</p></>
@@ -75,7 +75,7 @@ export default function DashboardView({ d }: { d: DashData }) {
               const mod = getSubject(w.slug)!;
               const t = allTypes(mod).find(x => x.key === w.type);
               const ps = mod.problemSets?.find(p => p.types.some(x => x.key === w.type));
-              return <li key={w.slug + w.type}><Link href={ps ? `/s/${w.slug}/ps?run=1&set=${ps.id}` : `/s/${w.slug}/cycle?topic=${t?.topic || ''}`}><small>{mod.short}</small>{t?.name || w.type}</Link><span className="v weak num">{Math.round(100 * w.rate)}%</span></li>;
+              return <li key={w.slug + w.type}><Link href={ps ? `/s/${w.slug}/ps?run=1&set=${ps.id}` : `/s/${w.slug}?topic=${t?.topic || ''}`}><small>{mod.short}</small>{t?.name || w.type}</Link><span className="v weak num">{Math.round(100 * w.rate)}%</span></li>;
             })}</ul>
           ) : <div className="empty">Listed after three answers per question type.</div>}
           <h3>Mock exams</h3>
