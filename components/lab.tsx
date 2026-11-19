@@ -43,7 +43,7 @@ function FragmentPair({ k, v }: { k: string; v: string }) {
 
 export type Series = { label: string; pts: [number, number][]; style?: 'strong' | 'soft' | 'dash' };
 
-const STROKE = { strong: '#2952e3', soft: '#9a9ea8', dash: '#101114' } as const;
+const STROKE = { strong: 'var(--accent)', soft: '#9a9ea8', dash: '#101114' } as const;
 
 /** Line plot for explanations: one blue, one gray, one dashed series at most; ends labelled directly. */
 export function LinePlot({ series, x, y: yIn, xLabel, yLabel, marker, vline, fmtX = String, fmtY = String, height = 300 }: {
@@ -95,7 +95,7 @@ export function LinePlot({ series, x, y: yIn, xLabel, yLabel, marker, vline, fmt
       )}
       <defs><clipPath id={clipId}><rect x={L} y={T - 2} width={W - L - R} height={H - T - B + 4} /></clipPath></defs>
       {series.map(s => (
-        <polyline key={s.label} clipPath={`url(#${clipId})`} fill="none" stroke={STROKE[s.style || 'strong']} strokeWidth={2}
+        <polyline key={s.label} clipPath={`url(#${clipId})`} fill="none" style={{ stroke: STROKE[s.style || 'strong'] }} strokeWidth={2}
           strokeDasharray={s.style === 'dash' ? '6 5' : undefined} strokeLinejoin="round"
           points={s.pts.map(([a, b]) => sx(a).toFixed(1) + ',' + sy(Math.min(y[1] + (y[1] - y[0]), Math.max(y[0] - (y[1] - y[0]), b))).toFixed(1)).join(' ')} />
       ))}
@@ -104,7 +104,7 @@ export function LinePlot({ series, x, y: yIn, xLabel, yLabel, marker, vline, fmt
       ))}
       {marker?.map((m, i) => (
         <g key={i}>
-          <circle cx={sx(m.x)} cy={sy(clampY(m.y))} r={5} fill="#1c3aa6" stroke="#fff" strokeWidth={2} />
+          <circle cx={sx(m.x)} cy={sy(clampY(m.y))} r={5} style={{ fill: 'var(--accent-ink)' }} stroke="#fff" strokeWidth={2} />
           {m.label && <text x={sx(m.x) + 9} y={sy(clampY(m.y)) - 9} fontSize="12" fill="#101114">{m.label}</text>}
         </g>
       ))}

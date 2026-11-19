@@ -1,4 +1,5 @@
 // Shared building blocks for procedural question generators.
+import { numPrefs } from '../numfmt';
 import type { CalcStep, ChoicePart, NumPart, Part, Question, Unit } from './types';
 
 export const rint = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
@@ -51,15 +52,16 @@ export const K = <T extends Part>(part: T, key: string): T => ({ ...part, key })
 /** A number for a formula: fixed decimals, thousands as {,}, a real minus sign. */
 export function tn(x: number, d = 2): string {
   if (!Number.isFinite(x)) return String(x);
-  // Shown values are rounded to two decimals; `d` only matters for whole numbers (d = 0). Small values such as
-  // rates and daily returns keep two significant digits instead of collapsing to 0.00 or 0.09.
-  const a = Math.abs(x);
+  // Shown values are rounded to two decimals (or the user's choice of three or four); `d` only matters for whole
+  // numbers (d = 0). Small values such as rates and daily returns keep as many significant digits instead of
+  // collapsing to 0.00 or 0.09.
+  const a = Math.abs(x), D = numPrefs().decimals;
   let t: string;
   if (d === 0) t = a.toFixed(0);
   // A factor such as e^(−0.0042) would read as 1.00 and make the next product look wrong; it keeps four decimals.
-  else if (a !== 1 && a >= 0.995 && a < 1.005) t = a.toFixed(4);
-  else if (a === 0 || a >= 0.1) t = a.toFixed(2);
-  else { t = a.toPrecision(2); if (/e/.test(t)) t = a.toFixed(8); }
+  else if (a !== 1 && a >= 0.995 && a < 1.005) t = a.toFixed(Math.max(4, D + 1));
+  else if (a === 0 || a >= 0.1) t = a.toFixed(D);
+  else { t = a.toPrecision(D); if (/e/.test(t)) t = a.toFixed(8); }
   const [i, f] = t.split('.');
   const s = i.replace(/\B(?=(\d{3})+$)/g, '{,}') + (f ? '.' + f : '');
   return (x < 0 && +t !== 0 ? '-' : '') + s;

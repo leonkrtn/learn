@@ -79,7 +79,7 @@ export default function HistoryChart({ rows, metric }: { rows: Day[]; metric: Me
           <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#d6d5d0" />
           {days.map((d, i) => i % step === 0 && <text key={'x' + i} x={r1(sx(i))} y={H - B + 18} textAnchor="middle" fontSize="12" fill="#676a75">{fmtDay(d.day)}</text>)}
           {days.map((d, i) => d.answers > 0 && <circle key={'d' + i} cx={r1(sx(i))} cy={r1(sy(d.correct / d.answers))} r={4} fill="#a9bbf3" stroke="#fff" strokeWidth={2} />)}
-          <path d={path} fill="none" stroke="#2952e3" strokeWidth={2.5} strokeLinejoin="round" />
+          <path d={path} fill="none" style={{ stroke: 'var(--accent)' }} strokeWidth={2.5} strokeLinejoin="round" />
           {hover != null && <line x1={sx(hover)} x2={sx(hover)} y1={T} y2={H - B} stroke="#676a75" strokeDasharray="2 3" />}
           {days.map((_, i) => <rect key={'h' + i} x={sx(i) - (W - L - R) / days.length / 2} y={T} width={(W - L - R) / days.length} height={H - T - B} fill="transparent" {...hit(i)} />)}
         </svg>
@@ -102,7 +102,7 @@ export default function HistoryChart({ rows, metric }: { rows: Day[]; metric: Me
             </g>
           ))}
           {days.map((d, i) => val(d) > 0 && (
-            <path key={'b' + i} fill={hover === i ? '#1c3aa6' : '#2952e3'}
+            <path key={'b' + i} style={{ fill: hover === i ? 'var(--accent-ink)' : 'var(--accent)' }}
               d={`M${r1(sx(i) - bw / 2)} ${r1(sb(0))} V${r1(Math.min(sb(val(d)) + 3, sb(0)))} q0 -3 3 -3 H${r1(sx(i) + bw / 2 - 3)} q3 0 3 3 V${r1(sb(0))} Z`} />
           ))}
           <line x1={L} x2={W - R} y1={sb(0)} y2={sb(0)} stroke="#d6d5d0" />

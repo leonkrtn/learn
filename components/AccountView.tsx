@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import DisplaySettings from './DisplaySettings';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import HistoryChart, { fmtMinutes, type Day, type Metric } from './HistoryChart';
@@ -96,6 +97,7 @@ export default function AccountView({ email, name, subjects }: { email: string; 
     <div className="page account">
       <div className="pagehead"><h1>Account</h1><span className="aside">{email}</span></div>
       <ProfileName initial={name} />
+      <DisplaySettings />
 
       <div className="sechead">
         <h2 className="sec">Your learning</h2>

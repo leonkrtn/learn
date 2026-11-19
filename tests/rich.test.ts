@@ -23,3 +23,18 @@ test('prices with dollar signs and spaces are left alone', () => {
   const h = renderRich('costs $ 5 and $ 6');
   assert.ok(!h.includes('katex'));
 });
+
+test('number display: decimal comma for generated text and formulas, code untouched', async () => {
+  const { localizeMd, localizeText, setNumPrefs } = await import('../lib/numfmt');
+  const { tn } = await import('../lib/engine/gen-helpers');
+  const { parsePrefs } = await import('../lib/prefs');
+  assert.equal(localizeText('<p class="a1.5">€1,234.5 and 8.5%, years 1, 2</p>', 'comma'), '<p class="a1.5">€1.234,5 and 8,5%, years 1, 2</p>');
+  assert.equal(localizeText('8.5%', 'point'), '8.5%');
+  assert.equal(localizeMd('$1{,}234.56 \\times 1.08$ (\\$ million) and `x = 1.5`', 'comma'), '$1.234{,}56 \\times 1{,}08$ (\\$ million) and `x = 1.5`');
+  setNumPrefs({ sep: 'point', decimals: 4 });
+  assert.equal(tn(12.345678), '12.3457');
+  setNumPrefs({ sep: 'point', decimals: 2 });
+  assert.equal(tn(12.345678), '12.35');
+  assert.deepEqual(parsePrefs('{"size":"huge","accent":"teal","decimals":3}'), { size: 'normal', accent: 'teal', sep: 'point', decimals: 3 });
+  assert.deepEqual(parsePrefs('not json'), { size: 'normal', accent: 'blue', sep: 'point', decimals: 2 });
+});

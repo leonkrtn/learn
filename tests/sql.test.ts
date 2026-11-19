@@ -189,3 +189,13 @@ test('practice_sets: one row per scope, private, cleared by reset', async () => 
   const left = await db.query('select * from public.practice_sets');
   assert.equal(left.rows.length, 0);
 });
+
+test('display preferences belong to their user', async () => {
+  const db = await boot();
+  await as(db, U1, () => db.query(`insert into public.user_prefs (prefs) values ('{"size":"large","sep":"comma"}')`));
+  await as(db, U1, () => db.query(`insert into public.user_prefs (user_id, prefs) values ('${U1}', '{"size":"small"}') on conflict (user_id) do update set prefs = excluded.prefs`));
+  const mine = await as(db, U1, () => db.query<{ size: string }>("select prefs->>'size' as size from public.user_prefs"));
+  assert.deepEqual(mine.rows.map(r => r.size), ['small']);
+  assert.equal((await as(db, U2, () => db.query('select * from public.user_prefs'))).rows.length, 0);
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.user_prefs (user_id, prefs) values ('${U1}', '{}')`)));
+});

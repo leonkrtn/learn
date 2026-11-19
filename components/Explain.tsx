@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { calcView } from '@/lib/calc';
 import { fmtSolution } from '@/lib/engine/grade';
+import { localizeText } from '@/lib/numfmt';
 import type { Question } from '@/lib/engine/types';
 import { resolveExplainer, type Explainer } from '@/lib/explain';
 import { allTypes, type SubjectModule } from '@/lib/subject';
@@ -11,10 +12,10 @@ import Icon from './Icons';
 import Rich from './Rich';
 
 const LET = 'abcdefghij';
-const R = ({ src, className }: { src: string; className?: string }) => <Rich text={src} className={className} />;
+const R = ({ src, className }: { src: string; className?: string }) => <Rich text={src} className={className} localize />;
 /** A calculation step; fractions in display size so the numbers stay readable. */
-const Step = ({ md }: { md: string }) => <Rich text={md.replace(/\\frac(?=\{)/g, '\\dfrac')} />;
-const Html = ({ html, className }: { html: string; className?: string }) => <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+const Step = ({ md }: { md: string }) => <Rich text={md.replace(/\\frac(?=\{)/g, '\\dfrac')} localize />;
+const Html = ({ html, className }: { html: string; className?: string }) => <span className={className} dangerouslySetInnerHTML={{ __html: localizeText(html) }} />;
 
 /** Modal lightbox with a title and a close button; closes on Escape, the button or a click on the backdrop. */
 function Lightbox({ kicker, title, onClose, children }: { kicker: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -77,7 +78,7 @@ function Method({ e, mod, theory }: { e: Explainer; mod: SubjectModule; theory?:
 function answerOf(q: Question, k: number): string {
   const p = q.parts[k];
   if (p.type === 'num') return fmtSolution(p);
-  return p.options[p.correct];
+  return localizeText(p.options[p.correct]);
 }
 
 /**
@@ -99,7 +100,7 @@ export function PartDialog({ mod, q, part, onClose }: { mod: SubjectModule; q: Q
     return (
       <Lightbox kicker={unit || 'Explanation'} title={title} onClose={onClose}>
         <div className="explaincol">
-          {q.solution && <section><h3>Why</h3><div className="qtext" dangerouslySetInnerHTML={{ __html: q.solution }} /></section>}
+          {q.solution && <section><h3>Why</h3><div className="qtext" dangerouslySetInnerHTML={{ __html: localizeText(q.solution) }} /></section>}
           {e && <>
             <section><h3>What the question asks</h3><R src={e.task} /></section>
             <section><h3>The idea</h3><R src={e.idea} /></section>
