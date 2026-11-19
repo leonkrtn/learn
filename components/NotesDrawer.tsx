@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { groupsOf } from './CheatsheetView';
 import Icon from './Icons';
+import { useCombo } from './Keys';
 import Rich from './Rich';
 import { useSubject } from './SubjectContext';
 import TexEditor from './TexEditor';
@@ -15,9 +16,10 @@ type Show = 'open' | 'done';
 
 const COLS = 'id, topic, body, done, created_at';
 
-/** Top-bar button (or Alt+N) that slides in your private study notes for the subject: what to look at again, open questions, to-dos. A new note is filed under the lecture of the question on screen; ticking one off moves it to Done. */
+/** Top-bar button (or Alt+N / ⌥N) that slides in your private study notes for the subject: what to look at again, open questions, to-dos. A new note is filed under the lecture of the question on screen; ticking one off moves it to Done. */
 export default function NotesDrawer({ open, setOpen }: { open: boolean; setOpen: (o: boolean) => void }) {
   const { mod, focusTopic } = useSubject();
+  const combo = useCombo('alt+N');
   const [notes, setNotes] = useState<StudyNote[] | null>(null);
   const [q, setQ] = useState('');
   const [show, setShow] = useState<Show>('open');
@@ -78,7 +80,7 @@ export default function NotesDrawer({ open, setOpen }: { open: boolean; setOpen:
 
   return (
     <>
-      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(!open)} aria-expanded={open} title="Your notes: what to look at again (Alt+N)">
+      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(!open)} aria-expanded={open} title={`Your notes: what to look at again (${combo})`}>
         <Icon name="notes" size={18} />Notes
       </button>
       {open && createPortal(
@@ -102,7 +104,7 @@ export default function NotesDrawer({ open, setOpen }: { open: boolean; setOpen:
             {notes === null ? <div aria-label="Loading"><span className="skel w40" /><span className="skel w80" /><span className="skel w60" /></div> : !visible.length ? (
               adding ? null : <p className="note">{s ? `No ${show} note matches “${q}”.`
                 : show === 'done' ? 'Nothing ticked off yet.'
-                : <>No open notes for {mod.short}. Jot down what you want to look at again with <b>New note</b> or Alt+N, from any page.</>}</p>
+                : <>No open notes for {mod.short}. Jot down what you want to look at again with <b>New note</b> or {combo}, from any page.</>}</p>
             ) : groupsOf(mod.topics).map(g => {
               const list = visible.filter(n => g.id === null ? !known(n.topic) : n.topic === g.id);
               if (!list.length) return null;

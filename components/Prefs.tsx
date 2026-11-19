@@ -5,13 +5,18 @@ import { setNumPrefs } from '@/lib/numfmt';
 import { PREFS_COOKIE, SIZES, type Prefs } from '@/lib/prefs';
 import { supabaseBrowser } from '@/lib/supabase/client';
 
-type Ctx = { prefs: Prefs; update: (p: Prefs) => Promise<string | null> };
+type Ctx = {
+  prefs: Prefs;
+  update: (p: Prefs) => Promise<string | null>;
+  /** A Mac keyboard (from the user agent on the server, so the first render already shows ⌥ and ⌘). */
+  mac: boolean;
+};
 const PrefsCtx = createContext<Ctx | null>(null);
 
 const writeCookie = (p: Prefs) => { document.cookie = `${PREFS_COOKIE}=${encodeURIComponent(JSON.stringify(p))}; path=/; max-age=31536000; samesite=lax`; };
 
 /** Applies the display preferences: text size and accent on <html>, number format for generated questions. */
-export function PrefsProvider({ initial, persist, children }: { initial: Prefs; persist: boolean; children: ReactNode }) {
+export function PrefsProvider({ initial, persist, mac, children }: { initial: Prefs; persist: boolean; mac: boolean; children: ReactNode }) {
   const [prefs, setPrefs] = useState(initial);
   if (typeof window !== 'undefined') setNumPrefs(prefs);
   // Preferences read from the database on a new device go into the cookie for the next page load.
@@ -31,7 +36,7 @@ export function PrefsProvider({ initial, persist, children }: { initial: Prefs; 
     return error ? 'Saved on this device only: ' + error.message : null;
   }, []);
 
-  const value = useMemo(() => ({ prefs, update }), [prefs, update]);
+  const value = useMemo(() => ({ prefs, update, mac }), [prefs, update, mac]);
   return <PrefsCtx.Provider value={value}>{children}</PrefsCtx.Provider>;
 }
 

@@ -9,6 +9,7 @@ import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, set
 import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Answers, Graded, TypeDef } from '@/lib/engine/types';
+import Keys from './Keys';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
 
@@ -298,7 +299,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             <dt>{unitName}</dt><dd>{type.topic}</dd>
           </dl>
           {theory && <Link className="raillink" href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link>}
-          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>←</kbd> <kbd>→</kbd> earlier questions</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
+          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>←</kbd> <kbd>→</kbd> earlier questions</span><span><Keys k="alt+C" /> cheatsheet</span><span><Keys k="alt+N" /> notes</span><Link href="/settings/help">All shortcuts</Link></p>
         </div>
       </aside>
     </div>

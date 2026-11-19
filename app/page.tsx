@@ -35,9 +35,9 @@ export default async function Dashboard() {
   };
   return (
     <div className="shell">
-      <HomeSidebar subjects={data.subjects.filter(s => getSubject(s.slug)).map(s => ({ slug: s.slug, short: s.short, name: s.name }))} />
+      <HomeSidebar email={user.email || ''} subjects={data.subjects.filter(s => getSubject(s.slug)).map(s => ({ slug: s.slug, short: s.short, name: s.name }))} />
       <div className="content">
-        <TopBar email={user.email || ''} />
+        <TopBar />
         <DashboardView d={data} />
       </div>
     </div>

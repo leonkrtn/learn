@@ -7,12 +7,14 @@ import { createPortal } from 'react-dom';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { EntryEditor, groupsOf, inGroup, matches, type Entry } from './CheatsheetView';
 import Icon from './Icons';
+import { useCombo } from './Keys';
 import Rich from './Rich';
 import { useSubject } from './SubjectContext';
 
-/** Top-bar button (or Alt+C, which stays clear of the a–d answer keys) that slides in your cheatsheet with search and a quick "new entry" (filed under the lecture of the question on screen); on every subject page but the cheatsheet itself. */
+/** Top-bar button (or Alt+C / ⌥C, which stays clear of the a–d answer keys) that slides in your cheatsheet with search and a quick "new entry" (filed under the lecture of the question on screen); on every subject page but the cheatsheet itself. */
 export default function CheatDrawer({ open, setOpen }: { open: boolean; setOpen: (o: boolean) => void }) {
   const { mod, focusTopic } = useSubject();
+  const combo = useCombo('alt+C');
   const path = usePathname();
   const base = '/s/' + mod.slug;
   const active = !path.startsWith(base + '/cheatsheet');
@@ -55,7 +57,7 @@ export default function CheatDrawer({ open, setOpen }: { open: boolean; setOpen:
   if (!active) return null;
   return (
     <>
-      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(!open)} aria-expanded={open} title="Your cheatsheet (Alt+C)">
+      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(!open)} aria-expanded={open} title={`Your cheatsheet (${combo})`}>
         <Icon name="sheet" size={18} />Cheatsheet
       </button>
       {/* In a portal: the top bar's backdrop filter would otherwise become the drawer's containing block. */}

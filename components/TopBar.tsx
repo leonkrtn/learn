@@ -2,9 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import Icon from './Icons';
 
-/** Top bar: current location on the left, page actions and account on the right. */
-export default function TopBar({ email, crumbs, actions }: { email: string; crumbs?: { href?: string; label: string }[]; actions?: ReactNode }) {
-  const initials = (email.split('@')[0].match(/[a-z0-9]/gi) || ['?']).slice(0, 2).join('').toUpperCase();
+/** Top bar: current location on the left, page actions and sign-out on the right; profile and settings sit at the foot of the sidebar. */
+export default function TopBar({ crumbs, actions }: { crumbs?: { href?: string; label: string }[]; actions?: ReactNode }) {
   return (
     <header className="topbar">
       <nav className="crumbs" aria-label="Breadcrumb">
@@ -15,7 +14,6 @@ export default function TopBar({ email, crumbs, actions }: { email: string; crum
       <div className="spacer" />
       <div className="right">
         {actions}
-        <Link className="account" href="/account" title="Account"><span className="avatar" aria-hidden>{initials}</span><span className="who">{email}</span></Link>
         <form action="/auth/signout" method="post"><button className="iconbtn" type="submit" title="Sign out"><Icon name="signout" size={18} /><span>Sign out</span></button></form>
       </div>
     </header>

@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { Instrument_Sans, Schibsted_Grotesk } from 'next/font/google';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import type { CSSProperties, ReactNode } from 'react';
 import Logo from '@/components/Logo';
 import { PrefsProvider } from '@/components/Prefs';
 import { PREFS_COOKIE, SIZES, parsePrefs } from '@/lib/prefs';
+import { isMacUA } from '@/lib/shortcuts';
 import { supabaseServer } from '@/lib/supabase/server';
 import 'katex/dist/katex.min.css';
 import './globals.css';
@@ -34,6 +35,7 @@ async function loadPrefs() {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const { prefs, persist } = await loadPrefs();
+  const mac = isMacUA((await headers()).get('user-agent') || '');
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`} data-accent={prefs.accent} style={{ '--fs': String(SIZES[prefs.size]) } as CSSProperties}>
       <body>
@@ -43,7 +45,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <p>This site is built for laptop and desktop screens. Open it on a window at least 1024 pixels wide.</p>
           </div>
         </div>
-        <div className="app"><PrefsProvider initial={prefs} persist={persist}>{children}</PrefsProvider></div>
+        <div className="app"><PrefsProvider initial={prefs} persist={persist} mac={mac}>{children}</PrefsProvider></div>
       </body>
     </html>
   );

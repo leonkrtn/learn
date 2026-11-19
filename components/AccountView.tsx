@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import DisplaySettings from './DisplaySettings';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import HistoryChart, { fmtMinutes, type Day, type Metric } from './HistoryChart';
@@ -97,7 +96,6 @@ export default function AccountView({ email, name, subjects }: { email: string; 
     <div className="page account">
       <div className="pagehead"><h1>Account</h1><span className="aside">{email}</span></div>
       <ProfileName initial={name} />
-      <DisplaySettings />
 
       <div className="sechead">
         <h2 className="sec">Your learning</h2>
@@ -163,7 +161,7 @@ export default function AccountView({ email, name, subjects }: { email: string; 
 
       <fieldset>
         <legend>Reset progress</legend>
-        <p className="note" style={{ marginTop: 0 }}>A reset deletes your answers, the right and wrong counts, the weighting of weak question types, your open question sets and your mock exam results. Flashcards, slide notes and your cheatsheet stay. Use Reset in the table for one subject.</p>
+        <p className="note" style={{ marginTop: 0 }}>A reset deletes your answers, the right and wrong counts, the weighting of weak question types, your open question sets and your mock exam results. Flashcards, slide notes, your notes and your cheatsheet stay. Use Reset in the table for one subject.</p>
         <div className="actions" style={{ justifyContent: 'flex-start' }}>
           <button type="button" className={'btn ghost small' + (armed === 'all' ? ' danger' : '')} disabled={busy || !totalA} onClick={() => reset(null)}
             onBlur={() => armed === 'all' && setArmed(null)}>
