@@ -15,12 +15,13 @@ export const SHORTCUTS: ShortcutGroup[] = [
     ],
   },
   {
-    name: 'Practice, cycle, problem sets and mock exam', where: 'When no answer field has the focus',
+    name: 'Practice, cycle, problem sets and marked questions', where: 'When no answer field has the focus',
     items: [
       { keys: ['Enter'], label: 'Check the answer, then go to the next question' },
       { keys: ['A', 'B', 'C', 'D', 'E'], label: 'Choose an option of a multiple-choice question' },
       { keys: ['T', 'F'], label: 'True or false' },
       { keys: ['R'], label: 'Same question with new numbers (after checking)' },
+      { keys: ['M'], label: 'Mark or unmark the question (practise it later under Marked questions)' },
       { keys: ['←', '→'], label: 'Earlier and later questions of a set' },
       { keys: ['Enter'], label: 'In an answer field: next field, or check after the last one' },
     ],

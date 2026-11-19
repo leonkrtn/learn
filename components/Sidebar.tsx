@@ -53,6 +53,7 @@ export default function Sidebar({ email }: { email: string }) {
         {item('/cycle', 'Cycle by lecture', 'cycle')}
         {mod.problemSets && item('/ps', 'Problem sets', 'ps')}
         {mod.mock && item('/mock', 'Mock exam', 'mock')}
+        {item('/marked', 'Marked questions', 'flag')}
         <div className="group">Learn</div>
         {item('/cards', 'Flashcards', 'cards')}
         {item('/theory', 'Theory', 'theory')}

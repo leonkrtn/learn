@@ -8,7 +8,8 @@ export const SET_SIZE = 20;
 /** Upper bound when repeats are added to a set whose questions have all been seen (matches the table's check). */
 export const SET_MAX = 40;
 
-export type SetItem = { type: string; q: Question; answers?: Answers; checked?: boolean; seen?: boolean };
+/** `mark` is the signature of the marked question this one was drawn from (Marked questions page). */
+export type SetItem = { type: string; q: Question; answers?: Answers; checked?: boolean; seen?: boolean; mark?: string };
 /** `pos` may equal `items.length`: the set is finished and the next one has not been drawn yet. */
 export type QSet = { pool: string; items: SetItem[]; pos: number };
 

@@ -30,6 +30,7 @@ const P: Record<string, ReactNode> = {
   upload: <><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9" /><path d="M4.5 15v4.5h15V15" /></>,
   copy: <><rect x="8.5" y="8.5" width="11" height="11" rx="2" /><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" /></>,
   pin: <><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></>,
+  flag: <><path d="M6 20.5V4" /><path d="M6 4.5h11.5l-2.5 4 2.5 4H6" /></>,
   star: <><path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.8l-5.1 2.7 1-5.7-4.1-4 5.7-.8z" /></>,
   expand: <><path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15" /></>,
   notes: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M14 4.5v15M16.5 9h1.5M16.5 12h1.5" /></>,

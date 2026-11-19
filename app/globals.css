@@ -1045,3 +1045,14 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .keygroup dl > div { display: grid; grid-template-columns: 12rem 1fr; gap: 16px; align-items: baseline; padding: 5px 0; }
 .keygroup dt .keycombo { white-space: normal; }
 .keygroup dd { margin: 0; color: var(--ink-2); font-size: calc(14.5px * var(--fs)); }
+
+/* ---------- marked questions ---------- */
+.metar { display: flex; align-items: baseline; gap: 14px; }
+.act.markq { min-width: 6.4rem; justify-content: center; align-self: center; }
+.act.markq.on { color: var(--accent-ink); background: var(--accent-soft); }
+.markgroup { padding: 14px 20px 6px; margin-bottom: 16px; }
+.markrow { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.mrbody { flex: 1; min-width: 0; }
+.mrbody b { font-size: calc(14.5px * var(--fs)); margin-right: 10px; }
+.mrbody .muted { font-size: calc(12.5px * var(--fs)); }
+.mrbody p { margin: 4px 0 0; color: var(--ink-2); font-size: calc(14.5px * var(--fs)); max-width: var(--measure); }
