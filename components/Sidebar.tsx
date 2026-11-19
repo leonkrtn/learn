@@ -44,7 +44,6 @@ export default function Sidebar() {
         {item('/slides', 'Slides', 'slides')}
         <div className="group">You</div>
         {item('/cheatsheet', 'My cheatsheet', 'sheet')}
-        {item('/settings', 'Settings', 'settings')}
         <Link className="item" href="/account"><Icon name="user" /><span>Account</span></Link>
       </nav>
     </aside>

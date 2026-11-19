@@ -229,7 +229,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
         <div className="endbox panel">
           {mode.kind === 'ps'
               ? <><h2>No question types selected</h2><p>Turn on at least one type on the <Link href={`/s/${mod.slug}/ps`}>problem sets page</Link>.</p></>
-              : <><h2>No question types selected</h2><p>Turn on at least one type in <Link href={`/s/${mod.slug}/settings`}>Settings</Link>.</p></>}
+              : <><h2>No question types selected</h2><p>Turn on at least one type under <Link href={`/s/${mod.slug}?pick=1`}>Choose question types</Link>.</p></>}
           {saveErr && <p className="err">{saveErr}</p>}
         </div>
       </div>
@@ -281,7 +281,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             {graded ? 'Next question' : 'Check'}
           </button>
         </div>
-        <p className="note answernote">{mod.answerNote}</p>
+        <p className="note answernote">{mod.answerNote} Answers within {Math.round(mod.tolerance * 100)}% of the solution count as correct.</p>
         {saveErr && <p className="err">{saveErr}</p>}
       </div>
       <aside className="rail">

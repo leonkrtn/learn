@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { UNIT, fmtSolution } from '@/lib/engine/grade';
+import { localizeText as L } from '@/lib/numfmt';
 import type { Answers, Graded, Question } from '@/lib/engine/types';
 import { PartDialog } from './Explain';
 import { useSubject } from './SubjectContext';
@@ -48,7 +49,7 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
 
   return (
     <div ref={box}>
-      <div className="qtext" dangerouslySetInnerHTML={{ __html: wrapTables(q.html) }} />
+      <div className="qtext" dangerouslySetInnerHTML={{ __html: wrapTables(L(q.html)) }} />
       {single ? (
         <>
           <ul className={'mc' + (single.tf ? ' tf' : '')}>
@@ -58,7 +59,7 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
               return (
                 <li key={i}>
                   <button type="button" className={cls} onClick={() => (locked ? show(0) : set(0, i))} aria-pressed={sel} title={locked ? 'Show the explanation' : undefined}>
-                    {single.tf ? o : <><span className="letter">{LET[i]})</span><span>{o}</span><span className="mark">{graded && i === single.correct ? '✓' : ''}</span></>}
+                    {single.tf ? o : <><span className="letter">{LET[i]})</span><span>{L(o)}</span><span className="mark">{graded && i === single.correct ? '✓' : ''}</span></>}
                   </button>
                 </li>
               );
@@ -75,7 +76,7 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
             return (
               <div className={'part' + (p.type === 'choice' ? ' choice' : '')} key={i}>
                 <div className="lbl">{LET[i]})</div>
-                <div className="prompt" dangerouslySetInnerHTML={{ __html: p.type === 'mc' ? '' : p.prompt }} />
+                <div className="prompt" dangerouslySetInnerHTML={{ __html: p.type === 'mc' ? '' : L(p.prompt) }} />
                 <div className="ansbox">
                   {p.type === 'num' ? (
                     <div className="numbox">
@@ -87,26 +88,26 @@ export default function QuestionView({ q, answers, onChange, graded, onSubmit, a
                     </div>
                   ) : p.type === 'choice' && p.options.length > 6 && locked ? (
                     <button type="button" className={'selin calcable' + (r ? (r.ok ? ' ok' : ' bad') : '')} onClick={() => show(i)} title={tip}>
-                      {typeof answers[i] === 'number' ? p.options[answers[i] as number] : 'Not answered'}
+                      {typeof answers[i] === 'number' ? L(p.options[answers[i] as number]) : 'Not answered'}
                     </button>
                   ) : p.type === 'choice' && p.options.length > 6 ? (
                     <select className={'selin' + (r ? (r.ok ? ' ok' : ' bad') : '')} aria-label={'Answer ' + LET[i]} disabled={locked}
                       value={typeof answers[i] === 'number' ? String(answers[i]) : ''} onChange={e => e.target.value !== '' && set(i, +e.target.value)}>
                       <option value="">Choose…</option>
-                      {p.options.map((o, j) => <option key={j} value={j}>{o}</option>)}
+                      {p.options.map((o, j) => <option key={j} value={j}>{L(o)}</option>)}
                     </select>
                   ) : p.type === 'choice' ? (
                     <div className={'seg' + (p.options.some(o => o.length > 14) ? ' stack' : '')}>
                       {p.options.map((o, j) => {
                         const sel = answers[i] === j;
                         const cls = r ? (j === p.correct ? 'isright' : sel ? 'iswrong' : '') : sel ? 'sel' : '';
-                        return <button type="button" key={j} className={cls} onClick={() => (locked ? show(i) : set(i, j))} aria-pressed={sel} title={tip}>{o}</button>;
+                        return <button type="button" key={j} className={cls} onClick={() => (locked ? show(i) : set(i, j))} aria-pressed={sel} title={tip}>{L(o)}</button>;
                       })}
                     </div>
                   ) : null}
                 </div>
                 <div className={'fb' + (r ? (r.ok ? ' ok' : ' bad') : '')}>
-                  {r ? (r.ok ? 'Correct' : 'Correct answer: ' + (p.type === 'num' ? fmtSolution(p) : p.type === 'choice' ? p.options[p.correct] : '')) : ''}
+                  {r ? (r.ok ? 'Correct' : 'Correct answer: ' + (p.type === 'num' ? fmtSolution(p) : p.type === 'choice' ? L(p.options[p.correct]) : '')) : ''}
                 </div>
               </div>
             );

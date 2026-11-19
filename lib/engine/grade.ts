@@ -1,3 +1,4 @@
+import { localizeText, numPrefs } from '../numfmt';
 import type { Answers, Graded, NumPart, Question, Unit } from './types';
 
 export const DEFAULT_TOL = 0.02;
@@ -49,9 +50,9 @@ export function gradeQuestion(q: Question, answers: Answers, tolRel = DEFAULT_TO
 }
 
 export function fmtAns(a: number): string {
-  const d = Math.abs(a) < 1 && a !== 0 ? 4 : 2;
+  const D = numPrefs().decimals, d = Math.abs(a) < 1 && a !== 0 ? Math.max(4, D) : D;
   const s = Math.abs(a).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: d });
-  return (a < 0 ? '−' : '') + s;
+  return localizeText((a < 0 ? '−' : '') + s);
 }
 
 /** Short unit label shown left of the input box. */

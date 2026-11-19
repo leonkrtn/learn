@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import DeleteDeck from '@/components/DeleteDeck';
+import NewPerDay from '@/components/NewPerDay';
 import { getDecks, loadSubject, studyable } from '@/lib/queries';
 import { requireUser } from '@/lib/supabase/server';
 
@@ -13,7 +14,8 @@ export default async function CardsPage({ params }: { params: Promise<{ slug: st
   return (
     <div className="page">
       <div className="pagehead"><h1>Flashcards</h1><span className="aside"><Link href={`/s/${slug}/cards/import`}>Import Anki or CSV deck</Link></span></div>
-      <p className="lede">Rate each card Again, Hard, Good or Easy; the FSRS scheduler picks the next date so you see a card shortly before you would forget it. New cards are introduced at up to {newPerDay} per deck and day (change in Settings).</p>
+      <p className="lede">Rate each card Again, Hard, Good or Easy; the FSRS scheduler picks the next date so you see a card shortly before you would forget it. New cards are introduced at up to {newPerDay} per deck and day.</p>
+      <NewPerDay />
       <div className="decks">
         <div className="deckrow head"><span>Deck</span><span className="n">Ready</span><span className="n">Cards</span><span /></div>
         {decks.map(d => {
