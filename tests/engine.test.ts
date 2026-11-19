@@ -329,3 +329,23 @@ test('FV mock exam: 5 + 3 + 10 questions, 100 points, every question maps to a k
     assert.equal(new Set(lectures).size, 7, 'Part III covers every lecture');
   }
 });
+
+test('marked questions: stable signature, variants keep the question and change the numbers', async () => {
+  const { questionSig, variantOf } = await import('../lib/engine/marked');
+  for (const mod of Object.values(SUBJECTS)) {
+    const ctx = { bank: BANKS[mod.slug] };
+    // A sample of types per subject: each numeric variant searches for up to 1.5 s.
+    for (const t of allTypes(mod).filter((_, i) => i % 9 === 0)) {
+      const q = t.gen(ctx);
+      assert.equal(questionSig(q), questionSig(structuredClone(q)), `${t.key}: signature is stable`);
+      assert.ok(questionSig(q).length <= 64);
+      const v = variantOf(q, t, ctx);
+      assert.equal(v.fam, q.fam, `${t.key}: same generator`);
+      assert.equal(v.parts.length, q.parts.length, `${t.key}: same sub-questions`);
+      v.parts.forEach((p, i) => {
+        assert.equal(p.type, q.parts[i].type);
+        if (p.type === 'mc' && q.parts[i].type === 'mc') assert.equal(p.options[p.correct], (q.parts[i] as typeof p).options[(q.parts[i] as typeof p).correct], `${t.key}: shuffled options keep the answer`);
+      });
+    }
+  }
+});

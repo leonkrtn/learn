@@ -210,3 +210,13 @@ test('study notes are private to their owner', async () => {
   const mine = await as(db, U1, () => db.query<{ done: boolean }>('select done from public.study_notes'));
   assert.deepEqual(mine.rows.map(r => r.done), [false], 'others cannot change them');
 });
+
+test('marked questions are private and marked once', async () => {
+  const db = await boot();
+  const ins = (sig: string) => db.query(`insert into public.marked_questions (subject_slug, type_key, topic, sig, q) values ('fvcs', 'L1.mm2', '1', '${sig}', '{"fam":"L1.mm2"}')`);
+  await as(db, U1, () => ins('a1'));
+  await assert.rejects(as(db, U1, () => ins('a1')), 'the same question is marked once');
+  assert.equal((await as(db, U2, () => db.query('select * from public.marked_questions'))).rows.length, 0);
+  await as(db, U2, () => db.query('delete from public.marked_questions'));
+  assert.equal((await as(db, U1, () => db.query('select * from public.marked_questions'))).rows.length, 1, 'others cannot remove them');
+});

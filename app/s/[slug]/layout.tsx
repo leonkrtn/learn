@@ -19,9 +19,9 @@ export default async function SubjectLayout({ children, params }: { children: Re
     <>
       <SubjectProvider slug={slug} bank={data.bank} initialSettings={data.settings} initialStats={data.stats}>
         <div className="shell">
-          <Sidebar />
+          <Sidebar email={user.email || ''} />
           <div className="content">
-            <TopBar email={user.email || ''} crumbs={[{ href: '/', label: data.trimesterName || 'Subjects' }, { label: mod.name }]} actions={<Drawers />} />
+            <TopBar crumbs={[{ href: '/', label: data.trimesterName || 'Subjects' }, { label: mod.name }]} actions={<Drawers />} />
             <main className="main">
               {data.error && <p className="err" style={{ marginTop: 24 }}>The database is not set up yet ({data.error.message}). Run supabase/setup.sql in the Supabase SQL editor.</p>}
               <SyncNotice />

@@ -115,8 +115,21 @@ a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-v
 .sidebar {
   position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto;
   background: var(--glass-fill); box-shadow: inset -1px 0 0 rgba(16, 17, 20, 0.1);
-  padding: 16px 12px 28px; font-size: calc(14.5px * var(--fs));
+  padding: 16px 12px 0; font-size: calc(14.5px * var(--fs)); display: flex; flex-direction: column;
 }
+.sidebar nav { flex: 1 0 auto; padding-bottom: 20px; }
+/* Profile and settings gear at the foot of the sidebar; stays in view while the nav scrolls. */
+.sidefoot {
+  position: sticky; bottom: 0; display: flex; align-items: center; gap: 4px; margin: 0 -12px; padding: 10px 12px 14px;
+  background: var(--glass-dense); box-shadow: inset 0 1px 0 var(--rule);
+}
+.sidefoot a { display: flex; align-items: center; height: 40px; border-radius: var(--r-sm); text-decoration: none; color: var(--ink-2); }
+.sidefoot a:hover { background: var(--hover); color: var(--ink); }
+.sidefoot a.on { background: var(--glass-dense); color: var(--accent-ink); box-shadow: var(--glass-rim); }
+.sidefoot .profile { flex: 1; min-width: 0; gap: 10px; padding: 0 8px; font-weight: 500; font-size: calc(13.5px * var(--fs)); }
+.sidefoot .profile .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidefoot .gear { flex: none; width: 40px; justify-content: center; color: var(--muted); }
+.sidefoot .gear.on .icon { color: var(--accent); }
 .sidebar .brand { display: flex; align-items: center; height: 40px; padding: 0 10px; margin-bottom: 14px; text-decoration: none; }
 .sidebar .back {
   display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: var(--r-sm);
@@ -161,9 +174,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-v
 .topbar .spacer { flex: 1; }
 .topbar .right { flex: none; display: flex; align-items: center; gap: 12px; }
 .topbar form { margin: 0; display: flex; }
-.topbar .who { color: var(--ink-2); font-size: calc(14px * var(--fs)); }
-.topbar .account { display: flex; align-items: center; gap: 12px; text-decoration: none; border-radius: var(--r); }
-.topbar .account:hover .who { color: var(--accent); }
 .avatar {
   width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent); color: #fff; font-size: calc(12.5px * var(--fs)); font-weight: 600; letter-spacing: 0.02em;
@@ -200,7 +210,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-v
 .rail h4.sub { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule); }
 .rail .raillink { display: block; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--rule); line-height: 1.4; }
 .rail .keys { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--rule); font-size: calc(12.5px * var(--fs)); color: var(--muted); line-height: 1.9; }
-.rail .keys span { display: block; }
+.rail .keys > span, .rail .keys > a { display: block; }
+.keycombo { white-space: nowrap; }
+.keycombo kbd + kbd { margin-left: 3px; }
+.keycombo .or { margin: 0 5px; color: var(--faint); }
 kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.8); box-shadow: 0 0 0 1px var(--rule-strong); font: 600 calc(11.5px * var(--fs))/18px var(--sans); color: var(--ink-2); text-align: center; }
 
 .panel { background: var(--glass-fill); border-radius: var(--r-lg); box-shadow: var(--shadow); }
@@ -1019,3 +1032,27 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .seg.swatches button { display: inline-flex; align-items: center; gap: 8px; }
 .swatch { width: 14px; height: 14px; border-radius: 3px; flex: none; }
 
+
+/* ---------- settings ---------- */
+.tabs { display: flex; gap: 22px; margin: -4px 0 22px; box-shadow: inset 0 -1px 0 var(--rule); }
+.tabs a { padding: 8px 0 10px; color: var(--muted); text-decoration: none; font-weight: 500; font-size: calc(14.5px * var(--fs)); }
+.tabs a:hover { color: var(--ink); }
+.tabs a.on { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.keygroup { border-top: 1px solid var(--rule); padding: 14px 0 6px; }
+.keygroup h3 { margin: 0 0 8px; font-size: calc(15px * var(--fs)); }
+.keygroup h3 small { margin-left: 10px; font-family: var(--sans); font-weight: 400; font-size: calc(13px * var(--fs)); color: var(--muted); }
+.keygroup dl { margin: 0; }
+.keygroup dl > div { display: grid; grid-template-columns: 12rem 1fr; gap: 16px; align-items: baseline; padding: 5px 0; }
+.keygroup dt .keycombo { white-space: normal; }
+.keygroup dd { margin: 0; color: var(--ink-2); font-size: calc(14.5px * var(--fs)); }
+
+/* ---------- marked questions ---------- */
+.metar { display: flex; align-items: baseline; gap: 14px; }
+.act.markq { min-width: 6.4rem; justify-content: center; align-self: center; }
+.act.markq.on { color: var(--accent-ink); background: var(--accent-soft); }
+.markgroup { padding: 14px 20px 6px; margin-bottom: 16px; }
+.markrow { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.mrbody { flex: 1; min-width: 0; }
+.mrbody b { font-size: calc(14.5px * var(--fs)); margin-right: 10px; }
+.mrbody .muted { font-size: calc(12.5px * var(--fs)); }
+.mrbody p { margin: 4px 0 0; color: var(--ink-2); font-size: calc(14.5px * var(--fs)); max-width: var(--measure); }

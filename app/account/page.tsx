@@ -34,9 +34,9 @@ export default async function AccountPage() {
   const email = user.email || '';
   return (
     <div className="shell">
-      <HomeSidebar active="account" subjects={list.map(s => ({ slug: s.slug, short: s.short, name: s.name }))} />
+      <HomeSidebar email={email} active="account" subjects={list.map(s => ({ slug: s.slug, short: s.short, name: s.name }))} />
       <div className="content">
-        <TopBar email={email} crumbs={[{ href: '/', label: 'Dashboard' }, { label: 'Account' }]} />
+        <TopBar crumbs={[{ href: '/', label: 'Dashboard' }, { label: 'Account' }]} />
         <main className="main">
           {error && <p className="err">The database is not set up yet ({error.message}). Run supabase/setup.sql in the Supabase SQL editor.</p>}
           <AccountView email={email} name={profile.data?.display_name ?? email.split('@')[0]} subjects={list} />

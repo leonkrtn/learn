@@ -4,6 +4,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { commandAt, exact, GROUPS, mathAt, search, splice, SYMBOLS, type Sym } from '@/lib/texinput';
 import FormulaField, { type FormulaApi } from './FormulaField';
 import Icon from './Icons';
+import { useCombo } from './Keys';
 import Rich from './Rich';
 
 type Suggest = { start: number; items: Sym[]; i: number; query: string };
@@ -23,6 +24,7 @@ export default function TexEditor({ value, onChange, placeholder, rows = 5, auto
   onSubmit?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const save = useCombo('mod+Enter');
   const formulaApi = useRef<FormulaApi | null>(null);
   const [preview, setPreview] = useState(true);
   const [sug, setSug] = useState<Suggest | null>(null);
@@ -156,7 +158,7 @@ export default function TexEditor({ value, onChange, placeholder, rows = 5, auto
         )}
       </div>
       {preview && value.trim() && <div className="texpreview"><Rich text={value} /></div>}
-      <div className="texhint">Type <code>/beta</code> or <code>\beta</code> for β, <code>/wacc</code> for a formula. <b>Formula</b> opens the visual editor. Ctrl+Enter saves.</div>
+      <div className="texhint">Type <code>/beta</code> or <code>\beta</code> for β, <code>/wacc</code> for a formula. <b>Formula</b> opens the visual editor. {save} saves.</div>
     </div>
   );
 }

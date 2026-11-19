@@ -3,19 +3,24 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { gradeQuestion } from '@/lib/engine/grade';
+import { questionSig, variantOf } from '@/lib/engine/marked';
 import { canRepeat, sameWithNewNumbers } from '@/lib/engine/repeat';
 import { CycleBag } from '@/lib/engine/select';
 import { SET_SIZE, drawItems, goTo, insertRepeat, isSeen, isUsable, poolKey, setTally, type QSet, type SetItem } from '@/lib/engine/sets';
 import { allTypes } from '@/lib/subject';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import type { Answers, Graded, TypeDef } from '@/lib/engine/types';
+import Icon from './Icons';
+import Keys from './Keys';
+import { useMarks } from './Marks';
 import QuestionView from './QuestionView';
 import { useSubject } from './SubjectContext';
 
 export type RunnerMode =
   | { kind: 'practice' }
   | { kind: 'cycle'; topic: string }
-  | { kind: 'ps'; set?: string };
+  | { kind: 'ps'; set?: string }
+  | { kind: 'marked'; topic?: string };
 
 type Tally = { a: number; c: number };
 
@@ -46,17 +51,36 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     return enabled;
   }, [mode, mod, enabled, settings.ps]);
 
-  // Practice and problem sets keep a stored set of 20; the lecture cycle runs in memory.
-  const stored = mode.kind !== 'cycle';
+  const { marks, sigs, mark, unmark, error: markErr } = useMarks(mod.slug);
+  /** Marked questions to practise (Marked questions page), optionally of one lecture. */
+  const markedPool = useMemo(() => mode.kind !== 'marked' || !marks ? [] : marks.filter(m => (!mode.topic || m.topic === mode.topic) && types.some(t => t.key === m.type_key)),
+    [mode, marks, types]);
+  const markRef = useRef(markedPool);
+  markRef.current = markedPool;
+  const marksReady = mode.kind !== 'marked' || marks !== null;
+
+  // Practice and problem sets keep a stored set of 20; the lecture cycle and marked questions run in memory.
+  const stored = mode.kind === 'practice' || mode.kind === 'ps';
   const scope = mode.kind === 'ps' ? 'ps' + (mode.set ? ':' + mode.set : '') : mode.kind;
   const poolSig = poolKey(pool.map(t => t.key));
 
   const emaRef = useRef<Record<string, number>>({});
   emaRef.current = Object.fromEntries(Object.entries(stats).map(([k, s]) => [k, s.ema]));
   const bag = useRef<CycleBag | null>(null);
+  const bagKey = useRef('');
 
   /** Questions for a new set (or the next cycle question), continuing after `after`. */
   const fill = useCallback((n: number, after?: SetItem): SetItem[] => {
+    if (mode.kind === 'marked') {
+      // Every marked question once per round, in random order, each time with new numbers.
+      const list = markRef.current;
+      if (!list.length) return [];
+      const key = list.map(m => m.sig).join(',');
+      if (!bag.current || bagKey.current !== key) { bag.current = new CycleBag(list.map(m => m.sig)); bagKey.current = key; }
+      const m = list.find(x => x.sig === bag.current!.next());
+      const type = m && types.find(t => t.key === m.type_key);
+      return m && type ? [{ type: type.key, q: variantOf(m.q, type, { bank }), mark: m.sig }] : [];
+    }
     if (mode.kind === 'cycle') {
       if (!pool.length) return [];
       if (!bag.current) bag.current = new CycleBag(pool.map(t => t.key));
@@ -109,6 +133,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
 
   // The first set is drawn on the client so server and client markup agree.
   useEffect(() => {
+    if (!marksReady) return;
     bag.current = null;
     setRunTally({ a: 0, c: 0 }); setSaveErr(null); setLoaded(false); setSet(null);
     let live = true;
@@ -116,7 +141,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     else { setSet(fresh()); setLoaded(true); }
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, poolSig, mode.kind === 'cycle' ? mode.topic : '']);
+  }, [scope, poolSig, mode.kind === 'cycle' || mode.kind === 'marked' ? mode.topic : '', marksReady]);
 
   // Back from another device or tab: pick up where that one left off; leaving: save typed answers now.
   useEffect(() => {
@@ -181,12 +206,21 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     if (!set || !item || !type || !repeatable) return;
     const q = sameWithNewNumbers(item.q, () => type.gen({ bank }));
     if (!q) { setRepeatFailed(true); return; }
-    const next: SetItem = { type: type.key, q };
+    const next: SetItem = { type: type.key, q, mark: item.mark };
     update(stored ? insertRepeat(set, next, n => fill(n, next))
       : goTo({ ...set, items: [...set.items.slice(0, set.pos + 1), next, ...set.items.slice(set.pos + 1)].slice(-CYCLE_KEEP) }, Math.min(set.pos + 1, CYCLE_KEEP - 1)));
     window.scrollTo({ top: 0 });
   }, [set, item, type, repeatable, bank, stored, update, fill]);
   useEffect(() => setRepeatFailed(false), [item]);
+
+  /** Marked: this question, or the marked question it was drawn from. Unmarking removes both. */
+  const ownSig = useMemo(() => item ? questionSig(item.q) : null, [item]);
+  const isMarked = !!ownSig && (sigs.has(ownSig) || (!!item?.mark && sigs.has(item.mark)));
+  const toggleMark = useCallback(() => {
+    if (!item || !type || !ownSig || marks === null) return;
+    if (isMarked) { for (const s of [ownSig, item.mark]) if (s && sigs.has(s)) unmark(s); }
+    else mark(item.q, type);
+  }, [item, type, ownSig, marks, isMarked, sigs, mark, unmark]);
   useEffect(() => { setFocusTopic(type?.topic ?? null); }, [type, setFocusTopic]);
   useEffect(() => () => setFocusTopic(null), [setFocusTopic]);
 
@@ -204,6 +238,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
         return;
       }
       if (graded && e.key.toLowerCase() === 'r') { e.preventDefault(); repeat(); return; }
+      if (e.key.toLowerCase() === 'm') { e.preventDefault(); toggleMark(); return; }
       if (set && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); jump(set.pos + (e.key === 'ArrowLeft' ? -1 : 1)); return; }
       if (!item || graded) return;
       const single = item.q.parts.length === 1 && item.q.parts[0].type === 'mc' ? item.q.parts[0] : null;
@@ -214,7 +249,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [set, item, graded, check, advance, repeat, jump, setAnswers]);
+  }, [set, item, graded, check, advance, repeat, jump, setAnswers, toggleMark]);
 
   const theory = type ? mod.theory.find(p => p.types.includes(type.key)) : undefined;
   const st = type ? stats[type.key] : undefined;
@@ -227,16 +262,18 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
     return (
       <div className="page">
         <div className="endbox panel">
-          {mode.kind === 'ps'
+          {mode.kind === 'marked'
+              ? <><h2>No marked questions{mode.topic ? ` in lecture ${mode.topic}` : ''}</h2><p>While you practise, mark a question with <b>Mark</b> above it or the <kbd>M</kbd> key. It shows up here, and you can practise exactly these questions again with new numbers.</p></>
+              : mode.kind === 'ps'
               ? <><h2>No question types selected</h2><p>Turn on at least one type on the <Link href={`/s/${mod.slug}/ps`}>problem sets page</Link>.</p></>
               : <><h2>No question types selected</h2><p>Turn on at least one type under <Link href={`/s/${mod.slug}?pick=1`}>Choose question types</Link>.</p></>}
-          {saveErr && <p className="err">{saveErr}</p>}
+          {(saveErr || markErr) && <p className="err">{saveErr || markErr}</p>}
         </div>
       </div>
     );
   }
 
-  const cycleInfo = mode.kind === 'cycle' && bag.current ? { pos: bag.current.pos, size: bag.current.size, round: bag.current.round } : null;
+  const cycleInfo = (mode.kind === 'cycle' || mode.kind === 'marked') && bag.current ? { pos: bag.current.pos, size: bag.current.size, round: bag.current.round } : null;
   const cur = set!;
   const newest = cur.pos === cur.items.length - 1;
   // The cycle counts its round; when looking back, the header counts the questions kept in memory instead.
@@ -256,7 +293,13 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             {cycleInfo && !newest ? 'Earlier question' : `Question ${progress.pos} of ${progress.size}`}
             <small>{type.name}</small>
           </div>
-          <div>{tally.a ? <>Correct: <b>{tally.c}</b> of {tally.a}</> : `${unitName} ${type.topic}`}</div>
+          <div className="metar">
+            <span>{tally.a ? <>Correct: <b>{tally.c}</b> of {tally.a}</> : `${unitName} ${type.topic}`}</span>
+            <button type="button" className={'act markq' + (isMarked ? ' on' : '')} onClick={toggleMark} aria-pressed={isMarked} disabled={marks === null}
+              title={isMarked ? 'Remove from your marked questions (M)' : 'Mark to practise this question again later with new numbers (M)'}>
+              <Icon name="flag" size={16} filled={isMarked} />{isMarked ? 'Marked' : 'Mark'}
+            </button>
+          </div>
         </div>
         <nav className="qnav" aria-label="Questions in this set">
           {nav.map((st, i) => (
@@ -282,7 +325,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
           </button>
         </div>
         <p className="note answernote">{mod.answerNote} Answers within {Math.round(mod.tolerance * 100)}% of the solution count as correct.</p>
-        {saveErr && <p className="err">{saveErr}</p>}
+        {(saveErr || markErr) && <p className="err">{saveErr || markErr}</p>}
       </div>
       <aside className="rail">
         <div className="block">
@@ -298,7 +341,7 @@ export default function Runner({ mode }: { mode: RunnerMode }) {
             <dt>{unitName}</dt><dd>{type.topic}</dd>
           </dl>
           {theory && <Link className="raillink" href={`/s/${mod.slug}/theory/${theory.slug}`}>{theory.title}</Link>}
-          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>←</kbd> <kbd>→</kbd> earlier questions</span><span><kbd>Alt</kbd> <kbd>C</kbd> cheatsheet</span></p>
+          <p className="keys"><span><kbd>Enter</kbd> check, then next</span><span><kbd>a</kbd>–<kbd>e</kbd> or <kbd>t</kbd> <kbd>f</kbd> choose</span><span><kbd>R</kbd> same question, new numbers</span><span><kbd>M</kbd> mark the question</span><span><kbd>←</kbd> <kbd>→</kbd> earlier questions</span><span><Keys k="alt+C" /> cheatsheet</span><span><Keys k="alt+N" /> notes</span><Link href="/settings/help">All shortcuts</Link></p>
         </div>
       </aside>
     </div>
