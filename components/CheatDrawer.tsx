@@ -11,12 +11,11 @@ import Rich from './Rich';
 import { useSubject } from './SubjectContext';
 
 /** Top-bar button (or Alt+C, which stays clear of the a–d answer keys) that slides in your cheatsheet with search and a quick "new entry" (filed under the lecture of the question on screen); on every subject page but the cheatsheet itself. */
-export default function CheatDrawer() {
+export default function CheatDrawer({ open, setOpen }: { open: boolean; setOpen: (o: boolean) => void }) {
   const { mod, focusTopic } = useSubject();
   const path = usePathname();
   const base = '/s/' + mod.slug;
   const active = !path.startsWith(base + '/cheatsheet');
-  const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
@@ -47,16 +46,16 @@ export default function CheatDrawer() {
       if (t && (['TEXTAREA', 'MATH-FIELD'].includes(t.tagName) || t.isContentEditable)) return;
       if (e.key === 'Escape' && open && !adding) setOpen(false);
       // Works from an answer box too; e.code, because Alt+C types another character on a Mac.
-      if (e.code === 'KeyC' && e.altKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setOpen(o => !o); }
+      if (e.code === 'KeyC' && e.altKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setOpen(!open); }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [active, open, adding]);
+  }, [active, open, adding, setOpen]);
 
   if (!active) return null;
   return (
     <>
-      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(o => !o)} aria-expanded={open} title="Your cheatsheet (Alt+C)">
+      <button type="button" className={'iconbtn cheatbtn' + (open ? ' on' : '')} onClick={() => setOpen(!open)} aria-expanded={open} title="Your cheatsheet (Alt+C)">
         <Icon name="sheet" size={18} />Cheatsheet
       </button>
       {/* In a portal: the top bar's backdrop filter would otherwise become the drawer's containing block. */}
