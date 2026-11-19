@@ -4,6 +4,7 @@ import { C, N, Q, calc, chance, p_, pick, rint, roundTo, rstep, table, tn, tq, w
 import { shortAnswer } from '@/lib/engine/mc';
 import type { Part, Question } from '@/lib/engine/types';
 import { BANK } from './concepts';
+import { L2_diagram, L2_points } from './diagram';
 import * as G from './generators';
 import { CONT, bs, bsSteps, e2, f2, f4 } from './generators';
 
@@ -158,6 +159,8 @@ export const PROBLEM_SETS: { id: string; title: string; topic: string; types: { 
     T('PS2.ex4', 'Portfolio of long and short options: value and payoff (ex. 4C–E)', retag('PS2.ex4', G.L2_portfolio)),
     T('PS2.strategy', 'Spreads, strangles and butterflies', retag('PS2.strategy', G.L2_strategy), false),
     T('PS2.identify', 'Name the strategy', retag('PS2.identify', G.L2_identify), false),
+    T('PS2.diagram', 'Read the payoff diagram: strike, costs, break-even', retag('PS2.diagram', L2_diagram), false),
+    T('PS2.points', 'Points of the payoff diagram without a plot', retag('PS2.points', L2_points), false),
     T('PS2.short', 'Short answers', short('PS2.short', '2'), false),
   ] },
   { id: '3', topic: '3', title: 'Binomial trees (exercises 3A–E, 5C–D)', types: [

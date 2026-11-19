@@ -150,6 +150,89 @@ A strangle: a bet on high volatility, cheaper than a straddle.
 - Mixing up straddle (same strike) and strangle (different strikes).
 `,
 
+  'L2.diagram': ex`
+@task
+A net payoff diagram of an option position with letters on the axes. Either you say which letter marks the strike, the break-even, the cost (premium carried to maturity) or the largest gain or loss, and which position it is, or you are given the legs and premiums and compute the value behind each letter.
+
+@idea
+The net payoff at maturity is the payoff plus the initial cash flow carried forward, $CF_0 e^{rT}$. Plotted against the share price at maturity $S_T$ (the horizontal axis; today's $S_0$ only enters through the premiums), it is a broken line:
+
+- It **bends only at strikes**: there an option starts or stops paying.
+- Where every option expires worthless the payoff is 0, so the line sits at the **premium carried to maturity**: below the axis if you paid, above it if you received.
+- A **break-even** is where the line crosses the horizontal axis.
+- Flat parts and peaks give the **largest gain or loss**; a part that keeps sloping means the gain or loss is unlimited.
+
+| Position | Flat part | Break-even |
+|---|---|---|
+| Long call | $-c \, e^{rT}$ below $X$ | $X + c \, e^{rT}$ |
+| Short call | $+c \, e^{rT}$ below $X$ | $X + c \, e^{rT}$ |
+| Long put | $-p \, e^{rT}$ above $X$ | $X - p \, e^{rT}$ |
+| Short put | $+p \, e^{rT}$ above $X$ | $X - p \, e^{rT}$ |
+
+@steps
+1. Read the axes: horizontal $S_T$, vertical net payoff.
+2. Points under a bend of the line are strikes; points where the line crosses the horizontal axis are break-evens.
+3. Points on the vertical axis mark heights: the flat part where all options expire worthless is the premium carried to maturity; the top and bottom levels are the largest gain and loss.
+4. Name the shape (rising to the right: long call, bull spread; V: straddle; flat bottom between two bends: strangle; peak in the middle: butterfly …).
+5. With numbers: $CF_0 e^{rT}$ for the flat part, then solve for the zero crossing on the sloped piece.
+
+@example
+Long call with strike €50 and premium €3.00, 3 months, $r = 4\%$. The diagram marks A under the bend, B where the line crosses the horizontal axis and C on the vertical axis at the height of the flat part.
+
+@solution
+1. A sits under the only bend, so A is the strike: €50.
+2. C is the flat part where the call expires worthless: $-3.00 \times e^{0.04 \times 0.25} = -3.00 \times 1.0101 = -3.03$, the cost carried to maturity.
+3. B is the break-even: $S_T - 50 - 3.03 = 0 \Rightarrow S_T = 53.03$.
+4. Flat on the left, rising without limit on the right: a long call.
+
+@answer
+A = strike €50, B = break-even €53.03, C = cost carried to maturity −€3.03.
+
+@pitfalls
+- Taking a point on the horizontal axis for a cost: costs and gains are heights, read on the vertical axis.
+- Using the premium paid today as the flat part; the diagram carries it to maturity with $e^{rT}$.
+- Looking for today's share price in the diagram: the horizontal axis is the price at maturity.
+- Bull and bear spreads look the same with calls or puts; only the premiums tell them apart.
+`,
+
+  'L2.points': ex`
+@task
+The key points of a net payoff diagram without the plot. Either a position with premiums is given and you find the height of the flat part, where the line meets the vertical axis, its slope, the break-evens and the extremes; or a single option's diagram is described (flat part, kink, crossing) and you work back to the strike and the premium.
+
+@idea
+The net payoff is a straight line between strikes:
+
+- Height where all options expire worthless: $CF_0 e^{rT}$.
+- At $S_T = 0$: put payoffs $X$ per long put, calls pay nothing, plus $CF_0 e^{rT}$.
+- Slope above the highest strike: $+1$ per long call, $-1$ per short call. Below the lowest strike: $-1$ per long put, $+1$ per short put.
+- For a single option the gap between break-even and strike is the premium carried to maturity, $|BE - X| = c \, e^{rT}$ (or $p \, e^{rT}$).
+
+@steps
+1. $CF_0 = -$premiums bought $+$ premiums sold; carried: $CF_0 e^{rT}$.
+2. Heights: add the leg payoffs at that share price to $CF_0 e^{rT}$.
+3. Slopes: count the options in the money on that side.
+4. Break-even: set the line on the piece with the sign change to zero.
+5. Backwards for one option: premium at maturity $= |BE - X|$, strike $= BE \mp$ that amount, premium today $=$ amount $\times e^{-rT}$.
+
+@example
+The net payoff diagram of a long put is flat at −€3.05 for share prices above the strike and crosses the horizontal axis at €46.95. The put matures in 6 months; $r = 5\%$.
+
+@solution
+1. Above the strike the put expires worthless, so the flat part is the premium carried to maturity: $p \, e^{rT} = 3.05$.
+2. A put's line reaches zero below the strike: $BE = X - 3.05$, so $X = 46.95 + 3.05 = 50.00$.
+3. Premium today: $3.05 \times e^{-0.05 \times 0.5} = 3.05 \times 0.9753 = 2.97$.
+4. At $S_T = 40$: $\max(50 - 40, 0) - 3.05 = 6.95$.
+
+@answer
+Strike €50.00, premium today €2.97; net payoff €6.95 at a share price of €40.
+
+@pitfalls
+- Mixing the premium today with the premium carried to maturity (the gap in the diagram).
+- Wrong side: a call's flat part is below the strike, a put's above it.
+- Forgetting that a short option's flat part is positive (premium received) and its loss is on the sloped side.
+- Slope sign for puts: a long put loses value as $S_T$ rises, slope $-1$.
+`,
+
   'L2.concept': ex`
 @task
 Concept questions on option trading strategies: true/false, find the false (or true) statement, or the best short answer.

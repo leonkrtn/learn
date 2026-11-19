@@ -317,9 +317,9 @@ export const STRATS: Strat[] = [
 ];
 
 export const payoff = (legs: Leg[], s: number) => legs.reduce((t, l) => t + l.q * Math.max(l.k === 'c' ? s - l.X : l.X - s, 0), 0);
-const legPay = (l: Leg, s: number) => l.q * Math.max(l.k === 'c' ? s - l.X : l.X - s, 0);
+export const legPay = (l: Leg, s: number) => l.q * Math.max(l.k === 'c' ? s - l.X : l.X - s, 0);
 /** One leg's payoff at the share price s as a formula: quantity × max(…, 0) = value. */
-const legStr = (l: Leg, s: number) => `${tq(l.q, 0)} \\times \\max(${l.k === 'c' ? `${tn(s)} - ${tn(l.X)}` : `${tn(l.X)} - ${tn(s)}`}, 0) = ${tn(legPay(l, s))}`;
+export const legStr = (l: Leg, s: number) => `${tq(l.q, 0)} \\times \\max(${l.k === 'c' ? `${tn(s)} - ${tn(l.X)}` : `${tn(l.X)} - ${tn(s)}`}, 0) = ${tn(legPay(l, s))}`;
 export const legText = (l: Leg) => `${l.q > 0 ? 'buy' : 'sell'} ${Math.abs(l.q)} ${l.k === 'c' ? 'call' : 'put'}${Math.abs(l.q) > 1 ? 's' : ''} with strike ${f2(l.X)}`;
 
 /** Zeros of a piecewise linear payoff with kinks at the strikes. */
@@ -335,9 +335,9 @@ export function breakevens(f: (s: number) => number, kinks: number[], hi: number
   return out;
 }
 
-export function stratDraw(si?: number) {
+export function stratDraw(si?: number, stIn?: Strat) {
   for (;;) {
-    const st = STRATS[si ?? rint(0, STRATS.length - 1)], S = rstep(20, 120, 1), g = S >= 60 ? 5 : S >= 30 ? 2.5 : 1;
+    const st = stIn ?? STRATS[si ?? rint(0, STRATS.length - 1)], S = rstep(20, 120, 1), g = S >= 60 ? 5 : S >= 30 ? 2.5 : 1;
     const h = g * rint(1, 3), mid = roundTo(S * rstep(0.95, 1.05, 0.01), g);
     const xs = st.n === 1 ? [mid] : st.n === 2 ? [mid - h, mid + h] : [mid - h, mid, mid + h];
     if (xs[0] <= 0) continue;
