@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
-import CheatDrawer from '@/components/CheatDrawer';
+import Drawers from '@/components/Drawers';
 import { SubjectProvider } from '@/components/SubjectContext';
 import Sidebar from '@/components/Sidebar';
 import SyncNotice from '@/components/SyncNotice';
@@ -21,7 +21,7 @@ export default async function SubjectLayout({ children, params }: { children: Re
         <div className="shell">
           <Sidebar />
           <div className="content">
-            <TopBar email={user.email || ''} crumbs={[{ href: '/', label: data.trimesterName || 'Subjects' }, { label: mod.name }]} actions={<CheatDrawer />} />
+            <TopBar email={user.email || ''} crumbs={[{ href: '/', label: data.trimesterName || 'Subjects' }, { label: mod.name }]} actions={<Drawers />} />
             <main className="main">
               {data.error && <p className="err" style={{ marginTop: 24 }}>The database is not set up yet ({data.error.message}). Run supabase/setup.sql in the Supabase SQL editor.</p>}
               <SyncNotice />

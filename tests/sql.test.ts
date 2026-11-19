@@ -199,3 +199,14 @@ test('display preferences belong to their user', async () => {
   assert.equal((await as(db, U2, () => db.query('select * from public.user_prefs'))).rows.length, 0);
   await assert.rejects(as(db, U2, () => db.query(`insert into public.user_prefs (user_id, prefs) values ('${U1}', '{}')`)));
 });
+
+test('study notes are private to their owner', async () => {
+  const db = await boot();
+  await as(db, U1, () => db.query("insert into public.study_notes (subject_slug, topic, body) values ('fvcs', '2', 'Look at MM II again')"));
+  await assert.rejects(as(db, U1, () => db.query("insert into public.study_notes (subject_slug, body) values ('fvcs', '')")), 'empty notes are refused');
+  await assert.rejects(as(db, U2, () => db.query(`insert into public.study_notes (user_id, subject_slug, body) values ('${U1}', 'fvcs', 'x')`)));
+  assert.equal((await as(db, U2, () => db.query('select * from public.study_notes'))).rows.length, 0);
+  await as(db, U2, () => db.query('update public.study_notes set done = true'));
+  const mine = await as(db, U1, () => db.query<{ done: boolean }>('select done from public.study_notes'));
+  assert.deepEqual(mine.rows.map(r => r.done), [false], 'others cannot change them');
+});
