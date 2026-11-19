@@ -1047,8 +1047,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .keygroup dd { margin: 0; color: var(--ink-2); font-size: calc(14.5px * var(--fs)); }
 
 /* ---------- marked questions ---------- */
-.metar { display: flex; align-items: baseline; gap: 14px; }
-.act.markq { min-width: 6.4rem; justify-content: center; align-self: center; }
+/* Same text size as the row and centred on it; the flag keeps the width of "Marked", flush right, so toggling moves nothing. */
+.metar { display: flex; align-items: center; gap: 6px; }
+.act.markq { min-width: 6.4em; justify-content: flex-end; margin: -4px 0; font-size: inherit; }
 .act.markq.on { color: var(--accent-ink); background: var(--accent-soft); }
 .markgroup { padding: 14px 20px 6px; margin-bottom: 16px; }
 .markrow { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule); }
